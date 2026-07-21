@@ -66,7 +66,7 @@ export function Terminal() {
       const input = process.input.getWriter()
       
       let commandInjected = false
-      onDataDisposable = xtermRef.current?.onData((data) => {
+      onDataDisposable = xtermRef.current?.onData((data: string) => {
         input.write(data)
       })
 
