@@ -113,6 +113,9 @@ function patchForWebContainer(files: Record<string, string>): Record<string, str
   // 4. Force omit=optional via .npmrc to prevent downloading huge SWC native binaries in WebContainers
   patched['/.npmrc'] = 'omit=optional\n'
 
+  // 5. Fallback to Babel to bypass the SWC WASM loading error entirely
+  patched['/.babelrc'] = '{\n  "presets": ["next/babel"]\n}'
+
   return patched
 }
 
