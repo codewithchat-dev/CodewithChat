@@ -7,32 +7,27 @@ const footerNav = [
   {
     title: 'Product',
     links: [
-      { label: 'Project Builder', href: '/dashboard/project-builder' },
-      { label: 'System Design Mentor', href: '/dashboard/system-design' },
-      { label: 'Build Steps', href: '/dashboard/build-steps' },
-      { label: 'Tools Library', href: '/dashboard/tools' },
-    ],
-  },
-  {
-    title: 'Resources',
-    links: [
-      { label: 'Dashboard', href: '/dashboard' },
-      { label: 'Documentation', href: '#' },
-      { label: 'Changelog', href: '#' },
-      { label: 'Support', href: '#' },
+      { label: 'Home', href: '/' },
+      { label: 'Pricing', href: '/pricing' },
     ],
   },
   {
     title: 'Company',
     links: [
-      { label: 'About', href: '#' },
-      { label: 'Blog', href: '#' },
-      { label: 'Privacy', href: '#' },
-      { label: 'Terms', href: '#' },
+      { label: 'AI Policy', href: '/ai-policy' },
+      { label: 'Privacy Policy', href: '/privacy' },
+      { label: 'Terms of Service', href: '/terms' },
     ],
   },
   {
-    title: 'Community',
+    title: 'Resources',
+    links: [
+      { label: 'Documentation', href: '/docs' },
+      { label: 'FAQs', href: '/faqs' },
+    ],
+  },
+  {
+    title: 'Social',
     links: [
       { label: 'Twitter / X', href: 'https://x.com/codewithchat' },
       { label: 'LinkedIn', href: 'https://www.linkedin.com/company/codewithchat' },
