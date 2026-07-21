@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SiteLogo } from '@/components/site-logo'
+import { AsciiBackground } from './ascii-background'
 
 const footerNav = [
   {
@@ -40,9 +41,11 @@ const footerNav = [
 
 export function SiteFooter() {
   return (
-    <footer>
-      <section className="border-b border-border">
-        <div className="mx-auto flex w-full max-w-6xl flex-col items-start justify-between gap-6 px-6 py-16 md:flex-row md:items-center">
+    <footer className="relative overflow-hidden bg-background">
+      <AsciiBackground />
+      <div className="relative z-10">
+        <section className="border-b border-border">
+          <div className="mx-auto flex w-full max-w-6xl flex-col items-start justify-between gap-6 px-6 py-16 md:flex-row md:items-center">
           <div className="max-w-xl">
             <h2 className="text-balance text-2xl font-semibold tracking-tight md:text-3xl">
               Ready to build your first real SaaS?
@@ -91,6 +94,7 @@ export function SiteFooter() {
           <p>© {new Date().getFullYear()} CodewithChat AI Studio. All rights reserved.</p>
           <p>Built for developers, by developers.</p>
         </div>
+      </div>
       </div>
     </footer>
   )
