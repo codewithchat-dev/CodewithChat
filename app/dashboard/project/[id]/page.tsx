@@ -274,21 +274,25 @@ export default function ProjectPage() {
     }
   }
 
-  async function handleSendChat() {
+  async function handleSendChat(attachedImage?: string | null) {
     if (!idea.trim()) return
     const trimmed = chatInput.trim()
-    if (isTrivialMessage(trimmed)) {
+    if (isTrivialMessage(trimmed) && !attachedImage) {
       toast.error('Please ask a question or describe a real change (not just ".").')
       return
     }
 
-    const userMsg = { role: 'user', content: trimmed }
+    const finalMessage = attachedImage 
+      ? (trimmed ? `${trimmed}\n\n[IMAGE: ${attachedImage}]` : `[IMAGE: ${attachedImage}]`) 
+      : trimmed
+
+    const userMsg = { role: 'user', content: finalMessage }
     const nextMessages = [...messages, userMsg]
     setMessages(nextMessages)
     setChatInput('')
 
-    if (!shouldRegenerateCode(trimmed)) {
-      await handleChatOnly(trimmed, nextMessages)
+    if (!shouldRegenerateCode(trimmed) && !attachedImage) {
+      await handleChatOnly(finalMessage, nextMessages)
       return
     }
 

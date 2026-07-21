@@ -14,6 +14,8 @@ import {
   Lock,
   ChevronDown,
   Zap,
+  X,
+  Image as ImageIcon
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -32,7 +34,7 @@ import { Spinner } from '@/components/ui/spinner'
 interface PromptComposerProps {
   value: string
   onChange: (value: string) => void
-  onSubmit: () => void
+  onSubmit: (attachedImage?: string | null) => void
   loading?: boolean
   disabled?: boolean
   credits?: number
@@ -74,6 +76,7 @@ export function PromptComposer({
   allowInputWhenExhausted = false,
 }: PromptComposerProps) {
   const [isListening, setIsListening] = useState(false)
+  const [attachedImage, setAttachedImage] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const recognitionRef = useRef<{ start: () => void; stop: () => void } | null>(null)
 
@@ -144,7 +147,41 @@ export function PromptComposer({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      if (!inputDisabled && value.trim()) onSubmit()
+      if (!inputDisabled && (value.trim() || attachedImage)) {
+        onSubmit(attachedImage)
+        setAttachedImage(null) // clear image after submit
+      }
+    }
+  }
+
+  const handleSubmitClick = () => {
+    onSubmit(attachedImage)
+    setAttachedImage(null)
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file.')
+      return
+    }
+    
+    // Check size (max 4MB)
+    if (file.size > 4 * 1024 * 1024) {
+      toast.error('Image is too large. Max size is 4MB.')
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      setAttachedImage(e.target?.result as string)
+    }
+    reader.readAsDataURL(file)
+    
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
     }
   }
 
@@ -190,6 +227,22 @@ export function PromptComposer({
           </div>
         )}
 
+        {/* Image Preview Area */}
+        {attachedImage && (
+          <div className="px-4 pt-4 flex gap-2">
+            <div className="relative inline-block group/img">
+              <img src={attachedImage} alt="Attached preview" className="h-16 w-16 object-cover rounded-md border border-border/50 shadow-sm" />
+              <button
+                type="button"
+                onClick={() => setAttachedImage(null)}
+                className="absolute -top-2 -right-2 bg-background border border-border text-muted-foreground hover:text-foreground rounded-full p-1 shadow-sm opacity-0 group-hover/img:opacity-100 transition-opacity"
+              >
+                <X className="size-3" />
+              </button>
+            </div>
+          </div>
+        )}
+
         <Textarea
           value={value}
           onChange={e => onChange(e.target.value)}
@@ -202,12 +255,12 @@ export function PromptComposer({
                 ? 'Ask a question (code updates need credits)…'
                 : placeholder
           }
-          className={`${compact ? 'min-h-[88px]' : 'min-h-[120px]'} resize-none border-0 bg-transparent px-4 py-4 text-sm focus-visible:ring-0 placeholder:text-muted-foreground/60 shadow-none disabled:opacity-60`}
+          className={`${compact ? (attachedImage ? 'min-h-[40px]' : 'min-h-[88px]') : (attachedImage ? 'min-h-[60px]' : 'min-h-[120px]')} resize-none border-0 bg-transparent px-4 py-4 text-sm focus-visible:ring-0 placeholder:text-muted-foreground/60 shadow-none disabled:opacity-60`}
         />
 
         <div className="flex items-center justify-between px-3 pb-3 gap-2">
           <div className="flex items-center gap-1 min-w-0 flex-wrap">
-            <input type="file" className="hidden" ref={fileInputRef} />
+            <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleFileChange} />
             <Button
               type="button"
               variant="ghost"
@@ -215,7 +268,7 @@ export function PromptComposer({
               disabled={inputDisabled}
               onClick={() => fileInputRef.current?.click()}
               className="rounded-full size-9 text-muted-foreground hover:text-foreground"
-              title="Attach file"
+              title="Attach image"
             >
               <Plus className="size-4" />
             </Button>
@@ -323,8 +376,8 @@ export function PromptComposer({
             <Button
               type="button"
               size="icon"
-              onClick={onSubmit}
-              disabled={inputDisabled || !value.trim()}
+              onClick={handleSubmitClick}
+              disabled={inputDisabled || (!value.trim() && !attachedImage)}
               className="rounded-full size-10 bg-primary/10 hover:bg-primary text-primary hover:text-primary-foreground shrink-0"
               title={submitHint || 'Send'}
             >

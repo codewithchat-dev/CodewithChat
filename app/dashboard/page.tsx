@@ -76,15 +76,17 @@ export default function DashboardPage() {
     return () => clearTimeout(timeout)
   }, [charIndex, isDeleting, phraseIndex])
 
-  const handleSubmit = async () => {
-    if (!idea.trim()) return
+  const handleSubmit = async (attachedImage?: string | null) => {
+    if (!idea.trim() && !attachedImage) return
     if (credits <= 0) {
       toast.error('Daily credits used up. Upgrade to start building.')
       return
     }
     const toastId = toast.loading('Initializing workspace...')
     try {
-      const res = await addProjectAction(idea, idea)
+      const finalIdea = attachedImage ? `${idea}\n\n[IMAGE: ${attachedImage}]` : idea;
+      
+      const res = await addProjectAction(finalIdea, finalIdea)
       if (res.success && res.data) {
         toast.success('Workspace created!', { id: toastId })
         router.push(`/dashboard/project/${res.data.id}?tech=${encodeURIComponent(tech)}&platform=${encodeURIComponent(platform)}&agent=${encodeURIComponent(agent)}`)

@@ -38,6 +38,24 @@ async function consumeGenerationCredit() {
   return { ok: true as const, credits: updated.credits }
 }
 
+function parseMessageContent(content: string) {
+  if (typeof content !== 'string' || !content.includes('[IMAGE: data:image/')) {
+    return content;
+  }
+  const startIndex = content.indexOf('[IMAGE: ');
+  const textPart = content.substring(0, startIndex).trim();
+  const imagePartWithBracket = content.substring(startIndex + 8);
+  const endIndex = imagePartWithBracket.indexOf(']');
+  const imagePartStr = imagePartWithBracket.substring(0, endIndex).trim();
+  
+  const base64Data = imagePartStr.includes(',') ? imagePartStr.split(',')[1] : imagePartStr;
+
+  return [
+    ...(textPart ? [{ type: 'text' as const, text: textPart }] : []),
+    { type: 'image' as const, image: base64Data }
+  ];
+}
+
 export async function POST(req: Request) {
   try {
     const { idea, tech, platform, messages = [], existingPlan } = await req.json()
@@ -99,7 +117,7 @@ OTHER RULES & STRICT STACK ENFORCEMENT:
 - If the user sends an UPDATE request (chat history below), MODIFY the existing project — do NOT start from scratch. Keep working files unless the user asks to remove them.
 - When updating: merge changes into fullStackFiles. Fix imports, add missing files, preserve what still works.`,
       messages: [
-        { role: 'user', content: `Idea: ${idea}\nPlatform: ${platform}\n[CRITICAL INSTRUCTION]: I might have selected "${tech}" as my preferred stack, but you MUST IGNORE THIS. Strictly use the Next.js + Supabase stack for fullStackFiles as instructed in the system prompt.` },
+        { role: 'user', content: parseMessageContent(`Idea: ${idea}\nPlatform: ${platform}\n[CRITICAL INSTRUCTION]: I might have selected "${tech}" as my preferred stack, but you MUST IGNORE THIS. Strictly use the Next.js + Supabase stack for fullStackFiles as instructed in the system prompt.`) },
         ...(existingPlan
           ? [{
               role: 'user' as const,
@@ -108,7 +126,7 @@ OTHER RULES & STRICT STACK ENFORCEMENT:
           : []),
         ...messages.map((m: { role: string; content: string }) => ({
           role: m.role === 'assistant' ? ('assistant' as const) : ('user' as const),
-          content: m.content,
+          content: parseMessageContent(m.content),
         })),
       ],
       schema: planSchema

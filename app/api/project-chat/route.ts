@@ -3,11 +3,29 @@ import { generateText } from 'ai'
 
 export const maxDuration = 60
 
+function parseMessageContent(content: string) {
+  if (typeof content !== 'string' || !content.includes('[IMAGE: data:image/')) {
+    return content;
+  }
+  const startIndex = content.indexOf('[IMAGE: ');
+  const textPart = content.substring(0, startIndex).trim();
+  const imagePartWithBracket = content.substring(startIndex + 8);
+  const endIndex = imagePartWithBracket.indexOf(']');
+  const imagePartStr = imagePartWithBracket.substring(0, endIndex).trim();
+  
+  const base64Data = imagePartStr.includes(',') ? imagePartStr.split(',')[1] : imagePartStr;
+
+  return [
+    ...(textPart ? [{ type: 'text' as const, text: textPart }] : []),
+    { type: 'image' as const, image: base64Data }
+  ];
+}
+
 export async function POST(req: Request) {
   try {
     const { message, idea, tech, platform, messages = [] } = await req.json()
 
-    if (!message?.trim()) {
+    if (!message?.trim() && !message?.includes('[IMAGE:')) {
       return new Response(JSON.stringify({ error: 'Missing message' }), { status: 400 })
     }
 
@@ -15,7 +33,7 @@ export async function POST(req: Request) {
       .slice(-8)
       .map((m: { role: string; content: string }) => ({
         role: m.role === 'assistant' ? ('assistant' as const) : ('user' as const),
-        content: m.content,
+        content: parseMessageContent(m.content),
       }))
 
     const { text } = await generateText({
@@ -34,7 +52,7 @@ Your job is to ANSWER QUESTIONS and give guidance — do NOT dump full project c
 - End with one clear next step like: "Say 'Add Supabase auth' when you want me to update the code."`,
       messages: [
         ...history,
-        { role: 'user', content: message },
+        { role: 'user', content: parseMessageContent(message) },
       ],
     })
 
