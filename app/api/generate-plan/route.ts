@@ -84,7 +84,7 @@ LEAVE \`previewFiles\` EMPTY. We no longer use it.
 CRITICAL RULES FOR fullStackFiles (NEXT.JS + SUPABASE PRODUCTION STACK):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 The \`fullStackFiles\` array is what the user will download and deploy to Vercel. It MUST be a complete, working Next.js App Router project.
-✅ STACK: Next.js (App Router), TypeScript, TailwindCSS, Supabase (for Auth & DB), Vercel AI SDK (if AI is needed).
+✅ STACK: Next.js (App Router), TypeScript, TailwindCSS, Supabase (for Auth & DB), Vercel AI SDK (if AI is needed, use "ai" and "@ai-sdk/react" in dependencies. NEVER use "@vercel/ai" as it does not exist).
 ✅ REQUIRED FILES: You must generate all essential files including:
    - \`/package.json\` (CRITICAL: Must use "next": "14.2.3" and "@next/swc-wasm-nodejs": "14.2.3" in dependencies. Set dev script to "NEXT_SWC_WASM_ENABLE=1 next dev".)
    - \`/tsconfig.json\` (MUST be valid JSON — NO trailing commas, NO comments. Use moduleResolution "bundler".)
