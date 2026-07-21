@@ -25,7 +25,7 @@ const TEMPLATES = [
   {
     title: 'Portfolio Website',
     description: 'A professional developer portfolio with projects and contact form.',
-    image: 'https://images.unsplash.com/photo-1507238692062-7e1efcd92e07?auto=format&fit=crop&w=600&q=80',
+    image: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=600&q=80',
     prompt: 'Build a minimalist software developer portfolio website. Include a hero section with a profile picture and bio, a "Projects" section with 3 project cards (image, description, tech stack tags), and a "Contact Me" section with a functional-looking form.'
   },
   {
@@ -37,7 +37,7 @@ const TEMPLATES = [
   {
     title: 'Financial Tracker',
     description: 'A personal finance app for tracking expenses and budgets.',
-    image: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?auto=format&fit=crop&w=600&q=80',
+    image: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=600&q=80',
     prompt: 'Create a personal finance tracking dashboard. Include summary cards for Total Balance, Monthly Income, and Monthly Expenses. Add a visual budget breakdown using a pie chart, and a list of recent transactions with positive (green) and negative (red) amounts.'
   }
 ]
