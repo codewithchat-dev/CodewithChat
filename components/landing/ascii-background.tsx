@@ -47,8 +47,8 @@ export function AsciiBackground() {
   }, [])
 
   return (
-    <div className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden opacity-[0.03] select-none">
-      <pre className="font-mono text-[8px] sm:text-[10px] md:text-[14px] lg:text-[18px] font-bold text-foreground leading-none tracking-tighter whitespace-pre text-center">
+    <div className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden opacity-[0.08] select-none">
+      <pre className="font-mono text-[10px] sm:text-[14px] md:text-[20px] lg:text-[28px] font-bold text-foreground leading-none tracking-tighter whitespace-pre text-center">
         {ascii.join("\n")}
       </pre>
     </div>

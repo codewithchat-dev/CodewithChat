@@ -64,31 +64,33 @@ export function SiteFooter() {
       </section>
 
       <div className="mx-auto w-full max-w-6xl px-6 py-12">
-        <div className="grid gap-10 md:grid-cols-[1.5fr_1fr_1fr_1fr_1fr]">
-          <div>
+        <div className="flex flex-col gap-10 md:flex-row md:justify-between">
+          <div className="max-w-xs">
             <SiteLogo />
-            <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted-foreground">
+            <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
               An AI software engineering mentor that helps beginners build real,
               production-grade SaaS applications.
             </p>
           </div>
-          {footerNav.map((col) => (
-            <div key={col.title}>
-              <h3 className="text-sm font-medium">{col.title}</h3>
-              <ul className="mt-4 space-y-3">
-                {col.links.map((link) => (
-                  <li key={link.label}>
-                    <Link
-                      href={link.href}
-                      className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+          <div className="grid grid-cols-2 gap-8 sm:grid-cols-4 md:gap-10 lg:gap-12">
+            {footerNav.map((col) => (
+              <div key={col.title}>
+                <h3 className="text-sm font-medium">{col.title}</h3>
+                <ul className="mt-4 space-y-3">
+                  {col.links.map((link) => (
+                    <li key={link.label}>
+                      <Link
+                        href={link.href}
+                        className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        {link.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
         </div>
         <div className="mt-12 flex flex-col items-start justify-between gap-3 border-t border-border pt-6 text-sm text-muted-foreground sm:flex-row sm:items-center">
           <p>© {new Date().getFullYear()} CodewithChat AI Studio. All rights reserved.</p>
