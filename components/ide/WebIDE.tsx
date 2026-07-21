@@ -110,6 +110,9 @@ function patchForWebContainer(files: Record<string, string>): Record<string, str
     }
   }
 
+  // 4. Force omit=optional via .npmrc to prevent downloading huge SWC native binaries in WebContainers
+  patched['/.npmrc'] = 'omit=optional\n'
+
   return patched
 }
 
