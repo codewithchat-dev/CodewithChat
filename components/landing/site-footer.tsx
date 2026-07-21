@@ -31,6 +31,16 @@ const footerNav = [
       { label: 'Terms', href: '#' },
     ],
   },
+  {
+    title: 'Community',
+    links: [
+      { label: 'Twitter / X', href: 'https://x.com/codewithchat' },
+      { label: 'LinkedIn', href: 'https://www.linkedin.com/company/codewithchat' },
+      { label: 'YouTube', href: 'https://www.youtube.com/@codewithchat' },
+      { label: 'Discord', href: 'https://discord.com/invite/x9UNvGyXzf' },
+      { label: 'Instagram', href: 'https://www.instagram.com/codewithchat/#' },
+    ],
+  },
 ]
 
 export function SiteFooter() {
@@ -56,7 +66,7 @@ export function SiteFooter() {
       </section>
 
       <div className="mx-auto w-full max-w-6xl px-6 py-12">
-        <div className="grid gap-10 md:grid-cols-[1.5fr_1fr_1fr_1fr]">
+        <div className="grid gap-10 md:grid-cols-[1.5fr_1fr_1fr_1fr_1fr]">
           <div>
             <SiteLogo />
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted-foreground">
