@@ -12,6 +12,8 @@ const navLinks = [
   { label: 'Features', href: '#features' },
   { label: 'How it works', href: '#how-it-works' },
   { label: 'Testimonials', href: '#testimonials' },
+  { label: 'Pricing', href: '/pricing' },
+  { label: 'Enterprise', href: '/enterprise' },
 ]
 
 export function SiteHeader() {

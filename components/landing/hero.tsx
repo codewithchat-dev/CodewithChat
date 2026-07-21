@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useAuth, useClerk } from '@clerk/nextjs'
 import { toast } from 'sonner'
 import { AnimatedBackground } from '@/components/landing/animated-background'
+import { HeroPreview } from '@/components/landing/hero-preview'
 
 const PLACEHOLDER_PHRASES = [
   "Ask CodewithChat to build a SaaS dashboard...",
@@ -218,6 +219,24 @@ export function Hero() {
               </div>
             </div>
           </form>
+          
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-2 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300 fill-mode-both">
+            {["Build a SaaS dashboard", "Create an e-commerce store", "Make a portfolio website", "Build a healthcare scheduling app"].map((suggestion, i) => (
+              <button
+                key={suggestion}
+                type="button"
+                onClick={() => setIdea(suggestion)}
+                className="rounded-full border border-border/40 bg-background/50 px-4 py-1.5 text-xs text-muted-foreground transition-all hover:bg-muted hover:text-foreground hover:border-border shadow-sm hover:shadow-md"
+                style={{ animationDelay: `${i * 100}ms` }}
+              >
+                {suggestion}
+              </button>
+            ))}
+          </div>
+          
+          <div className="w-full mt-16 md:mt-24">
+            <HeroPreview />
+          </div>
         </div>
       </div>
     </section>
