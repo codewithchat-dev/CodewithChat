@@ -214,19 +214,19 @@ export const testimonials: Testimonial[] = [
   {
     quote:
       'I shipped my first real SaaS in a month. The step-by-step plan removed the guesswork I used to get stuck on.',
-    name: 'Maya Chen',
+    name: 'Rohit Bansal',
     role: 'Self-taught developer',
   },
   {
     quote:
       'The system design breakdowns finally made backend architecture click for me. It reads like a senior engineer pairing with you.',
-    name: 'Daniel Okafor',
+    name: 'Ome Tiwari',
     role: 'Bootcamp graduate',
   },
   {
     quote:
       'Clear, practical, and opinionated in the right places. It recommends real tools and tells you exactly when to use them.',
-    name: 'Priya Nair',
+    name: 'Rajat Garg',
     role: 'Indie founder',
   },
 ]

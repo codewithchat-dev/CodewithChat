@@ -117,45 +117,96 @@ export function HeroPreview() {
           </div>
           
           {/* Browser Body / Animated UI Placeholder */}
-          <div className="relative aspect-[16/10] bg-muted/10 w-full overflow-hidden group flex items-center justify-center">
+          <div className="relative aspect-[16/10] bg-background w-full overflow-hidden group flex items-center justify-center">
             
-            {/* Animated Skeleton UI to simulate a SaaS dashboard */}
-            <div className="absolute inset-0 p-4 sm:p-6 flex flex-col gap-6 w-full h-full">
+            {/* Animated Dashboard UI (Reveals when command 4 is reached) */}
+            <div className={cn(
+              "absolute inset-0 p-4 sm:p-6 flex flex-col gap-6 w-full h-full transition-all duration-1000",
+              currentCommand >= 4 ? "opacity-100 scale-100" : "opacity-30 scale-95 blur-sm"
+            )}>
               {/* Header skeleton */}
               <div className="flex justify-between items-center w-full">
-                <div className="w-32 h-6 bg-border/40 rounded-md animate-pulse" />
-                <div className="flex gap-3">
-                  <div className="w-8 h-8 bg-border/40 rounded-full animate-pulse" />
-                  <div className="w-24 h-8 bg-primary/20 rounded-md animate-pulse" />
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-primary/20 rounded-lg animate-pulse" />
+                  <div className="w-24 h-5 bg-border/40 rounded-md" />
+                </div>
+                <div className="flex gap-3 items-center">
+                  <div className="w-20 h-8 bg-border/30 rounded-md" />
+                  <div className="w-8 h-8 bg-border/40 rounded-full" />
                 </div>
               </div>
               
               <div className="flex-1 flex gap-6 w-full">
                 {/* Sidebar skeleton */}
-                <div className="hidden sm:flex flex-col gap-4 w-48">
-                  <div className="w-full h-8 bg-border/30 rounded-md animate-pulse delay-75" />
-                  <div className="w-full h-8 bg-border/20 rounded-md animate-pulse delay-100" />
-                  <div className="w-full h-8 bg-border/20 rounded-md animate-pulse delay-150" />
-                  <div className="w-full h-8 bg-border/20 rounded-md animate-pulse delay-200" />
+                <div className="hidden sm:flex flex-col gap-3 w-48 border-r border-border/50 pr-4">
+                  <div className="text-xs font-semibold text-muted-foreground/50 mb-2">MENU</div>
+                  <div className="w-full h-8 bg-primary/10 border border-primary/20 rounded-md flex items-center px-3 gap-2">
+                    <div className="w-4 h-4 bg-primary/40 rounded-sm" />
+                    <div className="w-16 h-3 bg-primary/40 rounded-sm" />
+                  </div>
+                  <div className="w-full h-8 hover:bg-border/20 rounded-md flex items-center px-3 gap-2">
+                    <div className="w-4 h-4 bg-border/40 rounded-sm" />
+                    <div className="w-20 h-3 bg-border/40 rounded-sm" />
+                  </div>
+                  <div className="w-full h-8 hover:bg-border/20 rounded-md flex items-center px-3 gap-2">
+                    <div className="w-4 h-4 bg-border/40 rounded-sm" />
+                    <div className="w-14 h-3 bg-border/40 rounded-sm" />
+                  </div>
                 </div>
                 
-                {/* Main content skeleton */}
-                <div className="flex-1 flex flex-col gap-4 w-full">
-                  <div className="flex gap-4 w-full h-32">
-                     <div className="flex-1 bg-border/20 rounded-xl animate-pulse delay-100" />
-                     <div className="flex-1 bg-border/20 rounded-xl animate-pulse delay-200" />
-                     <div className="flex-1 bg-border/20 rounded-xl animate-pulse delay-300" />
+                {/* Main content area */}
+                <div className="flex-1 flex flex-col gap-6 w-full">
+                  {/* KPI Cards */}
+                  <div className="flex gap-4 w-full h-24">
+                     <div className="flex-1 bg-card border border-border/50 rounded-xl p-4 flex flex-col justify-between shadow-sm">
+                        <div className="w-8 h-8 bg-green-500/10 rounded-full flex items-center justify-center">
+                          <div className="w-4 h-4 bg-green-500/50 rounded-sm" />
+                        </div>
+                        <div className="w-16 h-5 bg-foreground/20 rounded-md" />
+                     </div>
+                     <div className="flex-1 bg-card border border-border/50 rounded-xl p-4 flex flex-col justify-between shadow-sm">
+                        <div className="w-8 h-8 bg-blue-500/10 rounded-full flex items-center justify-center">
+                          <div className="w-4 h-4 bg-blue-500/50 rounded-sm" />
+                        </div>
+                        <div className="w-12 h-5 bg-foreground/20 rounded-md" />
+                     </div>
+                     <div className="flex-1 bg-card border border-border/50 rounded-xl p-4 flex flex-col justify-between shadow-sm">
+                        <div className="w-8 h-8 bg-purple-500/10 rounded-full flex items-center justify-center">
+                          <div className="w-4 h-4 bg-purple-500/50 rounded-sm" />
+                        </div>
+                        <div className="w-20 h-5 bg-foreground/20 rounded-md" />
+                     </div>
                   </div>
-                  <div className="w-full flex-1 bg-border/20 rounded-xl animate-pulse delay-500" />
+                  
+                  {/* Main Chart Area with CSS Bar Chart */}
+                  <div className="w-full flex-1 bg-card border border-border/50 rounded-xl p-5 flex flex-col gap-4 shadow-sm">
+                     <div className="w-32 h-4 bg-border/40 rounded-md" />
+                     <div className="flex-1 flex items-end gap-2 sm:gap-4 mt-4 px-2 border-b border-border/50 pb-1">
+                        {/* CSS Animated Bars */}
+                        {[40, 70, 45, 90, 65, 80, 55, 100].map((height, idx) => (
+                          <div 
+                            key={idx} 
+                            className="flex-1 bg-primary/80 rounded-t-sm transition-all duration-1000 ease-out"
+                            style={{ 
+                              height: currentCommand >= 4 ? `${height}%` : '0%',
+                              transitionDelay: `${idx * 100}ms`
+                            }}
+                          />
+                        ))}
+                     </div>
+                  </div>
                 </div>
               </div>
             </div>
             
             {/* Overlay Gradient to indicate generation */}
-            <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/40 to-transparent flex items-end justify-center pb-8 opacity-100 transition-opacity duration-1000">
-               <div className="bg-background/90 backdrop-blur-sm border border-primary/20 rounded-full px-5 py-2.5 flex items-center gap-2.5 text-xs sm:text-sm font-medium text-primary shadow-xl shadow-primary/10">
-                 <Sparkles className="size-4 animate-pulse" />
-                 <span>AI is building your SaaS...</span>
+            <div className={cn(
+              "absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center transition-opacity duration-1000 z-20",
+              currentCommand >= 4 ? "opacity-0 pointer-events-none" : "opacity-100"
+            )}>
+               <div className="bg-card border border-primary/20 rounded-full px-6 py-3 flex items-center gap-3 text-sm font-medium text-primary shadow-xl shadow-primary/10">
+                 <Sparkles className="size-5 animate-pulse" />
+                 <span>AI is writing your code...</span>
                </div>
             </div>
           </div>

@@ -3,49 +3,52 @@ import { Boxes, Network, ListChecks } from 'lucide-react'
 const features = [
   {
     icon: Boxes,
-    title: 'SaaS Project Builder',
-    description:
-      'Describe your idea and get a clear problem statement, MVP scope, feature breakdown, and a recommended stack tailored to your skill level.',
+    title: 'SaaS Builder',
+    description: 'Turn ideas into structured MVPs with the perfect tech stack.',
   },
   {
     icon: Network,
-    title: 'System Design Mentor',
-    description:
-      'Understand how the pieces fit together — frontend and backend architecture, database design, scaling, and security fundamentals.',
+    title: 'Design Mentor',
+    description: 'Learn modern system architecture, databases, and security.',
   },
   {
     icon: ListChecks,
-    title: 'Step-by-step Build Guide',
-    description:
-      'Follow a structured plan from setup to deployment, with beginner-friendly explanations and the right tool for each step.',
+    title: 'Build Guide',
+    description: 'Step-by-step execution plan from setup to live deployment.',
   },
 ]
 
 export function Features() {
   return (
-    <section id="features" className="border-b border-border">
+    <section id="features" className="border-b border-border relative overflow-hidden">
+      {/* Background glow */}
+      <div className="absolute left-1/2 top-0 -z-10 h-[300px] w-[500px] -translate-x-1/2 rounded-full bg-primary/10 blur-[100px]" />
+      
       <div className="mx-auto w-full max-w-6xl px-6 py-20">
         <div className="max-w-2xl">
           <h2 className="text-balance text-3xl font-semibold tracking-tight">
-            Everything you need to go from idea to launch
+            Everything you need
           </h2>
           <p className="mt-3 text-pretty leading-relaxed text-muted-foreground">
-            Three focused tools that work together to teach you how real software
-            gets built.
+            Three focused tools to go from an idea to a deployed product.
           </p>
         </div>
 
         <div className="mt-12 grid gap-6 md:grid-cols-3">
-          {features.map((feature) => (
+          {features.map((feature, i) => (
             <div
               key={feature.title}
-              className="rounded-xl border border-border bg-card p-6"
+              className="group relative overflow-hidden rounded-2xl border border-border bg-card/50 backdrop-blur-sm p-8 transition-all hover:border-primary/50 hover:shadow-lg hover:-translate-y-1 animate-in fade-in slide-in-from-bottom-8 duration-700 fill-mode-both"
+              style={{ animationDelay: `${i * 150}ms` }}
             >
-              <span className="flex size-10 items-center justify-center rounded-lg border border-border">
-                <feature.icon className="size-5" />
+              {/* Subtle hover gradient inside card */}
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+              
+              <span className="relative flex size-12 items-center justify-center rounded-xl border border-border bg-background transition-colors group-hover:border-primary/30 group-hover:bg-primary/10">
+                <feature.icon className="size-6 text-muted-foreground transition-colors group-hover:text-primary" />
               </span>
-              <h3 className="mt-5 text-lg font-medium">{feature.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+              <h3 className="relative mt-6 text-xl font-semibold transition-colors group-hover:text-foreground">{feature.title}</h3>
+              <p className="relative mt-2 text-sm leading-relaxed text-muted-foreground">
                 {feature.description}
               </p>
             </div>

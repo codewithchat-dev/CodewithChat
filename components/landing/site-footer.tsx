@@ -44,23 +44,28 @@ export function SiteFooter() {
     <footer className="relative overflow-hidden bg-background">
       <AsciiBackground />
       <div className="relative z-10">
-        <section className="border-b border-border">
-          <div className="mx-auto flex w-full max-w-6xl flex-col items-start justify-between gap-6 px-6 py-16 md:flex-row md:items-center">
-          <div className="max-w-xl">
-            <h2 className="text-balance text-2xl font-semibold tracking-tight md:text-3xl">
-              Ready to build your first real SaaS?
-            </h2>
-            <p className="mt-2 text-pretty leading-relaxed text-muted-foreground">
-              Start with your idea and let the mentor guide you to launch.
-            </p>
+        <section className="relative px-6 py-20 lg:py-28">
+          <div className="mx-auto w-full max-w-5xl rounded-3xl bg-card border border-border p-10 md:p-16 text-center relative overflow-hidden shadow-2xl transition-all duration-700 hover:border-primary/50 group hover:shadow-primary/10">
+            {/* Animated Glow Background */}
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-primary/5 opacity-50 transition-opacity duration-700 group-hover:opacity-100" />
+            <div className="absolute left-1/2 top-1/2 -z-10 h-[300px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/20 blur-[120px]" />
+            
+            <div className="relative z-10 flex flex-col items-center justify-center gap-6 animate-in fade-in slide-in-from-bottom-8 duration-1000 fill-mode-both">
+              <h2 className="text-balance text-3xl font-bold tracking-tight md:text-5xl lg:text-6xl text-foreground">
+                Ready to build your first real SaaS?
+              </h2>
+              <p className="text-pretty text-lg md:text-xl leading-relaxed text-muted-foreground max-w-2xl">
+                Start with your idea and let the AI mentor guide you step-by-step from an empty folder to a successful launch.
+              </p>
+              
+              <Button asChild size="lg" className="mt-6 rounded-full h-14 px-10 text-base lg:text-lg shadow-lg shadow-primary/25 transition-all hover:shadow-primary/40 hover:-translate-y-1 hover:scale-105">
+                <Link href="/dashboard/project-builder">
+                  Start Building Now
+                  <ArrowRight className="ml-2 size-5" />
+                </Link>
+              </Button>
+            </div>
           </div>
-          <Button asChild size="lg">
-            <Link href="/dashboard/project-builder">
-              Start Building
-              <ArrowRight className="size-4" />
-            </Link>
-          </Button>
-        </div>
       </section>
 
       <div className="mx-auto w-full max-w-6xl px-6 py-12">
