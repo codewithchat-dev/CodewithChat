@@ -14,7 +14,7 @@ export default function SignInPage() {
           </Link>
         </Button>
       </div>
-      <SignIn />
+      <SignIn forceRedirectUrl="/dashboard" />
     </div>
   )
 }

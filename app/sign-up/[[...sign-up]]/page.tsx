@@ -14,7 +14,7 @@ export default function SignUpPage() {
           </Link>
         </Button>
       </div>
-      <SignUp />
+      <SignUp forceRedirectUrl="/dashboard" />
     </div>
   )
 }

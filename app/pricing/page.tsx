@@ -6,6 +6,58 @@ import { Button } from '@/components/ui/button'
 import { SiteHeader } from '@/components/landing/site-header'
 import { SiteFooter } from '@/components/landing/site-footer'
 import { Switch } from '@/components/ui/switch'
+import { useAuth, SignInButton, SignUpButton } from '@clerk/nextjs'
+
+// ── Auth-gated Pricing Button ─────────────────────────────────────────────────
+// requireAuth=false → always opens Clerk sign-up modal (Free plan — always accessible)
+// requireAuth=true  → if not signed in, opens Clerk sign-in popup; if signed in, goes to billing
+function PricingButton({
+  label,
+  requireAuth,
+  variant = 'default',
+  size = 'lg',
+}: {
+  label: string
+  requireAuth: boolean
+  variant?: 'default' | 'outline'
+  size?: 'sm' | 'lg'
+}) {
+  const { isSignedIn } = useAuth()
+
+  // Free plan — always open sign-up
+  if (!requireAuth) {
+    return (
+      <SignUpButton mode="modal" forceRedirectUrl="/dashboard">
+        <Button variant={variant} className="mt-8 w-full" size={size}>
+          {label}
+        </Button>
+      </SignUpButton>
+    )
+  }
+
+  // Paid plan — not logged in → show sign-in popup
+  if (!isSignedIn) {
+    return (
+      <SignInButton mode="modal" forceRedirectUrl="/dashboard/settings/billing">
+        <Button variant={variant} className="mt-8 w-full" size={size}>
+          {label}
+        </Button>
+      </SignInButton>
+    )
+  }
+
+  // Paid plan — logged in → go to billing
+  return (
+    <Button
+      variant={variant}
+      className="mt-8 w-full"
+      size={size}
+      onClick={() => { window.location.href = '/dashboard/settings/billing' }}
+    >
+      {label}
+    </Button>
+  )
+}
 
 export default function PricingPage() {
   const [isYearly, setIsYearly] = useState(false)
@@ -38,7 +90,7 @@ export default function PricingPage() {
 
         {/* Pricing Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto relative z-10">
-          {/* Free Tier */}
+          {/* Free Tier — no auth required */}
           <div className="flex flex-col rounded-2xl border border-border bg-card p-8 shadow-sm transition-transform hover:scale-[1.02]">
             <div className="mb-6">
               <h3 className="text-2xl font-bold">Free</h3>
@@ -68,12 +120,10 @@ export default function PricingPage() {
                 <span className="text-sm text-muted-foreground">Community support</span>
               </li>
             </ul>
-            <Button variant="outline" className="mt-8 w-full" size="lg">
-              Get Started for Free
-            </Button>
+            <PricingButton variant="outline" label="Get Started for Free" requireAuth={false} />
           </div>
 
-          {/* Pro Tier */}
+          {/* Pro Tier — requires login */}
           <div className="flex flex-col rounded-2xl border-2 border-primary bg-card p-8 shadow-xl relative md:scale-105 z-20">
             <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2">
               <span className="bg-primary text-primary-foreground text-xs font-bold uppercase tracking-wider py-1 px-3 rounded-full flex items-center gap-1">
@@ -109,12 +159,10 @@ export default function PricingPage() {
                 <span className="text-sm font-medium">Private repositories</span>
               </li>
             </ul>
-            <Button className="mt-8 w-full" size="lg">
-              Upgrade to Pro
-            </Button>
+            <PricingButton variant="default" label="Upgrade to Pro" requireAuth={true} />
           </div>
 
-          {/* Student Tier */}
+          {/* Student Tier — requires login */}
           <div className="flex flex-col rounded-2xl border border-border bg-card p-8 shadow-sm transition-transform hover:scale-[1.02]">
             <div className="mb-6">
               <h3 className="text-2xl font-bold">Student Pack</h3>
@@ -140,13 +188,11 @@ export default function PricingPage() {
                 <span className="text-sm text-muted-foreground">Valid for 1 year</span>
               </li>
             </ul>
-            <Button variant="outline" className="mt-8 w-full" size="lg">
-              Verify with GitHub
-            </Button>
+            <PricingButton variant="outline" label="Verify with GitHub" requireAuth={true} />
           </div>
         </div>
 
-        {/* Model Pricing Section */}
+        {/* Credit Packs — requires login */}
         <div className="mt-32 max-w-4xl mx-auto">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold tracking-tight mb-4">Pay-as-you-go Credits</h2>
@@ -164,7 +210,9 @@ export default function PricingPage() {
             <div className="grid grid-cols-3 gap-4 p-6 border-b border-border items-center">
               <div className="font-medium text-sm md:text-base">100 Extra Credits</div>
               <div className="text-sm md:text-base">$5.00</div>
-              <div className="text-right"><Button variant="outline" size="sm">Buy Pack</Button></div>
+              <div className="text-right">
+                <PricingButton variant="outline" size="sm" label="Buy Pack" requireAuth={true} />
+              </div>
             </div>
             <div className="grid grid-cols-3 gap-4 p-6 border-b border-border items-center">
               <div className="font-medium flex flex-col md:flex-row md:items-center gap-1 text-sm md:text-base">
@@ -172,7 +220,9 @@ export default function PricingPage() {
                 <span className="w-fit text-[10px] md:text-xs text-green-500 bg-green-500/10 px-2 py-0.5 rounded-full font-bold">Save 10%</span>
               </div>
               <div className="text-sm md:text-base">$22.50</div>
-              <div className="text-right"><Button variant="outline" size="sm">Buy Pack</Button></div>
+              <div className="text-right">
+                <PricingButton variant="outline" size="sm" label="Buy Pack" requireAuth={true} />
+              </div>
             </div>
             <div className="grid grid-cols-3 gap-4 p-6 items-center">
               <div className="font-medium flex flex-col md:flex-row md:items-center gap-1 text-sm md:text-base">
@@ -180,7 +230,9 @@ export default function PricingPage() {
                 <span className="w-fit text-[10px] md:text-xs text-green-500 bg-green-500/10 px-2 py-0.5 rounded-full font-bold">Save 20%</span>
               </div>
               <div className="text-sm md:text-base">$40.00</div>
-              <div className="text-right"><Button variant="outline" size="sm">Buy Pack</Button></div>
+              <div className="text-right">
+                <PricingButton variant="outline" size="sm" label="Buy Pack" requireAuth={true} />
+              </div>
             </div>
           </div>
         </div>
