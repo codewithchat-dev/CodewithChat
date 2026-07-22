@@ -1,7 +1,23 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 
-const isPublicRoute = createRouteMatcher(['/', '/sign-in(.*)', '/sign-up(.*)'])
+// ── Public routes — no auth check needed ─────────────────────────────────────
+// All marketing, legal, and documentation pages are publicly accessible.
+// Only /dashboard and API routes require authentication.
+const isPublicRoute = createRouteMatcher([
+  '/',
+  '/sign-in(.*)',
+  '/sign-up(.*)',
+  '/pricing',
+  '/enterprise',
+  '/about',
+  '/ai-policy',
+  '/privacy',
+  '/terms',
+  '/faqs',
+  '/docs(.*)',
+  '/preview(.*)',
+])
 
 export default clerkMiddleware(async (auth, request) => {
   const { userId } = await auth()
@@ -11,10 +27,10 @@ export default clerkMiddleware(async (auth, request) => {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
+  // Only protect dashboard and API routes — let all public pages through freely
   if (!isPublicRoute(request)) {
     if (!userId) {
-      // If not logged in and trying to access a protected route (like a shared project), 
-      // redirect to landing page with a flag to auto-open the signup modal
+      // Not logged in + trying to access a protected route → redirect to landing
       const redirectUrl = new URL('/', request.url)
       redirectUrl.searchParams.set('sign_up', 'true')
       redirectUrl.searchParams.set('redirect_url', request.url)
