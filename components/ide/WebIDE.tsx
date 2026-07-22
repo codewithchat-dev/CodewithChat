@@ -74,7 +74,7 @@ function patchForWebContainer(files: Record<string, string>): Record<string, str
       if (pkg.scripts?.dev) {
         // Remove any existing NEXT_SWC_WASM_ENABLE prefix first
         const cleanDev = pkg.scripts.dev.replace(/NEXT_SWC_WASM_ENABLE=\d\s*/g, '').trim()
-        pkg.scripts.dev = `NEXT_SWC_WASM_ENABLE=1 ${cleanDev}`
+        pkg.scripts.dev = `NEXT_TELEMETRY_DISABLED=1 NEXT_SWC_WASM_ENABLE=1 ${cleanDev}`
       }
 
       patched[pkgKey] = JSON.stringify(pkg, null, 2)

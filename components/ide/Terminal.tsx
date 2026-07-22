@@ -79,7 +79,7 @@ export function Terminal() {
             commandInjected = true
             // Small delay just to be safe after prompt appears
             setTimeout(() => {
-              input.write('npm install --omit=optional && npm run dev\r')
+              input.write('npm install --no-audit --no-fund --legacy-peer-deps --omit=optional && npm run dev\r')
             }, 200)
           }
         },
