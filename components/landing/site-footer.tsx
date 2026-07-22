@@ -9,6 +9,9 @@ const footerNav = [
     title: 'Product',
     links: [
       { label: 'Home', href: '/' },
+      { label: 'Features', href: '/features' },
+      { label: 'How it works', href: '/how-it-works' },
+      { label: 'Templates', href: '/templates' },
       { label: 'Pricing', href: '/pricing' },
     ],
   },
@@ -25,6 +28,7 @@ const footerNav = [
     links: [
       { label: 'Documentation', href: '/docs' },
       { label: 'FAQs', href: '/faqs' },
+      { label: 'Enterprise', href: '/enterprise' },
     ],
   },
   {

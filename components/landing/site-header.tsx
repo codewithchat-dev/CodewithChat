@@ -9,9 +9,9 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import { UserButton, SignInButton, SignUpButton, useAuth } from '@clerk/nextjs'
 
 const navLinks = [
-  { label: 'Features', href: '#features' },
-  { label: 'How it works', href: '#how-it-works' },
-  { label: 'Documentation', href: '/docs' },
+  { label: 'Features', href: '/features' },
+  { label: 'How it works', href: '/how-it-works' },
+  { label: 'Templates', href: '/templates' },
   { label: 'Pricing', href: '/pricing' },
   { label: 'Enterprise', href: '/enterprise' },
 ]
