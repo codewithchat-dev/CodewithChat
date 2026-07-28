@@ -52,6 +52,7 @@ export function transformForSandpack(content: string, filePath: string): string 
   let code = content
 
   code = code.replace(/['"]use server['"]\s*;?\s*\n/g, '')
+  code = code.replace(/import\s+['"]server-only['"]\s*\n/g, '')
   code = code.replace(/export\s+const\s+metadata[\s\S]*?\n(?=\s*(?:export|function|const|class|'use client'))/g, '')
   code = code.replace(/import\s+type\s+\{[^}]*Metadata[^}]*\}\s*from\s*['"]next['"]\s*\n/g, '')
 
@@ -64,6 +65,10 @@ export function transformForSandpack(content: string, filePath: string): string 
   code = code.replace(/<Link(\s)/g, '<a$1')
   code = code.replace(/<\/Link>/g, '</a>')
 
+  code = code.replace(/import\s*\{[^}]*\}\s*from\s*['"]next\/font[^'"]*['"]\s*\n/g, '')
+  code = code.replace(/import\s+\w+\s+from\s*['"]next\/font[^'"]*['"]\s*\n/g, '')
+  code = code.replace(/className=\{[\w.]+\.className\}/g, 'className=""')
+
   code = code.replace(
     /from\s+['"]@\/([^'"]+)['"]/g,
     (_match, importPath: string) => `from '${computeRootRelativeImport(filePath, importPath)}'`,
@@ -72,13 +77,50 @@ export function transformForSandpack(content: string, filePath: string): string 
   code = code.replace(/import\s*\{[^}]*\}\s*from\s*['"]next\/navigation['"]\s*\n/g, '')
   code = code.replace(/import\s*\{[^}]*\}\s*from\s*['"]next\/headers['"]\s*\n/g, '')
   code = code.replace(/import\s*\{[^}]*\}\s*from\s*['"]next\/cache['"]\s*\n/g, '')
+  code = code.replace(/import\s*\{[^}]*\}\s*from\s*['"]@supabase[^'"]*['"]\s*\n/g, '')
   code = code.replace(/import\s*\{[^}]*\}\s*from\s*['"]@supabase\/auth-helpers-nextjs['"]\s*\n/g, '')
   code = code.replace(/import\s*\{[^}]*\}\s*from\s*['"]@supabase\/ssr['"]\s*\n/g, '')
+  code = code.replace(/import\s*\{[^}]*\}\s*from\s*['"]ai['"]\s*\n/g, '')
+  code = code.replace(/import\s*\{[^}]*\}\s*from\s*['"]@ai-sdk[^'"]*['"]\s*\n/g, '')
+  code = code.replace(/import\s+.*from\s*['"][^'"]*\.css['"]\s*\n/g, '')
 
   code = code.replace(/export\s+default\s+async\s+function/g, 'export default function')
 
+  if (
+    /useState|useEffect|useRef|useCallback|useMemo|useReducer|onClick|onChange/.test(code) &&
+    !code.includes("'use client'") &&
+    !code.includes('"use client"')
+  ) {
+    code = `'use client'\n\n${code}`
+  }
+
   return code
 }
+
+const SUPABASE_STUB = `export function createClient() {
+  return {
+    auth: {
+      getUser: async () => ({ data: { user: null }, error: null }),
+      signInWithPassword: async () => ({ data: { user: null }, error: null }),
+      signOut: async () => ({ error: null }),
+    },
+    from: () => ({
+      select: () => ({ data: [], error: null }),
+      insert: () => ({ data: null, error: null }),
+      update: () => ({ data: null, error: null }),
+      delete: () => ({ data: null, error: null }),
+    }),
+  }
+}
+`
+
+const UTILS_STUB = `import { clsx, type ClassValue } from 'clsx'
+import { twMerge } from 'tailwind-merge'
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+`
 
 function normalizeFullStackPath(path: string): string {
   return path.startsWith('/') ? path : `/${path}`
@@ -110,6 +152,14 @@ export function extractPreviewFromFullStack(
     }
 
     if (FULLSTACK_PREVIEW_PREFIXES.some(prefix => lower.startsWith(prefix))) {
+      if (lower.includes('supabase') && lower.endsWith('.ts')) {
+        result[path] = SUPABASE_STUB
+        continue
+      }
+      if (lower === '/lib/utils.ts' || lower === '/lib/utils.js') {
+        result[path] = UTILS_STUB
+        continue
+      }
       result[path] = transformForSandpack(content, path)
     }
   }
@@ -123,32 +173,14 @@ export function extractPreviewFromFullStack(
     fullStackFiles['/App.js']
 
   if (pageContent) {
-    let appCode = transformForSandpack(pageContent, '/App.tsx')
-
-    const layoutContent =
-      fullStackFiles['/app/layout.tsx'] ??
-      fullStackFiles['app/layout.tsx'] ??
-      fullStackFiles['/app/layout.js']
-
-    if (layoutContent && !appCode.includes('html') && layoutContent.includes('{children}')) {
-      const layoutBody = transformForSandpack(layoutContent, '/App.tsx')
-        .replace(/export\s+default\s+function\s+\w+[^{]*\{[\s\S]*?return\s*\(\s*/m, '')
-        .replace(/\{children\}/, '__APP_CONTENT__')
-        .replace(/\)\s*;?\s*\}\s*$/, '')
-
-      if (layoutBody.includes('__APP_CONTENT__')) {
-        const innerMatch = appCode.match(/return\s*\(([\s\S]*)\)\s*;?\s*\}\s*$/)
-        const inner = innerMatch?.[1]?.trim() ?? appCode
-        appCode = layoutBody.replace('__APP_CONTENT__', inner)
-        if (!appCode.includes('export default')) {
-          appCode = `export default function App() {\n  return (\n    ${appCode}\n  );\n}`
-        }
-      }
-    }
-
+    const appCode = transformForSandpack(pageContent, '/App.tsx')
     result['/App.tsx'] = appCode.includes('export default')
       ? appCode
       : `export default function App() {\n  return (\n    ${appCode}\n  );\n}`
+  }
+
+  if (!result['/lib/utils.ts'] && Object.values(result).some(c => c.includes("from './lib/utils'") || c.includes('from "../lib/utils"'))) {
+    result['/lib/utils.ts'] = UTILS_STUB
   }
 
   return result

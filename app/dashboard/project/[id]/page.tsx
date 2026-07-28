@@ -795,6 +795,19 @@ export default function ProjectPage() {
                       </Tooltip>
                       <Tooltip>
                         <TooltipTrigger asChild>
+                          <a
+                            href={`/preview/${projectId}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors inline-flex"
+                          >
+                            <ExternalLink className="size-3.5" />
+                          </a>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="text-xs">Open preview in new tab</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
                           <button
                             type="button"
                             onClick={() => setPreviewKey(k => k + 1)}
@@ -840,6 +853,7 @@ export default function ProjectPage() {
                       onCloseTerminal={() => setIsTerminalOpen(false)}
                       previewKey={previewKey}
                       tech={tech}
+                      openPreviewUrl={`/preview/${projectId}`}
                     />
                   ) : loading ? (
                     <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground bg-[#151515]">

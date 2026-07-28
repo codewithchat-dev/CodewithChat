@@ -11,7 +11,7 @@ import {
   useSandpack,
   defaultDark,
 } from '@codesandbox/sandpack-react'
-import { X, Terminal as TerminalIcon, ScrollText } from 'lucide-react'
+import { X, Terminal as TerminalIcon, ScrollText, RefreshCw, ExternalLink, AlertCircle, Loader2 } from 'lucide-react'
 
 export type SandpackView = 'preview' | 'code'
 export type ViewportSize = 'desktop' | 'tablet' | 'mobile'
@@ -29,6 +29,8 @@ interface SandpackPreviewProps {
   fileMode?: 'preview' | 'project'
   activeFile?: string | null
   tech?: string
+  /** Opens full-screen preview in a new browser tab */
+  openPreviewUrl?: string
 }
 
 function ActiveFileOpener({ filePath }: { filePath?: string | null }) {
@@ -61,6 +63,85 @@ function SandpackErrorWatcher({ onError }: { onError: (message: string) => void 
   }, [sandpack.error, onError])
 
   return null
+}
+
+function PreviewStatusOverlay({
+  onError,
+  onOpenConsole,
+}: {
+  onError?: (message: string) => void
+  onOpenConsole?: () => void
+}) {
+  const { sandpack } = useSandpack()
+  const status = sandpack.status
+  const errorMessage = sandpack.error?.message
+
+  useEffect(() => {
+    if (errorMessage) onError?.(errorMessage)
+  }, [errorMessage, onError])
+
+  if (!errorMessage && status !== 'running') return null
+
+  return (
+    <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#0a0a0a]/90 backdrop-blur-sm p-6">
+      {errorMessage ? (
+        <div className="max-w-md text-center space-y-3">
+          <AlertCircle className="size-10 text-red-400 mx-auto" />
+          <p className="text-sm font-medium text-red-300">Preview failed to compile</p>
+          <p className="text-xs text-zinc-400 font-mono break-words max-h-32 overflow-y-auto">{errorMessage}</p>
+          <button
+            type="button"
+            onClick={onOpenConsole}
+            className="text-xs text-primary hover:underline"
+          >
+            Open console logs
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center gap-3 text-zinc-400">
+          <Loader2 className="size-8 animate-spin text-primary" />
+          <p className="text-sm">Compiling preview…</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PreviewToolbar({
+  openPreviewUrl,
+  onRefresh,
+}: {
+  openPreviewUrl?: string
+  onRefresh?: () => void
+}) {
+  return (
+    <div className="h-9 shrink-0 flex items-center justify-between px-3 border-b border-[#2a2a2a] bg-[#141414]">
+      <span className="text-xs text-zinc-500">Live preview</span>
+      <div className="flex items-center gap-1">
+        {onRefresh && (
+          <button
+            type="button"
+            onClick={onRefresh}
+            className="p-1.5 rounded text-zinc-500 hover:text-zinc-200 hover:bg-white/5 transition-colors"
+            title="Refresh preview"
+          >
+            <RefreshCw className="size-3.5" />
+          </button>
+        )}
+        {openPreviewUrl && (
+          <a
+            href={openPreviewUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="p-1.5 rounded text-zinc-500 hover:text-zinc-200 hover:bg-white/5 transition-colors"
+            title="Open in new tab"
+          >
+            <ExternalLink className="size-3.5" />
+          </a>
+        )}
+      </div>
+    </div>
+  )
 }
 
 const INDEX_HTML = `<!DOCTYPE html>
@@ -110,10 +191,14 @@ export function SandpackPreview({
   fileMode = 'preview',
   activeFile = null,
   tech = 'React + TypeScript',
+  openPreviewUrl,
 }: SandpackPreviewProps) {
   const [consoleTab, setConsoleTab] = useState<'logs' | 'terminal'>('logs')
   const [consoleHeight, setConsoleHeight] = useState(DEFAULT_CONSOLE_HEIGHT)
+  const [consoleForcedOpen, setConsoleForcedOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+
+  const showConsole = isTerminalOpen || consoleForcedOpen
 
   const handleConsoleResizeStart = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault()
@@ -146,8 +231,23 @@ export function SandpackPreview({
 
   const handlePreviewError = useCallback((message: string) => {
     setConsoleTab('logs')
+    setConsoleForcedOpen(true)
     onPreviewError?.(message)
   }, [onPreviewError])
+
+  const sanitizedDeps = useMemo(() => {
+    const blocked = new Set(['@vercel/ai', '@supabase/ssr', '@supabase/auth-helpers-nextjs', 'next'])
+    return Object.fromEntries(
+      Object.entries(dependencies).filter(([name]) => !blocked.has(name) && !name.startsWith('@supabase/ssr')),
+    )
+  }, [dependencies])
+
+  const mergedDeps = useMemo(() => ({
+    'lucide-react': 'latest',
+    clsx: 'latest',
+    'tailwind-merge': 'latest',
+    ...sanitizedDeps,
+  }), [sanitizedDeps])
 
   const sandpackFiles = useMemo(() => {
     const result: Record<string, { code: string; active?: boolean }> = {}
@@ -229,12 +329,7 @@ export function SandpackPreview({
     }
 
     return result
-  }, [files, fileMode, activeFile])
-
-  const mergedDeps = useMemo(() => ({
-    'lucide-react': 'latest',
-    ...dependencies,
-  }), [dependencies])
+  }, [files, fileMode, activeFile, tech])
 
   const viewportWidth = VIEWPORT_WIDTHS[viewportSize]
   const isConstrained = viewportSize !== 'desktop'
@@ -286,31 +381,40 @@ export function SandpackPreview({
           {/* PREVIEW VIEW */}
           <div
             style={{ display: view === 'preview' && !isProjectFiles ? 'flex' : 'none' }}
-            className="w-full h-full items-center justify-center bg-[#0a0a0a]"
+            className="w-full h-full flex-col bg-[#0a0a0a]"
           >
-            {isConstrained ? (
-              <div
-                className="h-full overflow-hidden shadow-2xl transition-all duration-300 rounded-lg"
-                style={{ width: viewportWidth, border: '1px solid hsl(var(--border))' }}
-              >
+            <PreviewToolbar openPreviewUrl={openPreviewUrl} />
+            <div className="flex-1 min-h-0 relative flex items-center justify-center">
+              <PreviewStatusOverlay
+                onError={handlePreviewError}
+                onOpenConsole={() => setConsoleForcedOpen(true)}
+              />
+              {isConstrained ? (
+                <div
+                  className="h-full overflow-hidden shadow-2xl transition-all duration-300 rounded-lg"
+                  style={{ width: viewportWidth, border: '1px solid hsl(var(--border))' }}
+                >
+                  <SandpackPreviewPane
+                    showNavigator={false}
+                    showOpenInCodeSandbox={false}
+                    showRefreshButton={false}
+                    style={{ height: '100%', width: '100%' }}
+                  />
+                </div>
+              ) : (
                 <SandpackPreviewPane
                   showNavigator={false}
                   showOpenInCodeSandbox={false}
+                  showRefreshButton={false}
                   style={{ height: '100%', width: '100%' }}
                 />
-              </div>
-            ) : (
-              <SandpackPreviewPane
-                showNavigator={false}
-                showOpenInCodeSandbox={false}
-                style={{ height: '100%', width: '100%' }}
-              />
-            )}
+              )}
+            </div>
           </div>
         </div>
 
         {/* TERMINAL / CONSOLE DRAWER */}
-        {isTerminalOpen && (
+        {showConsole && (
           <div
             className="bg-[#0f0f0f] flex flex-col shrink-0 animate-in slide-in-from-bottom-2 duration-200"
             style={{ height: consoleHeight }}
@@ -354,7 +458,10 @@ export function SandpackPreview({
                 </button>
               </div>
               <button
-                onClick={onCloseTerminal}
+                onClick={() => {
+                  setConsoleForcedOpen(false)
+                  onCloseTerminal?.()
+                }}
                 className="p-1.5 rounded text-zinc-500 hover:text-zinc-200 hover:bg-white/5 transition-colors"
               >
                 <X className="size-3.5" />

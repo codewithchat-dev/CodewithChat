@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation'
 import { SandpackProvider, SandpackLayout, SandpackPreview } from '@codesandbox/sandpack-react'
 import { getProjectByIdAction } from '@/app/actions/projects'
 import { planSchema } from '@/lib/schema'
-import { buildInstantPreviewFiles, repairPreviewFiles } from '@/lib/preview-files'
+import { buildInstantPreviewFiles } from '@/lib/preview-files'
 import { z } from 'zod'
 import { Spinner } from '@/components/ui/spinner'
 
@@ -54,6 +54,10 @@ export default function PreviewPage() {
       .map(f => [f!.path!.startsWith('/') ? f!.path! : `/${f!.path!}`, f!.content!]),
   )
   const previewFiles = buildInstantPreviewFiles(localPlan.previewFiles, fullStackMap, isTypeScript)
+  const blocked = new Set(['@vercel/ai', '@supabase/ssr', '@supabase/auth-helpers-nextjs', 'next'])
+  const safeDeps = Object.fromEntries(
+    Object.entries(localPlan.dependencies || {}).filter(([name]) => !blocked.has(name)),
+  )
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-white relative">
@@ -80,9 +84,11 @@ export default function PreviewPage() {
           }}
           customSetup={/html/i.test(tech) ? undefined : {
             dependencies: {
-              "lucide-react": "latest",
-              ...(localPlan.dependencies || {})
-            }
+              'lucide-react': 'latest',
+              clsx: 'latest',
+              'tailwind-merge': 'latest',
+              ...safeDeps,
+            },
           }}
         >
           <SandpackLayout style={{ border: 'none', borderRadius: 0, height: '100%', flex: 1 }}>
