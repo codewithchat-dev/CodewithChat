@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation'
 import { SandpackProvider, SandpackLayout, SandpackPreview } from '@codesandbox/sandpack-react'
 import { getProjectByIdAction } from '@/app/actions/projects'
 import { planSchema } from '@/lib/schema'
-import { buildPreviewFiles, repairPreviewFiles } from '@/lib/preview-files'
+import { buildInstantPreviewFiles, repairPreviewFiles } from '@/lib/preview-files'
 import { z } from 'zod'
 import { Spinner } from '@/components/ui/spinner'
 
@@ -48,8 +48,12 @@ export default function PreviewPage() {
   }
 
   const isTypeScript = localPlan.previewFiles?.some(f => f?.path?.endsWith('.ts') || f?.path?.endsWith('.tsx')) || false
-  const rawPreviewFiles = buildPreviewFiles(localPlan.previewFiles, isTypeScript)
-  const { files: previewFiles } = repairPreviewFiles(rawPreviewFiles)
+  const fullStackMap = Object.fromEntries(
+    (localPlan.fullStackFiles ?? [])
+      .filter(f => f?.path && f?.content)
+      .map(f => [f!.path!.startsWith('/') ? f!.path! : `/${f!.path!}`, f!.content!]),
+  )
+  const previewFiles = buildInstantPreviewFiles(localPlan.previewFiles, fullStackMap, isTypeScript)
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-white relative">

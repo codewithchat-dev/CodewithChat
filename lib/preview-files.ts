@@ -35,6 +35,140 @@ export function hasPreviewEntry(files: Record<string, string>): boolean {
   return Boolean(files['/App.tsx'] || files['/App.js'] || files['/index.html'] || files['index.html'])
 }
 
+/** Paths copied from a Next.js fullStack project into Sandpack preview. */
+const FULLSTACK_PREVIEW_PREFIXES = ['/components/', '/lib/', '/hooks/', '/types/', '/utils/', '/data/']
+
+function computeRootRelativeImport(fromFile: string, importPath: string): string {
+  const fromDir = fromFile.includes('/')
+    ? fromFile.slice(0, fromFile.lastIndexOf('/'))
+    : ''
+  const fromParts = fromDir.split('/').filter(Boolean)
+  if (fromParts.length === 0) return `./${importPath}`
+  return `${'../'.repeat(fromParts.length)}${importPath}`
+}
+
+/** Strip Next.js-only syntax so fullStackFiles can run in Sandpack. */
+export function transformForSandpack(content: string, filePath: string): string {
+  let code = content
+
+  code = code.replace(/['"]use server['"]\s*;?\s*\n/g, '')
+  code = code.replace(/export\s+const\s+metadata[\s\S]*?\n(?=\s*(?:export|function|const|class|'use client'))/g, '')
+  code = code.replace(/import\s+type\s+\{[^}]*Metadata[^}]*\}\s*from\s*['"]next['"]\s*\n/g, '')
+
+  code = code.replace(/import\s+Image\s+from\s*['"]next\/image['"]\s*\n/g, '')
+  code = code.replace(/<Image(\s)/g, '<img$1')
+  code = code.replace(/<\/Image>/g, '</img>')
+
+  code = code.replace(/import\s+Link\s+from\s*['"]next\/link['"]\s*\n/g, '')
+  code = code.replace(/import\s*\{\s*Link\s*\}\s*from\s*['"]next\/link['"]\s*\n/g, '')
+  code = code.replace(/<Link(\s)/g, '<a$1')
+  code = code.replace(/<\/Link>/g, '</a>')
+
+  code = code.replace(
+    /from\s+['"]@\/([^'"]+)['"]/g,
+    (_match, importPath: string) => `from '${computeRootRelativeImport(filePath, importPath)}'`,
+  )
+
+  code = code.replace(/import\s*\{[^}]*\}\s*from\s*['"]next\/navigation['"]\s*\n/g, '')
+  code = code.replace(/import\s*\{[^}]*\}\s*from\s*['"]next\/headers['"]\s*\n/g, '')
+  code = code.replace(/import\s*\{[^}]*\}\s*from\s*['"]next\/cache['"]\s*\n/g, '')
+  code = code.replace(/import\s*\{[^}]*\}\s*from\s*['"]@supabase\/auth-helpers-nextjs['"]\s*\n/g, '')
+  code = code.replace(/import\s*\{[^}]*\}\s*from\s*['"]@supabase\/ssr['"]\s*\n/g, '')
+
+  code = code.replace(/export\s+default\s+async\s+function/g, 'export default function')
+
+  return code
+}
+
+function normalizeFullStackPath(path: string): string {
+  return path.startsWith('/') ? path : `/${path}`
+}
+
+/**
+ * Builds instant Sandpack preview files from a Next.js fullStack project.
+ * Maps app/page.tsx → App.tsx and copies client-side components.
+ */
+export function extractPreviewFromFullStack(
+  fullStackFiles: Record<string, string>,
+): Record<string, string> {
+  const result: Record<string, string> = {}
+
+  for (const [rawPath, content] of Object.entries(fullStackFiles)) {
+    const path = normalizeFullStackPath(rawPath)
+    const lower = path.toLowerCase()
+
+    if (
+      lower === '/package.json' ||
+      lower.endsWith('.config.js') ||
+      lower.endsWith('.config.mjs') ||
+      lower.endsWith('.config.ts') ||
+      lower.startsWith('/app/api/') ||
+      lower.startsWith('/pages/api/') ||
+      lower.includes('.env')
+    ) {
+      continue
+    }
+
+    if (FULLSTACK_PREVIEW_PREFIXES.some(prefix => lower.startsWith(prefix))) {
+      result[path] = transformForSandpack(content, path)
+    }
+  }
+
+  const pageContent =
+    fullStackFiles['/app/page.tsx'] ??
+    fullStackFiles['app/page.tsx'] ??
+    fullStackFiles['/app/page.js'] ??
+    fullStackFiles['app/page.js'] ??
+    fullStackFiles['/App.tsx'] ??
+    fullStackFiles['/App.js']
+
+  if (pageContent) {
+    let appCode = transformForSandpack(pageContent, '/App.tsx')
+
+    const layoutContent =
+      fullStackFiles['/app/layout.tsx'] ??
+      fullStackFiles['app/layout.tsx'] ??
+      fullStackFiles['/app/layout.js']
+
+    if (layoutContent && !appCode.includes('html') && layoutContent.includes('{children}')) {
+      const layoutBody = transformForSandpack(layoutContent, '/App.tsx')
+        .replace(/export\s+default\s+function\s+\w+[^{]*\{[\s\S]*?return\s*\(\s*/m, '')
+        .replace(/\{children\}/, '__APP_CONTENT__')
+        .replace(/\)\s*;?\s*\}\s*$/, '')
+
+      if (layoutBody.includes('__APP_CONTENT__')) {
+        const innerMatch = appCode.match(/return\s*\(([\s\S]*)\)\s*;?\s*\}\s*$/)
+        const inner = innerMatch?.[1]?.trim() ?? appCode
+        appCode = layoutBody.replace('__APP_CONTENT__', inner)
+        if (!appCode.includes('export default')) {
+          appCode = `export default function App() {\n  return (\n    ${appCode}\n  );\n}`
+        }
+      }
+    }
+
+    result['/App.tsx'] = appCode.includes('export default')
+      ? appCode
+      : `export default function App() {\n  return (\n    ${appCode}\n  );\n}`
+  }
+
+  return result
+}
+
+/** Prefer previewFiles; fall back to extracting from fullStackFiles. */
+export function buildInstantPreviewFiles(
+  previewFiles: Array<{ path?: string; content?: string } | null | undefined> | undefined,
+  fullStackFiles: Record<string, string>,
+  useTypeScript = true,
+): Record<string, string> {
+  const fromPreview = buildPreviewFiles(previewFiles, useTypeScript)
+  if (hasPreviewEntry(fromPreview)) {
+    return repairPreviewFiles(fromPreview).files
+  }
+
+  const extracted = extractPreviewFromFullStack(fullStackFiles)
+  return repairPreviewFiles(extracted).files
+}
+
 export interface PreviewValidationIssue {
   file: string
   message: string

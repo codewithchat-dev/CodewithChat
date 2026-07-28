@@ -41,6 +41,39 @@ const FALLBACK_TSCONFIG = JSON.stringify({
 }, null, 2)
 
 // Patch files for WebContainer compatibility
+function sanitizePackageJsonForWebContainer(pkg: Record<string, unknown>): Record<string, unknown> {
+  const sanitized = { ...pkg }
+
+  // Drop packages that often break npm pre-resolve inside WebContainer
+  const stripFrom = (section: Record<string, string> | undefined) => {
+    if (!section) return section
+    const next = { ...section }
+    for (const name of Object.keys(next)) {
+      if (
+        name === '@vercel/ai' ||
+        name.startsWith('@supabase/ssr') ||
+        name.startsWith('@supabase/auth-helpers')
+      ) {
+        delete next[name]
+      }
+    }
+    return next
+  }
+
+  sanitized.dependencies = stripFrom(sanitized.dependencies as Record<string, string> | undefined)
+  sanitized.devDependencies = stripFrom(sanitized.devDependencies as Record<string, string> | undefined)
+  sanitized.optionalDependencies = stripFrom(sanitized.optionalDependencies as Record<string, string> | undefined)
+
+  // Ensure core runtime deps exist for next dev
+  if (!sanitized.dependencies) sanitized.dependencies = {}
+  const deps = sanitized.dependencies as Record<string, string>
+  if (!deps.react) deps.react = '^18.2.0'
+  if (!deps['react-dom']) deps['react-dom'] = '^18.2.0'
+  if (!deps.next) deps.next = '14.2.3'
+
+  return sanitized
+}
+
 function patchForWebContainer(files: Record<string, string>): Record<string, string> {
   const patched = { ...files }
 
@@ -48,7 +81,7 @@ function patchForWebContainer(files: Record<string, string>): Record<string, str
   const pkgKey = patched['/package.json'] ? '/package.json' : patched['package.json'] ? 'package.json' : null
   if (pkgKey) {
     try {
-      const pkg = JSON.parse(patched[pkgKey])
+      const pkg = sanitizePackageJsonForWebContainer(JSON.parse(patched[pkgKey]))
 
       // Detect Next.js version to match swc-wasm-nodejs version
       const nextVersion = pkg.dependencies?.next || pkg.devDependencies?.next
@@ -110,8 +143,8 @@ function patchForWebContainer(files: Record<string, string>): Record<string, str
     }
   }
 
-  // 4. Force omit=optional via .npmrc to prevent downloading huge SWC native binaries in WebContainers
-  patched['/.npmrc'] = 'omit=optional\n'
+  // 4. Force omit=optional + legacy peer deps via .npmrc
+  patched['/.npmrc'] = 'omit=optional\nlegacy-peer-deps=true\nfund=false\naudit=false\n'
 
   // 5. Fallback to Babel to bypass the SWC WASM loading error entirely
   patched['/.babelrc'] = '{\n  "presets": ["next/babel"]\n}'
