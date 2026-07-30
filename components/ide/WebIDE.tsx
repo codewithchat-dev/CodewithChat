@@ -81,7 +81,7 @@ function patchForWebContainer(files: Record<string, string>): Record<string, str
   const pkgKey = patched['/package.json'] ? '/package.json' : patched['package.json'] ? 'package.json' : null
   if (pkgKey) {
     try {
-      const pkg = sanitizePackageJsonForWebContainer(JSON.parse(patched[pkgKey]))
+      const pkg = sanitizePackageJsonForWebContainer(JSON.parse(patched[pkgKey])) as any
 
       // Detect Next.js version to match swc-wasm-nodejs version
       const nextVersion = pkg.dependencies?.next || pkg.devDependencies?.next
