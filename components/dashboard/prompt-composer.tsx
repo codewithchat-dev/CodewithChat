@@ -63,7 +63,7 @@ export function PromptComposer({
   credits = MAX_DAILY_CREDITS,
   maxCredits = MAX_DAILY_CREDITS,
   agent = 'Gemini 3.5 Flash',
-  tech = 'Next.js + Supabase',
+  tech = 'React + Vite',
   platform = 'Website',
   onAgentChange,
   onTechChange,
@@ -186,9 +186,8 @@ export function PromptComposer({
   }
 
   return (
-    <div className="relative w-full group">
-      <div className="absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-primary/15 via-primary/5 to-primary/15 blur-sm opacity-70" />
-      <div className="relative flex flex-col bg-card/90 backdrop-blur-sm border border-border hover:border-border/80 rounded-2xl shadow-sm transition-all focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/40 overflow-hidden">
+    <div className="relative w-full">
+      <div className="relative flex flex-col bg-card/50 border border-border/60 hover:border-border rounded-2xl transition-all focus-within:border-primary/60 overflow-hidden">
         {creditsExhausted && (
           <div className="px-4 py-3 border-b border-amber-500/20 bg-amber-500/10 flex flex-col gap-2">
             <div className="flex items-start gap-2">
@@ -321,8 +320,8 @@ export function PromptComposer({
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="w-56 p-2">
-                  <DropdownMenuItem onClick={() => onTechChange('Next.js + Supabase')} className="cursor-pointer">
-                    Next.js + Supabase
+                  <DropdownMenuItem onClick={() => onTechChange('React + Vite')} className="cursor-pointer">
+                    React + Vite
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

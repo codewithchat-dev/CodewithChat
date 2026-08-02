@@ -32,7 +32,13 @@ export function buildPreviewFiles(
 }
 
 export function hasPreviewEntry(files: Record<string, string>): boolean {
-  return Boolean(files['/App.tsx'] || files['/App.js'] || files['/index.html'] || files['index.html'])
+  return Boolean(
+    files['/App.tsx'] || files['/App.js'] ||
+    files['/index.html'] || files['index.html'] ||
+    files['/src/App.tsx'] || files['src/App.tsx'] ||
+    files['/src/App.jsx'] || files['src/App.jsx'] ||
+    files['/src/main.tsx'] || files['src/main.tsx']
+  )
 }
 
 /** Paths copied from a Next.js fullStack project into Sandpack preview. */
@@ -127,12 +133,110 @@ function normalizeFullStackPath(path: string): string {
 }
 
 /**
+ * Detect if this is a Vite project (vs Next.js)
+ */
+export function isViteProject(fullStackFiles: Record<string, string>): boolean {
+  return Boolean(
+    fullStackFiles['/src/App.tsx'] ||
+    fullStackFiles['src/App.tsx'] ||
+    fullStackFiles['/src/App.jsx'] ||
+    fullStackFiles['src/App.jsx'] ||
+    fullStackFiles['/vite.config.ts'] ||
+    fullStackFiles['vite.config.ts']
+  )
+}
+
+/**
+ * For Vite projects: convert to Sandpack-compatible format.
+ * - Remaps /src/App.tsx → /App.tsx, /src/components/* → /components/*
+ * - Strips @tailwind directives (we use CDN instead)
+ * - Removes index.html, vite.config.ts, tailwind.config.js etc.
+ * - Fixes relative imports that change due to path remapping
+ */
+export function extractPreviewFromVite(
+  fullStackFiles: Record<string, string>,
+): Record<string, string> {
+  // Files to skip entirely (Sandpack / CDN handles these)
+  const SKIP_PATHS = new Set([
+    '/vite.config.ts', '/vite.config.js',
+    '/tailwind.config.js', '/tailwind.config.ts',
+    '/postcss.config.js', '/postcss.config.cjs',
+    '/tsconfig.json', '/tsconfig.node.json', '/tsconfig.app.json',
+    '/index.html',
+    '/src/main.tsx', '/src/main.jsx', '/src/main.ts', '/src/main.js',
+  ])
+
+  // First pass: build a path remapping table
+  // /src/foo/bar.tsx → /foo/bar.tsx
+  const remapPath = (rawPath: string): string => {
+    const p = rawPath.startsWith('/') ? rawPath : `/${rawPath}`
+    if (p.startsWith('/src/')) return p.slice(4) // '/src/App.tsx' → '/App.tsx'
+    return p
+  }
+
+  const result: Record<string, string> = {}
+
+  for (const [rawPath, content] of Object.entries(fullStackFiles)) {
+    const original = rawPath.startsWith('/') ? rawPath : `/${rawPath}`
+    const lower = original.toLowerCase()
+
+    // Skip non-essential files
+    if (
+      SKIP_PATHS.has(lower) ||
+      lower.includes('.lock') ||
+      lower.endsWith('.gitignore') ||
+      lower === '/readme.md' ||
+      lower === '/package.json'
+    ) {
+      continue
+    }
+
+    const targetPath = remapPath(original)
+
+    let code = content
+
+    // Strip @tailwind / @layer base directives from CSS (we use CDN Tailwind)
+    if (lower.endsWith('.css')) {
+      code = code
+        .replace(/@tailwind\s+\S+;?\s*/g, '')
+        .replace(/@layer\s+base\s*\{[\s\S]*?\}/g, '')
+        .trim()
+      // If CSS is now empty, skip it
+      if (!code) continue
+    }
+
+    // Fix relative imports: if a file moved from /src/X to /X,
+    // an import like '../components/Foo' may now need to be './components/Foo'
+    if (lower.endsWith('.tsx') || lower.endsWith('.ts') || lower.endsWith('.jsx') || lower.endsWith('.js')) {
+      // Remap any import from 'src/...' absolute-style
+      code = code.replace(/from\s+['"]src\/([^'"]+)['"]/g, (_m, p: string) => `from './${p}'`)
+
+      // Strip CSS imports (handled by CDN)
+      code = code.replace(/import\s+['"][^'"]*\.css['"]\s*;?\s*\n?/g, '')
+
+      // Strip 'use client' (not needed in Sandpack)
+      code = code.replace(/^['"](use client)['"];?\s*\n/m, '')
+    }
+
+    result[targetPath] = code
+  }
+
+  return result
+}
+
+
+/**
  * Builds instant Sandpack preview files from a Next.js fullStack project.
  * Maps app/page.tsx → App.tsx and copies client-side components.
  */
 export function extractPreviewFromFullStack(
   fullStackFiles: Record<string, string>,
 ): Record<string, string> {
+  // If it's a Vite project, handle it differently
+  if (isViteProject(fullStackFiles)) {
+    return extractPreviewFromVite(fullStackFiles)
+  }
+
   const result: Record<string, string> = {}
 
   for (const [rawPath, content] of Object.entries(fullStackFiles)) {

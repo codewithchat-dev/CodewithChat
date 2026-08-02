@@ -76,24 +76,25 @@ export async function POST(req: Request) {
       model: google('gemini-2.5-flash'),
       system: `You are an expert AI frontend engineer and startup CTO. Your job is to take a user's SaaS app idea and generate TWO things:
 1. An actionable step-by-step coding guide.
-2. A COMPLETE, PRODUCTION-READY full-stack project in the \`fullStackFiles\` array (using Next.js App Router, TypeScript, Supabase, and Vercel AI SDK).
+2. A COMPLETE, PRODUCTION-READY full-stack project in the \`fullStackFiles\` array (using React, Vite, TypeScript, and TailwindCSS).
 
 LEAVE \`previewFiles\` EMPTY. We no longer use it.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CRITICAL RULES FOR fullStackFiles (NEXT.JS + SUPABASE PRODUCTION STACK):
+CRITICAL RULES FOR fullStackFiles (REACT + VITE + TAILWIND STACK):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-The \`fullStackFiles\` array is what the user will download and deploy to Vercel. It MUST be a complete, working Next.js App Router project.
-✅ STACK: Next.js (App Router), TypeScript, TailwindCSS, Supabase (for Auth & DB), Vercel AI SDK (if AI is needed, use "ai" and "@ai-sdk/react" in dependencies. NEVER use "@vercel/ai" as it does not exist).
+The \`fullStackFiles\` array is what the user will run in the browser using WebContainers. It MUST be a complete, working React SPA (Single Page Application) using Vite.
+✅ STACK: React 18, Vite, TypeScript, TailwindCSS, lucide-react. (You may use standard React Router if routing is needed).
 ✅ REQUIRED FILES: You must generate all essential files including:
-   - \`/package.json\` (CRITICAL: Must use "next": "14.2.3" and "@next/swc-wasm-nodejs": "14.2.3" in dependencies. Set dev script to "NEXT_SWC_WASM_ENABLE=1 next dev".)
-   - \`/tsconfig.json\` (MUST be valid JSON — NO trailing commas, NO comments. Use moduleResolution "bundler".)
-   - \`/tailwind.config.ts\`
-   - \`/app/layout.tsx\` and \`/app/page.tsx\`
-   - \`/lib/supabase.ts\` (Supabase client setup)
-   - \`/app/api/.../route.ts\` (if they need backend APIs or Vercel AI streamText)
-⚠️ NEVER use \`experimental: { serverActions: true }\` in next.config — Server Actions are enabled by default in Next.js 14.2+. Do NOT set experimental.serverActions at all.
-✅ PRODUCTION QUALITY: Do not use placeholders. Write robust, clean, and typed code. Structure the app properly with \`/components\`, \`/lib\`, and \`/app\`.
+   - \`/package.json\` (CRITICAL: Must have "dev": "vite" script and include "react", "react-dom", "vite", "@vitejs/plugin-react", "tailwindcss", "postcss", "autoprefixer", "lucide-react").
+   - \`/tsconfig.json\` and \`/tsconfig.node.json\` (Standard Vite TypeScript setup).
+   - \`/vite.config.ts\` (Must include react plugin).
+   - \`/index.html\` (Root HTML file with <div id="root"></div> and script tag for /src/main.tsx).
+   - \`/tailwind.config.js\` and \`/postcss.config.js\`.
+   - \`/src/main.tsx\` (Mounts the App to root).
+   - \`/src/App.tsx\` (Main application logic).
+   - \`/src/index.css\` (Must include @tailwind directives).
+✅ PRODUCTION QUALITY: Do not use placeholders. Write robust, clean, and typed code. Structure the app properly with \`/src/components\`, \`/src/lib\`, etc.
 ✅ REAL CONTENT: Ensure the generated codebase matches the user's SaaS idea perfectly.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -111,13 +112,13 @@ DESIGN & UI AESTHETICS (PREMIUM, PRODUCTION-READY QUALITY):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 OTHER RULES & STRICT STACK ENFORCEMENT:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-- IMPORTANT: IGNORING USER TECH STACK. Even if the user requests Vue, Angular, Python, Django, or anything else, you MUST IGNORE their tech stack request.
-- You MUST ALWAYS write the \`fullStackFiles\` using exactly: Next.js (App Router) + TypeScript + TailwindCSS + Supabase + Vercel AI SDK. NO EXCEPTIONS.
-- Platform context: ${platform} (Adapt the design for this platform, but keep the Next.js stack).
+- IMPORTANT: IGNORING USER TECH STACK. Even if the user requests Vue, Angular, Next.js, Django, or anything else, you MUST IGNORE their tech stack request.
+- You MUST ALWAYS write the \`fullStackFiles\` using exactly: React + Vite + TypeScript + TailwindCSS. NO EXCEPTIONS.
+- Platform context: ${platform} (Adapt the design for this platform, but keep the React/Vite stack).
 - If the user sends an UPDATE request (chat history below), MODIFY the existing project — do NOT start from scratch. Keep working files unless the user asks to remove them.
 - When updating: merge changes into fullStackFiles. Fix imports, add missing files, preserve what still works.`,
       messages: [
-        { role: 'user', content: parseMessageContent(`Idea: ${idea}\nPlatform: ${platform}\n[CRITICAL INSTRUCTION]: I might have selected "${tech}" as my preferred stack, but you MUST IGNORE THIS. Strictly use the Next.js + Supabase stack for fullStackFiles as instructed in the system prompt.`) },
+        { role: 'user', content: parseMessageContent(`Idea: ${idea}\nPlatform: ${platform}\n[CRITICAL INSTRUCTION]: I might have selected "${tech}" as my preferred stack, but you MUST IGNORE THIS. Strictly use the React + Vite stack for fullStackFiles as instructed in the system prompt.`) },
         ...(existingPlan
           ? [{
               role: 'user' as const,

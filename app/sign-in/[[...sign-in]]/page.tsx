@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 
 export default function SignInPage() {
   return (
-    <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background relative">
+    <div className="flex min-h-screen w-full flex-col items-center justify-center py-24 px-4 bg-background relative">
       <div className="absolute left-4 top-4 md:left-8 md:top-8">
         <Button asChild variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
           <Link href="/">

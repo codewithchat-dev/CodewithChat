@@ -23,7 +23,7 @@ const PLACEHOLDER_PHRASES = [
 
 export default function DashboardPage() {
   const [idea, setIdea] = useState('')
-  const [tech, setTech] = useState('Next.js + Supabase')
+  const [tech, setTech] = useState('React + Vite')
   const [platform, setPlatform] = useState('Website')
   const [agent, setAgent] = useState('Gemini 3.5 Flash')
   const [credits, setCredits] = useState(MAX_DAILY_CREDITS)
@@ -102,8 +102,10 @@ export default function DashboardPage() {
 
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center p-4 md:p-8">
-      {/* Background gradients */}
-      <div className="absolute inset-0 -z-10 h-full w-full bg-background bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))] dark:bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.15),rgba(255,255,255,0))]"></div>
+      {/* Background glowing effects */}
+      <div className="absolute inset-0 -z-20 bg-background"></div>
+      <div className="absolute top-0 left-1/2 -z-20 h-[800px] w-[1200px] -translate-x-1/2 -translate-y-[30%] rounded-full bg-primary/40 blur-[200px] pointer-events-none"></div>
+      <div className="absolute top-0 inset-x-0 -z-20 h-[800px] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/30 via-transparent to-transparent pointer-events-none"></div>
       
       <div className="w-full max-w-3xl flex-1 flex flex-col justify-center animate-in fade-in slide-in-from-bottom-4 duration-700 pt-16 md:pt-20">
         <h1 className="text-center text-3xl md:text-5xl font-semibold tracking-tight mb-8">

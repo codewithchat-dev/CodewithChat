@@ -312,6 +312,8 @@ export function SandpackPreview({
       if (result[normalized]) {
         result[normalized] = { ...result[normalized], active: true }
       }
+    } else if (result['/src/App.tsx']) {
+      result['/src/App.tsx'] = { ...result['/src/App.tsx'], active: true }
     } else if (result['/App.tsx']) {
       result['/App.tsx'] = { ...result['/App.tsx'], active: true }
     } else if (result['/App.js']) {
@@ -350,7 +352,8 @@ export function SandpackPreview({
         options={{
           externalResources: isVanilla ? [] : ['https://cdn.tailwindcss.com'],
           recompileMode: 'delayed',
-          recompileDelay: 600,
+          recompileDelay: 300,
+          bundlerURL: 'https://sandpack-bundler.codesandbox.io',
         }}
         theme={defaultDark}
         style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}

@@ -63,7 +63,7 @@ export default function PricingPage() {
   const [isYearly, setIsYearly] = useState(false)
 
   return (
-    <div className="min-h-screen flex flex-col bg-background relative overflow-hidden">
+    <div className="min-h-screen flex flex-col bg-background relative overflow-clip">
       <SiteHeader />
       
       {/* Background gradients */}

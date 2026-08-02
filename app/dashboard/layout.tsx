@@ -21,11 +21,16 @@ export default function DashboardLayout({
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const pathname = usePathname()
+  const isProjectWorkspace = pathname.startsWith('/dashboard/project/')
 
   // Auto-close mobile menu when route changes
   useEffect(() => {
     setIsMobileMenuOpen(false)
   }, [pathname])
+
+  if (isProjectWorkspace) {
+    return <main className="flex h-screen flex-col min-w-0 bg-background">{children}</main>
+  }
 
   return (
     <div className={`min-h-screen bg-background transition-all duration-300 ${isSidebarOpen ? 'lg:grid lg:grid-cols-[16rem_1fr]' : 'flex flex-col'}`}>

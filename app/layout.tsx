@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import { Outfit, JetBrains_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/sonner'
@@ -9,8 +9,8 @@ import NextTopLoader from 'nextjs-toploader'
 import { CommandMenu } from '@/components/command-menu'
 import './globals.css'
 
-const geist = Geist({ subsets: ['latin'], variable: '--font-geist-sans' })
-const geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono' })
+const fontSans = Outfit({ subsets: ['latin'], variable: '--font-sans' })
+const fontMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono' })
 
 export const metadata: Metadata = {
   title: 'CodewithChat - AI Studio',
@@ -35,7 +35,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning className="bg-background">
-      <body suppressHydrationWarning className={`${geist.variable} ${geistMono.variable} font-sans antialiased`}>
+      <body suppressHydrationWarning className={`${fontSans.variable} ${fontMono.variable} font-sans antialiased bg-background`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"

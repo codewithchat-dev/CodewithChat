@@ -142,16 +142,17 @@ export function Hero() {
   }
 
   return (
-    <section className="relative overflow-hidden pt-24 pb-20 md:pt-32 md:pb-28 min-h-[90vh] flex flex-col justify-center">
+    <section className="relative overflow-hidden pt-32 pb-20 md:pt-48 md:pb-28 flex flex-col items-center">
       {/* Background glowing effects */}
-      <div className="absolute inset-0 -z-20 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/10 via-background to-background"></div>
-      <AnimatedBackground />
+      <div className="absolute inset-0 -z-20 bg-background"></div>
+      <div className="absolute top-0 left-1/2 -z-20 h-[800px] w-[1200px] -translate-x-1/2 -translate-y-[30%] rounded-full bg-primary/40 blur-[200px] pointer-events-none"></div>
+      <div className="absolute top-0 inset-x-0 -z-20 h-[800px] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/30 via-transparent to-transparent pointer-events-none"></div>
       
       <div className="mx-auto w-full max-w-4xl px-6 relative z-10">
         <div className="flex flex-col items-center text-center">
           <div className="mb-8 space-y-4">
-            <h1 className="text-balance text-4xl font-bold tracking-tight md:text-5xl lg:text-6xl bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">
-              Build something Incredible
+            <h1 className="text-balance text-4xl font-bold tracking-tight md:text-5xl lg:text-6xl bg-gradient-to-br from-foreground via-foreground to-foreground/50 bg-clip-text text-transparent">
+              Build something <span className="bg-gradient-to-r from-primary to-indigo-400 bg-clip-text text-transparent">Incredible</span>
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground font-light max-w-2xl mx-auto">
               Create production-ready apps and websites just by chatting with AI.
@@ -163,7 +164,7 @@ export function Hero() {
             className="relative w-full group"
           >
             <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 blur-md transition-all group-hover:from-primary/30 group-hover:via-primary/20 group-hover:to-primary/30 opacity-70"></div>
-            <div className="relative flex flex-col bg-card border border-border/60 hover:border-border rounded-2xl shadow-sm transition-all focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 overflow-hidden">
+            <div className="relative flex flex-col bg-card/80 backdrop-blur-md border border-white/10 hover:border-white/20 rounded-2xl shadow-2xl transition-all focus-within:ring-2 focus-within:ring-primary/30 focus-within:border-primary/50 overflow-hidden">
               <Textarea
                 value={idea}
                 onChange={(e) => setIdea(e.target.value)}
@@ -211,7 +212,7 @@ export function Hero() {
                 <Button 
                   type="submit" 
                   size="icon" 
-                  className="rounded-full size-10 bg-primary/10 hover:bg-primary text-primary hover:text-primary-foreground transition-all"
+                  className="rounded-full size-10 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 transition-all"
                   disabled={!idea.trim()}
                 >
                   <ArrowUp className="size-5" />

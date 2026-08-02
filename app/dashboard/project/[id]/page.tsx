@@ -9,7 +9,7 @@ import {
   RotateCw, Download, MoreHorizontal, Github, Settings,
   Pin, PinOff, Pencil, Check, X, Share2, Rocket,
   Monitor, Tablet, Smartphone, FileCode2,
-  Zap, Lock, Slash, PanelLeftClose, PanelLeftOpen,
+  Zap, Lock, Slash, PanelLeftClose, PanelLeftOpen, Gift,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import JSZip from 'jszip'
@@ -81,7 +81,7 @@ export default function ProjectPage() {
   const [idea, setIdea] = useState('')
   const [projectTitle, setProjectTitle] = useState('')
   const [isPinned, setIsPinned] = useState(false)
-  const [tech] = useState(searchParams.get('tech') || 'React + Tailwind')
+  const [tech] = useState(searchParams.get('tech') || 'React + Vite')
   const [platform] = useState(searchParams.get('platform') || 'Website')
   const [agent] = useState(searchParams.get('agent') || 'Gemini 3.5 Flash')
   const [credits, setCredits] = useState(MAX_DAILY_CREDITS)
@@ -436,9 +436,15 @@ export default function ProjectPage() {
     <TooltipProvider delayDuration={300}>
       <div className="flex flex-col h-full min-h-0 overflow-hidden">
         {/* ═══════════════ TOP HEADER BAR ═══════════════ */}
-        <div className="h-12 border-b border-border bg-card flex items-center justify-between px-4 shrink-0">
-          {/* Left: Project Name + Pin + Rename + Settings */}
-          <div className="flex items-center gap-2 min-w-0">
+        <div className="h-[52px] border-b border-border/40 bg-background flex items-center justify-between px-4 shrink-0">
+          {/* Left: Logo + Project Name + Pin + Rename + Settings */}
+          <div className="flex items-center gap-3 min-w-0">
+            {/* Logo to go back */}
+            <Link href="/dashboard" className="mr-2 hover:opacity-80 transition-opacity">
+              <span className="font-bold italic text-xl tracking-tight">CWC</span>
+            </Link>
+            <div className="w-px h-5 bg-border/50 shrink-0 mr-1" />
+
             {/* Project Name (editable) */}
             {isRenaming ? (
               <div className="flex items-center gap-1.5">
@@ -495,8 +501,11 @@ export default function ProjectPage() {
 
           {/* Right: Publish + Share + 3-dot */}
           <div className="flex items-center gap-1.5 shrink-0">
-            <PublishProjectModal projectId={projectId} />
+            <Button asChild variant="secondary" className="h-8 px-3 text-xs bg-muted/40 hover:bg-muted font-medium rounded-md hidden sm:flex">
+              <Link href="/pricing">Upgrade</Link>
+            </Button>
             <ShareProjectModal projectId={projectId} />
+            <PublishProjectModal projectId={projectId} />
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -530,19 +539,30 @@ export default function ProjectPage() {
           >
             {/* Chat messages — scrollable */}
             <div className="flex-1 min-h-0 overflow-y-auto p-4">
-              <div className="flex flex-col gap-3">
-                <div className="bg-primary/10 text-primary p-3 rounded-lg text-sm rounded-tl-none">
-                  {idea ? `Building: ${idea}` : 'Loading project...'}
+              <div className="flex flex-col gap-4">
+                {/* Initial state exactly like bolt */}
+                <div className="flex flex-col gap-1.5 px-1 pb-2">
+                  <span className="font-bold italic text-xl tracking-tight mb-2 opacity-90">CWC</span>
+                  <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
+                    <Rocket className="size-4" />
+                    <span>{idea ? 'Reviewing the details...' : 'Loading project...'}</span>
+                  </div>
                 </div>
+                
                 {messages.map((msg, i) => (
                   <div
                     key={i}
-                    className={`p-3 rounded-lg text-sm max-w-[90%] whitespace-pre-wrap ${
+                    className={`text-[13px] leading-relaxed max-w-[92%] whitespace-pre-wrap ${
                       msg.role === 'user'
-                        ? 'bg-primary text-primary-foreground self-end rounded-tr-none ml-auto'
-                        : 'bg-muted text-foreground self-start rounded-tl-none'
+                        ? 'bg-muted/40 border border-border/40 text-foreground px-3.5 py-2.5 rounded-[20px] rounded-br-sm ml-auto self-end'
+                        : 'text-foreground/90 py-1 self-start w-full'
                     }`}
                   >
+                    {msg.role !== 'user' && (
+                      <div className="flex items-center gap-2 mb-2 font-medium text-foreground opacity-80 text-[12px]">
+                        <Rocket className="size-3.5" /> Assistant
+                      </div>
+                    )}
                     {msg.content}
                   </div>
                 ))}
@@ -600,9 +620,24 @@ export default function ProjectPage() {
               </div>
             )}
             {!activePlan && loading && !projectLoading && (
-              <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
-                <Spinner className="size-6" />
-                <p className="text-sm">Generating your project...</p>
+              <div className="flex h-full flex-col items-center justify-center text-center px-4 animate-in fade-in zoom-in-95 duration-500">
+                <div className="relative flex items-center justify-center mb-6">
+                  {/* Glowing background */}
+                  <div className="absolute bg-primary/20 blur-2xl rounded-full size-24"></div>
+                  <div className="relative flex items-center justify-center bg-gradient-to-b from-primary/20 to-transparent border border-primary/20 rounded-2xl p-5 shadow-2xl backdrop-blur-md">
+                    <Gift className="size-12 text-primary" />
+                  </div>
+                </div>
+                <h3 className="text-xl font-semibold text-foreground mb-2">Refer & earn</h3>
+                <p className="text-sm text-muted-foreground max-w-xs mb-8 leading-relaxed">
+                  Share CodewithChat with friends and get rewarded when they subscribe
+                </p>
+                <Button variant="outline" className="gap-2 bg-transparent border-border hover:bg-muted/50 hover:text-foreground mb-12 h-10 px-6 rounded-lg text-sm transition-all shadow-sm">
+                  <Gift className="size-4" /> Earn $50
+                </Button>
+                <p className="text-[13px] text-muted-foreground flex items-center gap-2">
+                  <Spinner className="size-3.5" /> <span className="text-foreground/80">Your</span> preview will appear here
+                </p>
               </div>
             )}
             {/* Fallback: generation failed or no plan saved */}
