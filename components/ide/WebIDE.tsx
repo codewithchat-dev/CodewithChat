@@ -11,6 +11,7 @@ import { Spinner } from '@/components/ui/spinner'
 
 interface WebIDEProps {
   files: Record<string, string>
+  view?: 'preview' | 'code' | 'both'
 }
 
 function toFsPath(path: string): string {
@@ -180,7 +181,7 @@ function buildFileSystemTree(files: Record<string, string>) {
   return tree
 }
 
-function IDEContent({ files }: WebIDEProps) {
+function IDEContent({ files, view = 'both' }: WebIDEProps) {
   const { webcontainer, isBooting, error } = useWebContainer()
   const patchedFiles = useMemo(() => patchForWebContainer(files), [files])
   const [activeFile, setActiveFile] = useState<string | null>(null)
@@ -279,50 +280,60 @@ function IDEContent({ files }: WebIDEProps) {
     <div className="w-full h-full bg-[#1e1e1e] text-stone-300 flex flex-col overflow-hidden">
       <PanelGroup direction="horizontal" className="flex-1">
         {/* Left Sidebar: File Tree */}
-        <Panel defaultSize={20} minSize={15} maxSize={30}>
-          <FileTree 
-            files={fileContents} 
-            activeFile={activeFile} 
-            onFileSelect={setActiveFile} 
-          />
-        </Panel>
+        {view !== 'preview' && (
+          <Panel defaultSize={20} minSize={15} maxSize={30}>
+            <FileTree 
+              files={fileContents} 
+              activeFile={activeFile} 
+              onFileSelect={setActiveFile} 
+            />
+          </Panel>
+        )}
         
-        <PanelResizeHandle className="w-1 bg-[#2b2b2b] hover:bg-indigo-500 transition-colors cursor-col-resize" />
+        {view !== 'preview' && (
+          <PanelResizeHandle className="w-1 bg-[#2b2b2b] hover:bg-indigo-500 transition-colors cursor-col-resize" />
+        )}
         
         {/* Center: Editor & Terminal */}
-        <Panel defaultSize={40} minSize={30}>
-          <PanelGroup direction="vertical">
-            <Panel defaultSize={70} minSize={30}>
-              <CodeEditor 
-                activeFile={activeFile}
-                fileContent={activeFile ? fileContents[activeFile] || '' : ''}
-                onContentChange={handleContentChange}
-              />
-            </Panel>
-            
-            <PanelResizeHandle className="h-1 bg-[#2b2b2b] hover:bg-indigo-500 transition-colors cursor-row-resize" />
-            
-            <Panel defaultSize={30} minSize={10}>
-              <Terminal />
-            </Panel>
-          </PanelGroup>
-        </Panel>
+        {view !== 'preview' && (
+          <Panel defaultSize={view === 'code' ? 80 : 40} minSize={30}>
+            <PanelGroup direction="vertical">
+              <Panel defaultSize={70} minSize={30}>
+                <CodeEditor 
+                  activeFile={activeFile}
+                  fileContent={activeFile ? fileContents[activeFile] || '' : ''}
+                  onContentChange={handleContentChange}
+                />
+              </Panel>
+              
+              <PanelResizeHandle className="h-1 bg-[#2b2b2b] hover:bg-indigo-500 transition-colors cursor-row-resize" />
+              
+              <Panel defaultSize={30} minSize={10}>
+                <Terminal />
+              </Panel>
+            </PanelGroup>
+          </Panel>
+        )}
 
-        <PanelResizeHandle className="w-1 bg-[#2b2b2b] hover:bg-indigo-500 transition-colors cursor-col-resize" />
+        {view === 'both' && (
+          <PanelResizeHandle className="w-1 bg-[#2b2b2b] hover:bg-indigo-500 transition-colors cursor-col-resize" />
+        )}
         
         {/* Right: Preview */}
-        <Panel defaultSize={40} minSize={30}>
-          <PreviewWindow />
-        </Panel>
+        {view !== 'code' && (
+          <Panel defaultSize={view === 'preview' ? 100 : 40} minSize={30}>
+            <PreviewWindow />
+          </Panel>
+        )}
       </PanelGroup>
     </div>
   )
 }
 
-export function WebIDE({ files }: WebIDEProps) {
+export function WebIDE({ files, view = 'both' }: WebIDEProps) {
   return (
     <WebContainerProvider>
-      <IDEContent files={files} />
+      <IDEContent files={files} view={view} />
     </WebContainerProvider>
   )
 }

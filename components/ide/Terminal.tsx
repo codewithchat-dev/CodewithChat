@@ -28,15 +28,30 @@ export function Terminal() {
     terminal.loadAddon(fitAddon)
 
     terminal.open(terminalRef.current)
-    fitAddon.fit()
 
     xtermRef.current = terminal
     fitAddonRef.current = fitAddon
 
-    const handleResize = () => fitAddon.fit()
+    // Defer fit() until element is visible in the DOM to avoid
+    // "Cannot read properties of undefined (reading 'dimensions')" error
+    const rafId = requestAnimationFrame(() => {
+      try { fitAddon.fit() } catch { /* ignore if not yet visible */ }
+    })
+
+    // Use ResizeObserver for more reliable resize handling
+    const ro = new ResizeObserver(() => {
+      try { fitAddon.fit() } catch { /* ignore */ }
+    })
+    if (terminalRef.current) ro.observe(terminalRef.current)
+
+    const handleResize = () => {
+      try { fitAddon.fit() } catch { /* ignore */ }
+    }
     window.addEventListener('resize', handleResize)
 
     return () => {
+      cancelAnimationFrame(rafId)
+      ro.disconnect()
       window.removeEventListener('resize', handleResize)
       terminal.dispose()
       xtermRef.current = null

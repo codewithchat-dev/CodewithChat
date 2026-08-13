@@ -358,6 +358,14 @@ export function SandpackPreview({
         theme={defaultDark}
         style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}
       >
+        <style dangerouslySetInnerHTML={{ __html: `
+          .sp-wrapper, .sp-layout, .sp-stack, .sp-preview-container, .sp-preview-iframe {
+            height: 100% !important;
+            min-height: 100% !important;
+            flex: 1 !important;
+            width: 100% !important;
+          }
+        `}} />
         <ActiveFileOpener filePath={activeFile} />
         {!isProjectFiles && <SandpackErrorWatcher onError={handlePreviewError} />}
         {/* Main content area */}

@@ -108,7 +108,6 @@ export default function ProjectPage() {
   const buildStartedAtRef = useRef<number | null>(null)
 
   // IDE / preview UI
-  const [ideMode, setIdeMode] = useState<IdeMode>('sandpack')
   const [view, setView] = useState<SandpackView>('preview')
   const [viewportSize, setViewportSize] = useState<ViewportSize>('desktop')
   const [isTerminalOpen, setIsTerminalOpen] = useState(false)
@@ -700,35 +699,31 @@ export default function ProjectPage() {
 
                   <div className="w-px h-5 bg-border shrink-0 ml-1" />
 
-                  {/* Preview / Code tabs (Sandpack) */}
-                  {ideMode === 'sandpack' && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => { setView('preview'); setRightPanel('preview') }}
-                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                          view === 'preview' && rightPanel === 'preview'
-                            ? 'bg-primary/10 text-primary'
-                            : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-                        }`}
-                      >
-                        <Eye className="size-3.5" />
-                        Preview
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setView('code'); setRightPanel('preview') }}
-                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                          view === 'code' && rightPanel === 'preview'
-                            ? 'bg-primary/10 text-primary'
-                            : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-                        }`}
-                      >
-                        <Code2 className="size-3.5" />
-                        Code
-                      </button>
-                    </>
-                  )}
+                  {/* Preview / Code tabs */}
+                  <button
+                    type="button"
+                    onClick={() => { setView('preview'); setRightPanel('preview') }}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                      view === 'preview' && rightPanel === 'preview'
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                    }`}
+                  >
+                    <Eye className="size-3.5" />
+                    Preview
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setView('code'); setRightPanel('preview') }}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                      view === 'code' && rightPanel === 'preview'
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                    }`}
+                  >
+                    <Code2 className="size-3.5" />
+                    Code
+                  </button>
 
                   <button
                     type="button"
@@ -746,7 +741,7 @@ export default function ProjectPage() {
                   <div className="w-px h-5 bg-border shrink-0 mx-1" />
 
                   {/* Viewport toggles */}
-                  {ideMode === 'sandpack' && view === 'preview' && rightPanel === 'preview' && (
+                  {view === 'preview' && rightPanel === 'preview' && (
                     <div className="flex items-center gap-0.5">
                       {([
                         ['desktop', Monitor],
@@ -772,89 +767,47 @@ export default function ProjectPage() {
 
                   <div className="flex-1" />
 
-                  {/* Sandpack vs Full IDE toggle */}
-                  <div className="flex items-center rounded-lg border border-border p-0.5 bg-muted/30">
-                    <button
-                      type="button"
-                      onClick={() => setIdeMode('sandpack')}
-                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                        ideMode === 'sandpack'
-                          ? 'bg-background text-foreground shadow-sm'
-                          : 'text-muted-foreground hover:text-foreground'
-                      }`}
-                    >
-                      <Zap className="size-3.5" />
-                      Instant
-                    </button>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          onClick={() => setIdeMode('full')}
-                          disabled={!fullIdeReady}
-                          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors disabled:opacity-40 ${
-                            ideMode === 'full'
-                              ? 'bg-background text-foreground shadow-sm'
-                              : 'text-muted-foreground hover:text-foreground'
-                          }`}
-                        >
-                          <Terminal className="size-3.5" />
-                          Full IDE
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" className="text-xs">
-                        {fullIdeReady
-                          ? 'Real terminal + npm dev server (slower)'
-                          : 'Waiting for project files…'}
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-
-                  {ideMode === 'sandpack' && (
-                    <>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            type="button"
-                            onClick={() => setIsTerminalOpen(open => !open)}
-                            className={`p-1.5 rounded-md transition-colors ${
-                              isTerminalOpen
-                                ? 'text-primary bg-primary/10'
-                                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-                            }`}
-                          >
-                            <Terminal className="size-3.5" />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom" className="text-xs">Console logs</TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <a
-                            href={`/preview/${projectId}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors inline-flex"
-                          >
-                            <ExternalLink className="size-3.5" />
-                          </a>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom" className="text-xs">Open preview in new tab</TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            type="button"
-                            onClick={() => setPreviewKey(k => k + 1)}
-                            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-                          >
-                            <RotateCw className="size-3.5" />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom" className="text-xs">Refresh preview</TooltipContent>
-                      </Tooltip>
-                    </>
-                  )}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={() => setIsTerminalOpen(open => !open)}
+                        className={`p-1.5 rounded-md transition-colors ${
+                          isTerminalOpen
+                            ? 'text-primary bg-primary/10'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                        }`}
+                      >
+                        <Terminal className="size-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="text-xs">Console logs</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <a
+                        href={`/preview/${projectId}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors inline-flex"
+                      >
+                        <ExternalLink className="size-3.5" />
+                      </a>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="text-xs">Open preview in new tab</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewKey(k => k + 1)}
+                        className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                      >
+                        <RotateCw className="size-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="text-xs">Refresh preview</TooltipContent>
+                  </Tooltip>
                 </div>
 
                 {/* ─── Content ─── */}
@@ -866,17 +819,10 @@ export default function ProjectPage() {
                       idea={idea}
                       tech={tech}
                     />
-                  ) : ideMode === 'full' ? (
-                    fullIdeReady ? (
-                      <div className="absolute inset-0 z-10">
-                        <WebIDE key={projectId} files={fullStackFileMap} />
-                      </div>
-                    ) : (
-                      <div className="flex h-full flex-col items-center justify-center gap-4 text-center px-6 bg-background">
-                        <Spinner className="size-6" />
-                        <p className="text-sm text-muted-foreground">Generating project files…</p>
-                      </div>
-                    )
+                  ) : fullIdeReady ? (
+                    <div className="absolute inset-0 z-10">
+                      <WebIDE key={projectId} files={fullStackFileMap} view={view} />
+                    </div>
                   ) : previewReady ? (
                     <SandpackPreview
                       key={previewKey}

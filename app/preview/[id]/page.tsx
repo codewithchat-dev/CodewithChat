@@ -47,7 +47,10 @@ export default function PreviewPage() {
     )
   }
 
-  const isTypeScript = localPlan.previewFiles?.some(f => f?.path?.endsWith('.ts') || f?.path?.endsWith('.tsx')) || false
+  const hasTsInPreview = localPlan.previewFiles?.some(f => f?.path?.endsWith('.ts') || f?.path?.endsWith('.tsx')) || false
+  const hasTsInFullStack = localPlan.fullStackFiles?.some(f => f?.path?.endsWith('.ts') || f?.path?.endsWith('.tsx')) || false
+  const isTypeScript = hasTsInPreview || hasTsInFullStack
+
   const fullStackMap = Object.fromEntries(
     (localPlan.fullStackFiles ?? [])
       .filter(f => f?.path && f?.content)

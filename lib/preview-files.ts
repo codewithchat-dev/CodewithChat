@@ -296,12 +296,16 @@ export function buildInstantPreviewFiles(
   fullStackFiles: Record<string, string>,
   useTypeScript = true,
 ): Record<string, string> {
+  const extracted = extractPreviewFromFullStack(fullStackFiles)
+  if (hasPreviewEntry(extracted)) {
+    return repairPreviewFiles(extracted).files
+  }
+
   const fromPreview = buildPreviewFiles(previewFiles, useTypeScript)
   if (hasPreviewEntry(fromPreview)) {
     return repairPreviewFiles(fromPreview).files
   }
-
-  const extracted = extractPreviewFromFullStack(fullStackFiles)
+  
   return repairPreviewFiles(extracted).files
 }
 
