@@ -19,6 +19,7 @@ const isPublicRoute = createRouteMatcher([
   '/how-it-works',
   '/templates',
   '/docs(.*)',
+  '/blog(.*)',
   '/preview(.*)',
 ])
 

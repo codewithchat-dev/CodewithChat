@@ -95,7 +95,7 @@ export default function DashboardLayout({
       {isSidebarOpen && (
         <aside className="sticky top-0 hidden h-screen flex-col border-r border-border/50 bg-background lg:flex animate-in slide-in-from-left duration-300">
           <div className="flex h-16 shrink-0 items-center justify-between border-b border-border/50 px-6">
-            <Link href="/dashboard" aria-label="CodeWithChat home">
+            <Link href="/dashboard" aria-label="CodewithChat home">
               <SiteLogo />
             </Link>
             <button 

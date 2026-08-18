@@ -11,11 +11,11 @@ import { AnimatedBackground } from '@/components/landing/animated-background'
 import { HeroPreview } from '@/components/landing/hero-preview'
 
 const PLACEHOLDER_PHRASES = [
-  "Ask CodeWithChat to build a SaaS dashboard...",
-  "Ask CodeWithChat to build an e-commerce store...",
-  "Ask CodeWithChat to build a portfolio website...",
-  "Ask CodeWithChat to build a healthcare scheduling app...",
-  "Ask CodeWithChat to build a social media clone..."
+  "Ask CodewithChat to build a SaaS dashboard...",
+  "Ask CodewithChat to build an e-commerce store...",
+  "Ask CodewithChat to build a portfolio website...",
+  "Ask CodewithChat to build a healthcare scheduling app...",
+  "Ask CodewithChat to build a social media clone..."
 ]
 
 export function Hero() {
@@ -239,10 +239,10 @@ export function Hero() {
                   >
                     {isListening ? <MicOff className="size-4 animate-pulse" /> : <Mic className="size-4" />}
                   </Button>
-                  <div className="ml-3 hidden sm:flex items-center gap-2 text-xs font-medium text-muted-foreground bg-surface-elevated px-3 py-1.5 rounded-lg border border-border/50">
+                  {/* <div className="ml-3 hidden sm:flex items-center gap-2 text-xs font-medium text-muted-foreground bg-surface-elevated px-3 py-1.5 rounded-lg border border-border/50">
                     <Sparkles className="size-3.5 text-primary" />
                     <span>CodewithChat</span>
-                  </div>
+                  </div> */}
                 </div>
                 
                 <Button 

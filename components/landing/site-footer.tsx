@@ -105,7 +105,7 @@ export function SiteFooter() {
             </div>
           </div>
           <div className="mt-12 flex flex-col items-start justify-between gap-3 border-t border-border/50 pt-6 text-sm text-foreground/80 sm:flex-row sm:items-center">
-            <p>© {new Date().getFullYear()} CodeWithChat. All rights reserved.</p>
+            <p>© {new Date().getFullYear()} CodewithChat. All rights reserved.</p>
             <p>Built for developers, by developers.</p>
           </div>
         </div>

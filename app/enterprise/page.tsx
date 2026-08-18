@@ -38,7 +38,7 @@ export default function EnterprisePage() {
               
               {/* Hero Details */}
               <div className="lg:col-span-7 space-y-6 text-left">
-                <div className="flex items-center gap-2 px-3 py-1 rounded-full border border-violet-500/20 bg-violet-500/5 text-violet-500 dark:text-violet-400 text-xs font-semibold w-fit animate-pulse">
+                <div className="flex items-center gap-2 px-3 py-1 rounded-full border border-violet-500/20 bg-violet-500/5 text-xs font-semibold w-fit animate-pulse">
                   <Award className="size-3.5" />
                   <span>Enterprise Edition</span>
                 </div>
@@ -53,15 +53,15 @@ export default function EnterprisePage() {
 
                 <div className="flex flex-wrap gap-6 pt-4">
                   <div className="flex items-center gap-2 text-sm text-foreground/80 font-medium">
-                    <ShieldAlert className="size-4 text-emerald-500" />
+                    <ShieldAlert className="size-4 " />
                     <span>VPC & Self-Hosted options</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm text-foreground/80 font-medium">
-                    <Cpu className="size-4 text-primary" />
+                    <Cpu className="size-4 " />
                     <span>Proprietary LLM training</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm text-foreground/80 font-medium">
-                    <Clock className="size-4 text-violet-500" />
+                    <Clock className="size-4 " />
                     <span>Guaranteed SLA support</span>
                   </div>
                 </div>
@@ -103,7 +103,7 @@ export default function EnterprisePage() {
 
               {/* Card 2 */}
               <div className="p-8 rounded-3xl border border-border bg-card/60 backdrop-blur-sm relative overflow-hidden transition-all duration-300 hover:border-primary/40 hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/5">
-                <div className="h-12 w-12 rounded-xl bg-violet-500/10 flex items-center justify-center text-violet-500 mb-6">
+                <div className="h-12 w-12 rounded-xl bg-violet-500/10 flex items-center justify-center mb-6">
                   <Cpu className="size-6" />
                 </div>
                 <h3 className="text-xl font-bold text-foreground mb-3">Custom Code Tuning</h3>
@@ -114,7 +114,7 @@ export default function EnterprisePage() {
 
               {/* Card 3 */}
               <div className="p-8 rounded-3xl border border-border bg-card/60 backdrop-blur-sm relative overflow-hidden transition-all duration-300 hover:border-primary/40 hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/5">
-                <div className="h-12 w-12 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 mb-6">
+                <div className="h-12 w-12 rounded-xl bg-emerald-500/10 flex items-center justify-center mb-6">
                   <Users className="size-6" />
                 </div>
                 <h3 className="text-xl font-bold text-foreground mb-3">Admin Governance</h3>
@@ -136,7 +136,7 @@ export default function EnterprisePage() {
               <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-violet-500/5" />
               
               <div className="flex items-center gap-3">
-                <div className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
+                <div className="h-2 w-2 rounded-full animate-ping" />
                 <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Operational Status</span>
               </div>
               

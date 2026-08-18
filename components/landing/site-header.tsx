@@ -16,7 +16,7 @@ import {
 const navLinks = [
   { label: 'Pricing', href: '/pricing' },
   { label: 'Enterprise', href: '/enterprise' },
-  { label: 'Community', href: '/community' },
+  { label: 'Community', href: 'https://discord.gg/x9UNvGyXzf', external: true },
 ]
 
 const resourcesLinks = [
@@ -31,7 +31,7 @@ export function SiteHeader() {
 
   return (
     <header className="sticky top-6 z-50 mx-auto w-full max-w-6xl px-4 sm:px-6">
-      <div className="flex h-16 items-center justify-between gap-4 rounded-xl border border-border/50 bg-card/80 backdrop-blur-xl px-6 shadow-lg shadow-black/10">
+      <div className="flex h-16 items-center justify-between gap-4 rounded-xl border border-border/50 bg-card  px-6 shadow-lg shadow-black/10">
         <Link href={userId ? "/dashboard" : "/"} aria-label="CodewithChat home">
           <SiteLogo />
         </Link>
@@ -41,6 +41,7 @@ export function SiteHeader() {
             <Link
               key={link.href}
               href={link.href}
+              target="_blank"
               className="text-sm font-medium text-foreground/90 transition-colors hover:text-foreground hover:text-primary"
             >
               {link.label}
