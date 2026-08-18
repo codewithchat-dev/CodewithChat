@@ -47,7 +47,7 @@ export function TargetAudience() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-3xl mx-auto mb-16">
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl text-foreground">
-            Who is <span className="text-primary">CodeWithChat</span> for?
+            Who is <span className="text-primary">CodewithChat</span> for?
           </h2>
           <p className="mt-4 text-lg text-muted-foreground">
             We are your <strong>Virtual CTO</strong> to plan, build, and launch smarter </p>

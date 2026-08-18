@@ -14,7 +14,7 @@ export function Testimonials() {
             Trusted by people learning to build
           </h2>
           <p className="mt-4 text-pretty leading-relaxed text-muted-foreground text-lg">
-            Developers use CodeWithChat to turn ideas into shipped products.
+            Developers use CodewithChat to turn ideas into shipped products.
           </p>
         </div>
 

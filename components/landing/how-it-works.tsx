@@ -125,7 +125,7 @@ useEffect(() => {
                     <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
                       <Sparkles className="size-4 text-primary" />
                     </div>
-                    <div className="text-sm font-medium">CodeWithChat</div>
+                    <div className="text-sm font-medium">CodewithChat</div>
                   </div>
                   <div className="bg-muted rounded-lg p-4">
                     <div className="text-sm font-mono text-foreground animate-typing inline-block overflow-hidden whitespace-nowrap">
