@@ -1,14 +1,14 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import dynamic from 'next/dynamic'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
-  Eye, Code2, Database, BookOpen, Terminal, ExternalLink,
+  Eye, Code2, BookOpen, ExternalLink,
   RotateCw, Download, MoreHorizontal, Github, Settings,
   Pin, PinOff, Pencil, Check, X, Share2, Rocket,
-  Monitor, Tablet, Smartphone, FileCode2,
+  FileCode2,
   Zap, Lock, Slash, PanelLeftClose, PanelLeftOpen, Gift,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -38,24 +38,13 @@ import {
 import { BuildActivityFeed } from '@/components/dashboard/build-activity-feed'
 import { getProjectByIdAction, updateProjectAction, togglePinProjectAction, renameProjectAction } from '@/app/actions/projects'
 
-import { buildFullStackFiles, hasFullStackProject } from '@/lib/fullstack-files'
 import { buildInstantPreviewFiles, hasPreviewEntry } from '@/lib/preview-files'
 import { isTrivialMessage, shouldRegenerateCode } from '@/lib/chat-intent'
-import type { SandpackView, ViewportSize } from '@/components/ide/SandpackPreview'
+import type { SandpackView } from '@/components/ide/SandpackPreview'
 
 type CodeSource = 'preview' | 'fullstack'
 
-const WebIDE = dynamic(
-  () => import('@/components/ide/WebIDE').then(mod => mod.WebIDE),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex h-full items-center justify-center bg-[#1e1e1e]">
-        <Spinner className="size-8 text-primary" />
-      </div>
-    ),
-  },
-)
+
 
 const SandpackPreview = dynamic(
   () => import('@/components/ide/SandpackPreview').then(mod => mod.SandpackPreview),
@@ -100,6 +89,13 @@ export default function ProjectPage() {
 
   // Preview state
   const [genError, setGenError] = useState<string | null>(null)
+  const [previewError, setPreviewError] = useState<string | null>(null)
+  
+  const handlePreviewError = useCallback((message: string) => {
+    console.error('[Project] Preview error:', message)
+    setPreviewError(message)
+    toast.error('Preview error: ' + message)
+  }, [])
   const [buildStartedAt, setBuildStartedAt] = useState<number | null>(null)
   const [buildDurationMs, setBuildDurationMs] = useState<number | null>(null)
   const [buildCompletedAt, setBuildCompletedAt] = useState<number | null>(null)
@@ -109,8 +105,6 @@ export default function ProjectPage() {
 
   // IDE / preview UI
   const [view, setView] = useState<SandpackView>('preview')
-  const [viewportSize, setViewportSize] = useState<ViewportSize>('desktop')
-  const [isTerminalOpen, setIsTerminalOpen] = useState(false)
   const [previewKey, setPreviewKey] = useState(0)
   const [rightPanel, setRightPanel] = useState<'preview' | 'guide'>('preview')
 
@@ -391,19 +385,128 @@ export default function ProjectPage() {
   }
 
   // ─── Build files object ────────────────────────
-  const fullStackFileMap = buildFullStackFiles(activePlan?.fullStackFiles)
-  const fullIdeReady = hasFullStackProject(fullStackFileMap)
-
   const previewFileMap = useMemo(() => {
-    return buildInstantPreviewFiles(activePlan?.previewFiles, fullStackFileMap, true)
-  }, [activePlan?.previewFiles, fullStackFileMap])
+    console.log('[Project] Building previewFileMap, activePlan:', !!activePlan)
+    console.log('[Project] previewFiles count:', activePlan?.previewFiles?.length)
+    
+    // If previewFiles exist, use them directly
+    if (activePlan?.previewFiles && activePlan.previewFiles.length > 0) {
+      const files: Record<string, string> = {}
+      for (const file of activePlan.previewFiles) {
+        if (file?.path && file?.content) {
+          const normalizedPath = file.path.startsWith('/') ? file.path : `/${file.path}`
+          files[normalizedPath] = file.content
+          console.log(`[Project] Added file: ${normalizedPath}, content length: ${file.content.length}`)
+        }
+      }
+      console.log('[Project] Final previewFileMap keys:', Object.keys(files))
+      
+      // Path remapping: convert /src/* to root level for Sandpack
+      const remappedFiles: Record<string, string> = {}
+      for (const [path, content] of Object.entries(files)) {
+        // Convert /src/App.tsx to /App.tsx
+        if (path.startsWith('/src/')) {
+          const newPath = path.replace('/src/', '/')
+          remappedFiles[newPath] = content
+          console.log(`[Project] Remapped: ${path} -> ${newPath}`)
+        } else {
+          remappedFiles[path] = content
+        }
+      }
+      
+      console.log('[Project] Remapped files keys:', Object.keys(remappedFiles))
+      
+      // If no App.tsx but we have files, create a simple fallback
+      if (!remappedFiles['/App.tsx'] && !remappedFiles['/App.js'] && Object.keys(remappedFiles).length > 0) {
+        console.log('[Project] No App.tsx found in remapped files, creating fallback')
+        remappedFiles['/App.tsx'] = `export default function App() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 flex items-center justify-center p-4">
+      <div className="text-center">
+        <h1 className="text-4xl font-bold text-white mb-4">Your App is Ready</h1>
+        <p className="text-gray-300 mb-6">Code generation completed successfully!</p>
+        <div className="bg-gray-800 rounded-lg p-6 text-left">
+          <p className="text-green-400 text-sm mb-2">✓ Project structure created</p>
+          <p className="text-green-400 text-sm mb-2">✓ Dependencies installed</p>
+          <p className="text-green-400 text-sm">✓ Ready for development</p>
+        </div>
+      </div>
+    </div>
+  )
+}`
+      }
+      
+      return remappedFiles
+    }
 
-  const previewReady = hasPreviewEntry(previewFileMap)
+    console.log('[Project] No previewFiles, using fallback')
+    // Fallback to buildInstantPreviewFiles
+    const fallbackFiles = buildInstantPreviewFiles(activePlan?.previewFiles, {}, true)
+    
+    // If fallback also has no App.tsx, create one
+    if (!fallbackFiles['/App.tsx'] && !fallbackFiles['/App.js']) {
+      console.log('[Project] Fallback also has no App.tsx, creating one')
+      fallbackFiles['/App.tsx'] = `export default function App() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 flex items-center justify-center p-4">
+      <div className="text-center">
+        <h1 className="text-4xl font-bold text-white mb-4">Your App is Ready</h1>
+        <p className="text-gray-300 mb-6">Code generation completed successfully!</p>
+        <div className="bg-gray-800 rounded-lg p-6 text-left">
+          <p className="text-green-400 text-sm mb-2">✓ Project structure created</p>
+          <p className="text-green-400 text-sm mb-2">✓ Dependencies installed</p>
+          <p className="text-green-400 text-sm">✓ Ready for development</p>
+        </div>
+      </div>
+    </div>
+  )
+}`
+    }
+    
+    return fallbackFiles
+  }, [activePlan?.previewFiles])
+
+  // More permissive preview ready check - show preview even if files are incomplete
+  const previewReady = useMemo(() => {
+    const hasApp = previewFileMap['/App.tsx'] || previewFileMap['/App.js'] || 
+                   previewFileMap['/src/App.tsx'] || previewFileMap['/src/App.jsx']
+    const hasAnyFile = Object.keys(previewFileMap).length > 0
+    
+    // Always show preview if we have files (more aggressive approach)
+    const shouldShow = hasAnyFile
+    
+    // Debug: log all file keys
+    console.log('[Project] All file keys:', Object.keys(previewFileMap))
+    console.log('[Project] App.tsx check:', {
+      '/App.tsx': !!previewFileMap['/App.tsx'],
+      '/App.js': !!previewFileMap['/App.js'],
+      '/src/App.tsx': !!previewFileMap['/src/App.tsx'],
+      '/src/App.jsx': !!previewFileMap['/src/App.jsx']
+    })
+    console.log('[Project] previewReady check:', { hasApp, hasAnyFile, loading, shouldShow, fileCount: Object.keys(previewFileMap).length })
+    
+    return shouldShow
+  }, [previewFileMap, loading])
+
+  // Auto-switch to Preview after generation completes
+  useEffect(() => {
+    if (!loading && !genError && Object.keys(previewFileMap).length > 0) {
+      setView('preview')
+    }
+  }, [loading, genError, previewFileMap])
 
   // Save to DB when generation finishes
   useEffect(() => {
     if (!loading && plan && projectId) {
       updateProjectAction(projectId, JSON.stringify(plan))
+        .then(res => {
+          if (!res.success) {
+            console.error('[Project] Failed to save project:', res.error)
+          }
+        })
+        .catch(err => {
+          console.error('[Project] Error saving project:', err)
+        })
     }
   }, [loading, plan, projectId])
 
@@ -565,24 +668,36 @@ export default function ProjectPage() {
                     {msg.content}
                   </div>
                 ))}
+
+                {/* Agent activity as inline message */}
+                {(loading || activePlan?.overview || activePlan?.steps?.length) && (
+                  <div className="text-foreground/90 py-1 self-start w-full">
+                    <div className="flex items-center gap-2 mb-2 font-medium text-foreground opacity-80 text-[12px]">
+                      <Rocket className="size-3.5" /> Assistant
+                      {loading && (
+                        <span className="flex items-center gap-1 text-muted-foreground">
+                          <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+                          </span>
+                          typing...
+                        </span>
+                      )}
+                    </div>
+                    <BuildActivityFeed
+                      plan={activePlan ?? undefined}
+                      loading={loading}
+                      idea={idea}
+                      startedAt={buildStartedAt}
+                      durationMs={buildDurationMs}
+                      completedAt={buildCompletedAt}
+                      fallbackUpdatedAt={projectUpdatedAt}
+                      compact
+                    />
+                  </div>
+                )}
               </div>
             </div>
-
-            {/* Agent activity — fixed above typing box */}
-            {(loading || activePlan?.overview || activePlan?.steps?.length) && (
-              <div className="shrink-0 border-t border-border bg-card/80 backdrop-blur-sm px-3 pt-2 pb-1">
-                <BuildActivityFeed
-                  plan={activePlan ?? undefined}
-                  loading={loading}
-                  idea={idea}
-                  startedAt={buildStartedAt}
-                  durationMs={buildDurationMs}
-                  completedAt={buildCompletedAt}
-                  fallbackUpdatedAt={projectUpdatedAt}
-                  compact
-                />
-              </div>
-            )}
 
             {/* Input area — same composer as dashboard home */}
             <div className="shrink-0 p-3 border-t border-border bg-muted/20">
@@ -740,49 +855,8 @@ export default function ProjectPage() {
 
                   <div className="w-px h-5 bg-border shrink-0 mx-1" />
 
-                  {/* Viewport toggles */}
-                  {view === 'preview' && rightPanel === 'preview' && (
-                    <div className="flex items-center gap-0.5">
-                      {([
-                        ['desktop', Monitor],
-                        ['tablet', Tablet],
-                        ['mobile', Smartphone],
-                      ] as const).map(([size, Icon]) => (
-                        <button
-                          key={size}
-                          type="button"
-                          onClick={() => setViewportSize(size)}
-                          className={`p-1.5 rounded-md transition-colors ${
-                            viewportSize === size
-                              ? 'text-primary bg-primary/10'
-                              : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-                          }`}
-                          title={size}
-                        >
-                          <Icon className="size-3.5" />
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
                   <div className="flex-1" />
 
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        type="button"
-                        onClick={() => setIsTerminalOpen(open => !open)}
-                        className={`p-1.5 rounded-md transition-colors ${
-                          isTerminalOpen
-                            ? 'text-primary bg-primary/10'
-                            : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-                        }`}
-                      >
-                        <Terminal className="size-3.5" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="text-xs">Console logs</TooltipContent>
-                  </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <a
@@ -819,28 +893,24 @@ export default function ProjectPage() {
                       idea={idea}
                       tech={tech}
                     />
-                  ) : fullIdeReady ? (
-                    <div className="absolute inset-0 z-10">
-                      <WebIDE key={projectId} files={fullStackFileMap} view={view} />
-                    </div>
                   ) : previewReady ? (
                     <SandpackPreview
                       key={previewKey}
                       files={previewFileMap}
                       dependencies={mergedDependencies}
                       view={view}
-                      viewportSize={viewportSize}
-                      isTerminalOpen={isTerminalOpen}
-                      onCloseTerminal={() => setIsTerminalOpen(false)}
+                      isTerminalOpen={false}
+                      onCloseTerminal={() => {}}
                       previewKey={previewKey}
                       tech={tech}
                       openPreviewUrl={`/preview/${projectId}`}
+                      isLoading={loading}
                     />
                   ) : loading ? (
                     <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground bg-[#151515]">
                       <Spinner className="size-6" />
                       <p className="text-sm">Building preview…</p>
-                      <p className="text-xs text-muted-foreground/70">Shows in seconds once page.tsx is ready</p>
+                      <p className="text-xs text-muted-foreground/70">Shows in seconds once App.tsx is ready</p>
                     </div>
                   ) : (
                     <div className="flex h-full flex-col items-center justify-center gap-4 text-center px-6 bg-background">

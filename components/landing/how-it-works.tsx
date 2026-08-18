@@ -27,50 +27,60 @@ const steps = [
 
 export function HowItWorks() {
   const [activeStep, setActiveStep] = useState(1)
-  const [progress, setProgress] = useState(0)
+const [progress, setProgress] = useState(0)
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setProgress((oldProgress) => {
-        if (oldProgress >= 100) {
-          setActiveStep((prev) => (prev % 3) + 1)
-          return 0
-        }
-        return oldProgress + 2.5 // Updates every 100ms, reaches 100% in 4000ms
-      })
-    }, 100)
-    
-    return () => clearInterval(timer)
-  }, [])
+useEffect(() => {
+  setProgress(0)
+
+  const progressTimer = setInterval(() => {
+    setProgress((prev) => {
+      if (prev >= 100) return 100
+      return prev + 2.5
+    })
+  }, 100)
+
+  const stepTimer = setTimeout(() => {
+    setActiveStep((prev) => {
+      if (prev === 1) return 2
+      if (prev === 2) return 3
+      return 1
+    })
+  }, 4000)
+
+  return () => {
+    clearInterval(progressTimer)
+    clearTimeout(stepTimer)
+  }
+}, [activeStep])
 
   return (
-    <section id="how-it-works" className="border-b border-border bg-muted/10 relative overflow-hidden">
+    <section id="how-it-works" className="border-b border-border/50 bg-muted/5 relative overflow-hidden">
+      <div className="absolute inset-0 pattern-grid opacity-[0.02] pointer-events-none" />
       <div className="mx-auto w-full max-w-6xl px-6 py-24">
         <div className="mb-16 text-center max-w-2xl mx-auto">
-          <h2 className="text-3xl font-bold tracking-tight md:text-4xl">
+          <h2 className="text-3xl font-bold tracking-tight md:text-4xl text-foreground">
             From prompt to production
           </h2>
           <p className="mt-4 text-muted-foreground text-lg">
-            See how a simple idea transforms into a working SaaS in minutes.
+            See how a simple idea transforms into a working product in minutes.
           </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           {/* Left Side: Step Indicators */}
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-5">
             {steps.map((step) => {
               const isActive = activeStep === step.id
-              const isPast = activeStep > step.id
+              const isPast = step.id < activeStep 
               return (
                 <div 
                   key={step.id}
                   onClick={() => {
                     setActiveStep(step.id)
-                    setProgress(0)
                   }}
                   className={cn(
-                    "relative flex items-start gap-5 p-6 rounded-2xl border transition-all cursor-pointer overflow-hidden group",
-                    isActive ? "border-primary/50 bg-primary/5 shadow-lg shadow-primary/5" : "border-border/50 bg-card hover:bg-muted/50 hover:border-border"
+                    "relative flex items-start gap-5 p-6 rounded-xl border transition-all cursor-pointer overflow-hidden group",
+                    isActive ? "border-primary/40 bg-primary/5 shadow-lg shadow-primary/10" : "border-border/50 bg-card/80 hover:bg-surface-hover hover:border-border/60"
                   )}
                 >
                   {/* Progress bar background for active step */}
@@ -82,9 +92,9 @@ export function HowItWorks() {
                   )}
                   
                   <div className={cn(
-                    "flex-shrink-0 flex items-center justify-center w-12 h-12 rounded-full border transition-colors",
+                    "flex-shrink-0 flex items-center justify-center w-12 h-12 rounded-lg border transition-colors",
                     isActive ? "bg-primary text-primary-foreground border-primary" : 
-                    isPast ? "bg-primary/10 text-primary border-primary/20" : "bg-muted text-muted-foreground border-border group-hover:bg-primary/5"
+                    isPast ? "bg-primary/10 text-primary border-primary/20" : "bg-surface-elevated text-muted-foreground border-border group-hover:bg-primary/5"
                   )}>
                     {isPast ? <CheckCircle2 className="size-6" /> : <step.icon className="size-6" />}
                   </div>
@@ -102,7 +112,7 @@ export function HowItWorks() {
           </div>
 
           {/* Right Side: Visual Representation */}
-          <div className="relative h-[400px] w-full rounded-2xl border border-border/50 bg-card overflow-hidden shadow-2xl flex items-center justify-center p-6 lg:ml-6">
+          <div className="relative h-[400px] w-full rounded-xl border border-border/50 bg-card/90 overflow-hidden shadow-xl flex items-center justify-center p-6 lg:ml-6">
             {/* Background grids */}
             <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
             
@@ -112,10 +122,10 @@ export function HowItWorks() {
               {activeStep === 1 && (
                 <div className="bg-background border border-border rounded-xl p-4 shadow-xl animate-in fade-in zoom-in-95 duration-500">
                   <div className="flex gap-3 items-center border-b border-border pb-3 mb-3">
-                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
                       <Sparkles className="size-4 text-primary" />
                     </div>
-                    <div className="text-sm font-medium">CodewithChat</div>
+                    <div className="text-sm font-medium">CodeWithChat</div>
                   </div>
                   <div className="bg-muted rounded-lg p-4">
                     <div className="text-sm font-mono text-foreground animate-typing inline-block overflow-hidden whitespace-nowrap">
@@ -144,26 +154,125 @@ export function HowItWorks() {
               )}
 
               {activeStep === 3 && (
-                <div className="bg-background border border-border rounded-xl overflow-hidden shadow-xl animate-in fade-in zoom-in-95 duration-500">
-                   <div className="flex items-center px-3 py-2.5 border-b border-border bg-muted/50 gap-3">
-                     <div className="flex gap-1.5 ml-1">
-                       <div className="w-3 h-3 rounded-full bg-border/80" />
-                       <div className="w-3 h-3 rounded-full bg-border/80" />
-                       <div className="w-3 h-3 rounded-full bg-border/80" />
-                     </div>
-                     <div className="flex-1 bg-background rounded-md text-xs text-muted-foreground px-3 py-1.5 font-mono border border-border/50 truncate text-center mr-12">
-                       myapp.codewithchat.com
-                     </div>
-                   </div>
-                   <div className="p-4 bg-muted/10 aspect-[4/3] flex flex-col gap-4">
-                     <div className="w-full h-10 bg-primary/10 rounded-lg animate-pulse border border-primary/20" />
-                     <div className="flex gap-4 h-full">
-                       <div className="w-1/3 h-full bg-border/20 rounded-lg animate-pulse" />
-                       <div className="flex-1 bg-border/20 rounded-lg animate-pulse" />
-                     </div>
-                   </div>
+  <div className="bg-background border border-border rounded-xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-500">
+    {/* Browser Header */}
+    <div className="flex items-center px-3 py-2.5 border-b border-border bg-muted/50">
+      <div className="flex gap-1.5">
+        <div className="w-2.5 h-2.5 rounded-full bg-red-400/80" />
+        <div className="w-2.5 h-2.5 rounded-full bg-yellow-400/80" />
+        <div className="w-2.5 h-2.5 rounded-full bg-green-400/80" />
+      </div>
+
+      <div className="flex-1 mx-4 bg-background rounded-md text-[10px] text-muted-foreground px-3 py-1.5 font-mono border border-border/50 text-center">
+        myapp.codewithchat.com
+      </div>
+
+      <div className="w-5" />
+    </div>
+
+    {/* Website */}
+    <div className="p-4 bg-background">
+      
+      {/* Live Status */}
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <div className="text-xs text-muted-foreground">
+            Your app is live
+          </div>
+          <div className="text-sm font-semibold mt-0.5">
+            E-commerce Dashboard
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-500/10 border border-green-500/20">
+          <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+          <span className="text-[10px] font-medium text-green-500">
+            Live
+          </span>
+        </div>
+      </div>
+
+      {/* Dashboard Preview */}
+      <div className="grid grid-cols-3 gap-2 mb-3">
+        <div className="rounded-lg border border-border bg-muted/30 p-3">
+          <div className="text-[9px] text-muted-foreground">
+            Revenue
+          </div>
+          <div className="text-sm font-bold mt-1">
+            $24,580
+          </div>
+          <div className="text-[9px] text-green-500 mt-1">
+            +12.5%
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-border bg-muted/30 p-3">
+          <div className="text-[9px] text-muted-foreground">
+            Orders
+          </div>
+          <div className="text-sm font-bold mt-1">
+            1,248
+          </div>
+          <div className="text-[9px] text-green-500 mt-1">
+            +8.2%
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-border bg-muted/30 p-3">
+          <div className="text-[9px] text-muted-foreground">
+            Customers
+          </div>
+          <div className="text-sm font-bold mt-1">
+            8,429
+          </div>
+          <div className="text-[9px] text-green-500 mt-1">
+            +18.4%
+          </div>
+        </div>
+      </div>
+
+      {/* Chart */}
+      <div className="rounded-lg border border-border bg-muted/20 p-3">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-[10px] font-medium">
+            Revenue overview
+          </span>
+          <span className="text-[9px] text-muted-foreground">
+            Last 30 days
+          </span>
+        </div>
+
+        <div className="flex items-end gap-1 h-20">
+          {[35, 48, 42, 58, 52, 68, 62, 76, 70, 88, 80, 96].map(
+            (height, index) => (
+              <div
+                key={index}
+                className="flex-1 rounded-t-sm bg-primary/60 animate-in slide-in-from-bottom-2"
+                style={{
+                  height: `${height}%`,
+                  animationDelay: `${index * 50}ms`,
+                  animationFillMode: 'both',
+                }}
+              />
+            )
+          )}
+        </div>
+      </div>
+
+              {/* Deployment footer */}
+              <div className="flex items-center justify-between mt-3 px-1">
+                <span className="text-[9px] text-muted-foreground">
+                  Deployed just now
+                </span>
+
+                <div className="flex items-center gap-1.5 text-[9px] text-primary font-medium">
+                  <CheckCircle2 className="size-3" />
+                  Production ready
                 </div>
-              )}
+              </div>
+            </div>
+          </div>
+        )}
 
             </div>
           </div>

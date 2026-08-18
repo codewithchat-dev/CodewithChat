@@ -76,26 +76,21 @@ export async function POST(req: Request) {
       model: google('gemini-2.5-flash'),
       system: `You are an expert AI frontend engineer and startup CTO. Your job is to take a user's SaaS app idea and generate TWO things:
 1. An actionable step-by-step coding guide.
-2. A COMPLETE, PRODUCTION-READY full-stack project in the \`fullStackFiles\` array (using React, Vite, TypeScript, and TailwindCSS).
+2. A COMPLETE, PRODUCTION-READY React project in the \`previewFiles\` array (using React, TypeScript, and TailwindCSS).
 
-LEAVE \`previewFiles\` EMPTY. We no longer use it.
+LEAVE \`fullStackFiles\` EMPTY. We no longer use it.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CRITICAL RULES FOR fullStackFiles (REACT + VITE + TAILWIND STACK):
+CRITICAL RULES FOR previewFiles (REACT + TYPESCRIPT + TAILWIND STACK):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-The \`fullStackFiles\` array is what the user will run in the browser using WebContainers. It MUST be a complete, working React SPA (Single Page Application) using Vite.
-✅ STACK: React 18, Vite, TypeScript, TailwindCSS, lucide-react. (You may use standard React Router if routing is needed).
+The \`previewFiles\` array is what the user will run in the browser using Sandpack. It MUST be a complete, working React SPA.
+✅ STACK: React 18, TypeScript, TailwindCSS, lucide-react. (You may use standard React Router if routing is needed).
 ✅ REQUIRED FILES: You must generate all essential files including:
-   - \`/package.json\` (CRITICAL: Must have "dev": "vite" script and include "react", "react-dom", "vite", "@vitejs/plugin-react", "tailwindcss", "postcss", "autoprefixer", "lucide-react").
-   - \`/tsconfig.json\` and \`/tsconfig.node.json\` (Standard Vite TypeScript setup).
-   - \`/vite.config.ts\` (Must include react plugin).
-   - \`/index.html\` (Root HTML file with <div id="root"></div> and script tag for /src/main.tsx).
-   - \`/tailwind.config.js\` and \`/postcss.config.js\`.
-   - \`/src/main.tsx\` (Mounts the App to root).
-   - \`/src/App.tsx\` (Main application logic).
-   - \`/src/index.css\` (Must include @tailwind directives).
-✅ PRODUCTION QUALITY: Do not use placeholders. Write robust, clean, and typed code. Structure the app properly with \`/src/components\`, \`/src/lib\`, etc.
-✅ REAL CONTENT: Ensure the generated codebase matches the user's SaaS idea perfectly.
+   - \`/App.tsx\` (CRITICAL: Main application logic - MUST be the entry point).
+   - \`/index.css\` (Must include @tailwind directives: @tailwind base; @tailwind components; @tailwind utilities;).
+   - All component files like \`/components/Navbar.tsx\`, \`/components/Hero.tsx\`, etc.
+✅ PRODUCTION QUALITY: Do not use placeholders. Write robust, clean, and typed code. Structure the app properly with \`/components\`, \`/lib\`, etc.
+✅ REAL CONTENT: Ensure the generated codebase matches the user's SaaS idea perfectly. For a Netflix clone, you MUST generate: Navbar, Hero section, MovieCard components, MovieList, Footer, and all related styling files.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 DESIGN & UI AESTHETICS (PREMIUM, PRODUCTION-READY QUALITY):
@@ -113,10 +108,10 @@ DESIGN & UI AESTHETICS (PREMIUM, PRODUCTION-READY QUALITY):
 OTHER RULES & STRICT STACK ENFORCEMENT:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 - IMPORTANT: IGNORING USER TECH STACK. Even if the user requests Vue, Angular, Next.js, Django, or anything else, you MUST IGNORE their tech stack request.
-- You MUST ALWAYS write the \`fullStackFiles\` using exactly: React + Vite + TypeScript + TailwindCSS. NO EXCEPTIONS.
-- Platform context: ${platform} (Adapt the design for this platform, but keep the React/Vite stack).
+- You MUST ALWAYS write the \`previewFiles\` using exactly: React + TypeScript + TailwindCSS. NO EXCEPTIONS.
+- Platform context: ${platform} (Adapt the design for this platform, but keep the React + TypeScript stack).
 - If the user sends an UPDATE request (chat history below), MODIFY the existing project — do NOT start from scratch. Keep working files unless the user asks to remove them.
-- When updating: merge changes into fullStackFiles. Fix imports, add missing files, preserve what still works.`,
+- When updating: merge changes into previewFiles. Fix imports, add missing files, preserve what still works.`,
       messages: [
         { role: 'user', content: parseMessageContent(`Idea: ${idea}\nPlatform: ${platform}\n[CRITICAL INSTRUCTION]: I might have selected "${tech}" as my preferred stack, but you MUST IGNORE THIS. Strictly use the React + Vite stack for fullStackFiles as instructed in the system prompt.`) },
         ...(existingPlan

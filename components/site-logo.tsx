@@ -9,17 +9,18 @@ export function SiteLogo({ className }: { className?: string }) {
         alt="CodewithChat Logo"
         width={28}
         height={28}
-        className="hidden dark:block object-contain"
+        className="object-contain dark:hidden"
       />
-      <Image
-        src="/dark_logo.png"
-        alt="CodewithChat Logo"
-        width={28}
-        height={28}
-        className="block dark:hidden object-contain"
-      />
+
+        <Image
+          src="/dark_logo.png"
+          alt="CodewithChat Logo"
+          width={28}
+          height={28}
+          className="hidden object-contain dark:block"
+        />
       <span className="text-sm">
-        CodewithChat<span className="text-muted-foreground"> AI Studio</span>
+        CodewithChat
       </span>
     </span>
   )

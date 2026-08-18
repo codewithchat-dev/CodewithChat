@@ -6,23 +6,27 @@ import { cn } from '@/lib/utils'
 
 const audiences = [
   {
-    title: 'College Students & CS Grads',
-    description: 'Perfect for Final Year Projects & Hackathons. Stop struggling with architecture and get a complete, runnable project blueprint in minutes.',
+    title: 'College Students',
+    description:
+      'Build final-year projects and hackathon ideas with a clear architecture and working project blueprint.',
     icon: GraduationCap,
   },
   {
     title: 'Indie Hackers & Founders',
-    description: 'Act as your Virtual CTO. Don\'t know where to start? We guide you on the exact tech stack, database, and AI models needed for your SaaS.',
+    description:
+      'Get the right tech stack, database, AI tools, and architecture for your SaaS idea.',
     icon: Rocket,
   },
   {
-    title: 'Freelancers & Devs',
-    description: 'Save 10+ hours on client project setup. Get a step-by-step roadmap and code boilerplate generated instantly so you can focus on building.',
+    title: 'Freelancers & Developers',
+    description:
+      'Skip repetitive setup and get a ready roadmap and boilerplate to start building faster.',
     icon: Code2,
   },
   {
     title: 'Product Managers',
-    description: 'Visualize your ideas instantly. Use the Live Preview to create interactive prototypes of your new feature without waiting for a developer.',
+    description:
+      'Turn product ideas into interactive prototypes and technical plans without waiting for development.',
     icon: Briefcase,
   },
 ]
@@ -38,20 +42,20 @@ export function TargetAudience() {
   }, [])
 
   return (
-    <section className="border-t border-border bg-card/30 py-24 relative overflow-hidden">
+    <section className="border-t border-border/50 bg-card/30 py-24 relative overflow-hidden">
+      <div className="absolute inset-0 pattern-grid opacity-[0.02] pointer-events-none" />
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-3xl mx-auto mb-16">
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            Who is <span className="text-primary">CodewithChat</span> for?
+          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl text-foreground">
+            Who is <span className="text-primary">CodeWithChat</span> for?
           </h2>
           <p className="mt-4 text-lg text-muted-foreground">
-            We are your <strong>Virtual CTO</strong>. We don't just write code—we design your startup's entire architecture and guide you step-by-step from idea to launch.
-          </p>
+            We are your <strong>Virtual CTO</strong> to plan, build, and launch smarter </p>
         </div>
         
         <div className="relative mt-20 max-w-6xl mx-auto">
           {/* Horizontal Background Line (Desktop) */}
-          <div className="absolute top-6 left-0 w-full h-1 bg-border hidden lg:block -translate-y-1/2 rounded-full" />
+          <div className="absolute top-6 left-0 w-full h-1 bg-border/50 hidden lg:block -translate-y-1/2 rounded-full" />
           
           {/* Animated Progress Line (Desktop) */}
           <div 
@@ -72,18 +76,18 @@ export function TargetAudience() {
                 >
                   {/* Timeline Node */}
                   <div className={cn(
-                    "w-12 h-12 rounded-full border-4 flex items-center justify-center mb-6 transition-all duration-700 cursor-pointer relative z-20",
+                    "w-12 h-12 rounded-xl border-4 flex items-center justify-center mb-6 transition-all duration-700 cursor-pointer relative z-20",
                     isActive ? "bg-primary border-primary/30 text-primary-foreground scale-110 shadow-lg shadow-primary/30" : 
                     isPast ? "bg-primary text-primary-foreground border-background" : 
-                    "bg-card border-border text-muted-foreground hover:border-primary/50"
+                    "bg-card border-border/50 text-muted-foreground hover:border-primary/50"
                   )}>
                     <audience.icon className="size-5" />
                   </div>
                   
                   {/* Card Content */}
                   <div className={cn(
-                    "bg-background border rounded-2xl p-6 transition-all duration-700 w-full text-center lg:text-left cursor-pointer",
-                    isActive ? "border-primary/50 shadow-xl shadow-primary/5 scale-105 bg-card" : "border-border/50 opacity-60 scale-95 hover:opacity-100 hover:border-border"
+                    "bg-background border rounded-xl p-6 transition-all duration-700 w-full text-center lg:text-left cursor-pointer",
+                    isActive ? "border-primary/40 shadow-xl shadow-primary/10 scale-105 bg-card/90" : "border-border/50 opacity-60 scale-95 hover:opacity-100 hover:border-border/60"
                   )}>
                     <h3 className={cn("mb-3 text-lg font-bold transition-colors", isActive ? "text-foreground" : "text-muted-foreground")}>
                       {audience.title}

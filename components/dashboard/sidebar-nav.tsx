@@ -22,10 +22,10 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
             onClick={onNavigate}
             aria-current={active ? 'page' : undefined}
             className={cn(
-              'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+              'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
               active
-                ? 'bg-accent font-medium text-accent-foreground'
-                : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground',
+                ? 'bg-primary/10 text-primary border border-primary/20'
+                : 'text-foreground/80 hover:bg-surface-hover hover:text-foreground hover:border-border/50 border border-transparent',
             )}
           >
             <item.icon className="size-4 shrink-0" />

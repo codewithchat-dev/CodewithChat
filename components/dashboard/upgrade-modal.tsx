@@ -29,7 +29,7 @@ export function UpgradeModal({ children }: { children?: React.ReactNode }) {
             Upgrade to Pro
           </DialogTitle>
           <DialogDescription>
-            Unlock the full potential of CodewithChat AI Studio with our Pro plan.
+            Unlock the full potential of CodewithChat with our Pro plan.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-4 py-4">

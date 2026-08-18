@@ -39,24 +39,24 @@ export default function DashboardLayout({
       <div className="absolute top-4 left-4 z-40 lg:hidden">
         <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
           <SheetTrigger asChild>
-            <Button variant="outline" size="icon" className="bg-background/80 backdrop-blur shadow-sm">
+            <Button variant="outline" size="icon" className="bg-background/80 backdrop-blur shadow-sm border-border/50">
               <Menu className="size-5" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="w-72 p-0 flex flex-col h-full">
+          <SheetContent side="left" className="w-72 p-0 flex flex-col h-full border-border/50">
             <SheetTitle className="sr-only">Navigation</SheetTitle>
-            <div className="flex h-16 items-center border-b border-border px-6 shrink-0">
+            <div className="flex h-16 items-center border-b border-border/50 px-6 shrink-0">
               <SiteLogo />
             </div>
             <div className="p-4 shrink-0">
               <Button
                 variant="outline"
-                className="w-full justify-start text-sm text-muted-foreground font-normal bg-muted/50 hover:bg-muted pr-2"
+                className="w-full justify-start text-sm text-muted-foreground font-normal bg-surface-elevated hover:bg-surface-hover pr-2 border-border/50"
                 onClick={() => window.dispatchEvent(new Event('open-command-menu'))}
               >
                 <Search className="mr-2 size-4 shrink-0" />
                 <span className="truncate">Search...</span>
-                <kbd className="pointer-events-none ml-auto inline-flex h-5 shrink-0 items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
+                <kbd className="pointer-events-none ml-auto inline-flex h-5 shrink-0 items-center gap-1 rounded border border-border/50 bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
                   <span className="text-xs">⌘</span>K
                 </kbd>
               </Button>
@@ -68,7 +68,7 @@ export default function DashboardLayout({
             </div>
             
             {/* Mobile Sidebar Footer */}
-            <div className="border-t border-border p-4 shrink-0 space-y-4">
+            <div className="border-t border-border/50 p-4 shrink-0 space-y-4">
               <CreditsCard />
               <div className="flex items-center justify-between pt-2 px-1">
                 <UserDropdown />
@@ -84,7 +84,7 @@ export default function DashboardLayout({
           variant="outline" 
           size="icon" 
           onClick={() => setIsSidebarOpen(true)}
-          className="absolute top-4 left-4 z-40 hidden lg:flex bg-background/80 backdrop-blur shadow-sm text-muted-foreground hover:text-foreground"
+          className="absolute top-4 left-4 z-40 hidden lg:flex bg-background/80 backdrop-blur shadow-sm text-muted-foreground hover:text-foreground border-border/50"
           aria-label="Open sidebar"
         >
           <PanelLeftOpen className="size-5" />
@@ -93,14 +93,14 @@ export default function DashboardLayout({
 
       {/* Desktop Sidebar */}
       {isSidebarOpen && (
-        <aside className="sticky top-0 hidden h-screen flex-col border-r border-border bg-background lg:flex animate-in slide-in-from-left duration-300">
-          <div className="flex h-16 shrink-0 items-center justify-between border-b border-border px-6">
-            <Link href="/dashboard" aria-label="CodewithChat AI Studio home">
+        <aside className="sticky top-0 hidden h-screen flex-col border-r border-border/50 bg-background lg:flex animate-in slide-in-from-left duration-300">
+          <div className="flex h-16 shrink-0 items-center justify-between border-b border-border/50 px-6">
+            <Link href="/dashboard" aria-label="CodeWithChat home">
               <SiteLogo />
             </Link>
             <button 
               onClick={() => setIsSidebarOpen(false)}
-              className="p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-muted/50"
+              className="p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-surface-hover"
             >
               <PanelLeftClose className="size-5" />
             </button>
@@ -109,12 +109,12 @@ export default function DashboardLayout({
           <div className="p-4 shrink-0">
             <Button
               variant="outline"
-              className="w-full justify-start text-sm text-muted-foreground font-normal bg-muted/50 hover:bg-muted pr-2"
+              className="w-full justify-start text-sm text-foreground/80 font-normal bg-surface-elevated hover:bg-surface-hover pr-2 border-border/50"
               onClick={() => window.dispatchEvent(new Event('open-command-menu'))}
             >
               <Search className="mr-2 size-4 shrink-0" />
               <span className="truncate">Search...</span>
-              <kbd className="pointer-events-none ml-auto inline-flex h-5 shrink-0 items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
+              <kbd className="pointer-events-none ml-auto inline-flex h-5 shrink-0 items-center gap-1 rounded border border-border/50 bg-muted px-1.5 font-mono text-[10px] font-medium text-foreground/80 opacity-100">
                 <span className="text-xs">⌘</span>K
               </kbd>
             </Button>
@@ -126,7 +126,7 @@ export default function DashboardLayout({
             <RecentProjects />
           </div>
           
-          <div className="border-t border-border p-4 shrink-0 space-y-4">
+          <div className="border-t border-border/50 p-4 shrink-0 space-y-4">
             <CreditsCard />
 
             {/* Unified User Profile & Settings */}

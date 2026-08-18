@@ -25,8 +25,8 @@ export function RecentProjects({ onNavigate }: { onNavigate?: () => void }) {
   if (pinnedProjects.length === 0 && recentProjects.length === 0) {
     return (
       <div className="flex flex-col gap-2 py-4 px-3 text-center">
-        <p className="text-xs text-muted-foreground">No projects yet.</p>
-        <p className="text-[10px] text-muted-foreground opacity-70">Build something amazing!</p>
+        <p className="text-xs text-foreground/80">No projects yet.</p>
+        <p className="text-[10px] text-foreground/70">Build something amazing!</p>
       </div>
     )
   }
@@ -36,7 +36,7 @@ export function RecentProjects({ onNavigate }: { onNavigate?: () => void }) {
       {/* Pinned Section */}
       {pinnedProjects.length > 0 && (
         <div>
-          <h4 className="px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+          <h4 className="px-3 text-[11px] font-semibold uppercase tracking-wider text-foreground/80 mb-2">
             Pinned
           </h4>
           <div className="flex flex-col gap-0.5">
@@ -45,10 +45,10 @@ export function RecentProjects({ onNavigate }: { onNavigate?: () => void }) {
                 key={project.id}
                 href={`/dashboard/project/${project.id}`}
                 onClick={onNavigate}
-                className={`group flex items-center justify-between rounded-md px-3 py-2 text-sm transition-colors ${
+                className={`group flex items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors ${
                   activeProjectId === project.id 
-                    ? 'bg-primary/15 text-primary font-medium' 
-                    : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                    ? 'bg-primary/15 text-primary font-medium border border-primary/20' 
+                    : 'text-foreground/80 hover:bg-surface-hover hover:text-foreground border border-transparent'
                 }`}
                 title={project.title}
               >
@@ -84,7 +84,7 @@ export function RecentProjects({ onNavigate }: { onNavigate?: () => void }) {
       {/* Recent Section */}
       {recentProjects.length > 0 && (
         <div>
-          <h4 className="px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+          <h4 className="px-3 text-[11px] font-semibold uppercase tracking-wider text-foreground/80 mb-2">
             Recent Projects
           </h4>
           <div className="flex flex-col gap-0.5">
@@ -93,10 +93,10 @@ export function RecentProjects({ onNavigate }: { onNavigate?: () => void }) {
                 key={project.id}
                 href={`/dashboard/project/${project.id}`}
                 onClick={onNavigate}
-                className={`group flex items-center justify-between rounded-md px-3 py-2 text-sm transition-colors ${
+                className={`group flex items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors ${
                   activeProjectId === project.id 
-                    ? 'bg-primary/15 text-primary font-medium' 
-                    : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                    ? 'bg-primary/15 text-primary font-medium border border-primary/20' 
+                    : 'text-foreground/80 hover:bg-surface-hover hover:text-foreground border border-transparent'
                 }`}
                 title={project.title}
               >
@@ -106,7 +106,7 @@ export function RecentProjects({ onNavigate }: { onNavigate?: () => void }) {
                 </div>
                 
                 <div className="flex items-center gap-1 shrink-0">
-                  <span className="text-[10px] text-muted-foreground/60 group-hover:hidden transition-all">{getTimeAgo(project.updatedAt)}</span>
+                  <span className="text-[10px] text-foreground/70 group-hover:hidden transition-all">{getTimeAgo(project.updatedAt)}</span>
                   <DropdownMenu modal={false}>
                     <DropdownMenuTrigger asChild>
                       <button 

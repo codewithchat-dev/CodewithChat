@@ -20,7 +20,7 @@ export default function HomePage() {
       <main className="flex-1">
         <Hero />
         <TechStackMarquee />
-        <Features />
+        {/* <Features /> */}
         <HowItWorks />
         <Templates />
         <TargetAudience />

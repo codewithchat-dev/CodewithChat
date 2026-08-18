@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { AnimatedBackground } from '@/components/landing/animated-background'
 import { useRouter } from 'next/navigation'
 import { addProjectAction } from '@/app/actions/projects'
 import { getCreditsAction } from '@/app/actions/credits'
@@ -102,13 +103,14 @@ export default function DashboardPage() {
 
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center p-4 md:p-8">
+      <AnimatedBackground />
       {/* Background glowing effects */}
       <div className="absolute inset-0 -z-20 bg-background"></div>
       <div className="absolute top-0 left-1/2 -z-20 h-[800px] w-[1200px] -translate-x-1/2 -translate-y-[30%] rounded-full bg-primary/40 blur-[200px] pointer-events-none"></div>
       <div className="absolute top-0 inset-x-0 -z-20 h-[800px] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/30 via-transparent to-transparent pointer-events-none"></div>
       
       <div className="w-full max-w-3xl flex-1 flex flex-col justify-center animate-in fade-in slide-in-from-bottom-4 duration-700 pt-16 md:pt-20">
-        <h1 className="text-center text-3xl md:text-5xl font-semibold tracking-tight mb-8">
+        <h1 className="text-center text-3xl md:text-5xl font-semibold tracking-tight mb-8 text-foreground">
           What are you building today{user?.firstName ? `, ${user.firstName}` : ''}?
         </h1>
         
@@ -133,7 +135,7 @@ export default function DashboardPage() {
         {/* Recent Projects Dock */}
         <div className="w-full mt-auto">
           <div className="flex items-center justify-between mb-4 px-2">
-            <h2 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+            <h2 className="text-sm font-medium text-foreground/90 flex items-center gap-2">
               <Clock className="size-4" />
               Your Recent Generations
             </h2>
@@ -186,10 +188,10 @@ export default function DashboardPage() {
                         App
                       </Badge>
                     </div>
-                    <p className="text-xs text-muted-foreground line-clamp-2 mb-4 leading-relaxed">
+                    <p className="text-xs text-foreground/80 line-clamp-2 mb-4 leading-relaxed">
                       {project.prompt}
                     </p>
-                    <div className="mt-auto flex items-center justify-between text-[10px] font-medium text-muted-foreground">
+                    <div className="mt-auto flex items-center justify-between text-[10px] font-medium text-foreground/80">
                       <span>{getTimeAgo(project.updatedAt)}</span>
                       <div className="flex items-center gap-1.5">
                         <div className="size-1.5 rounded-full bg-primary" />
@@ -202,7 +204,7 @@ export default function DashboardPage() {
             })}
             {projects.length === 0 && (
               <div className="col-span-full py-12 text-center border border-dashed rounded-xl border-border/60 bg-muted/10">
-                <p className="text-sm text-muted-foreground">No projects yet. Build your first app above!</p>
+                <p className="text-sm text-foreground/80">No projects yet. Build your first app above!</p>
               </div>
             )}
           </div>

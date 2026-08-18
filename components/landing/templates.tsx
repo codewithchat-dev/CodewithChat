@@ -57,18 +57,18 @@ export function Templates() {
   }
 
   return (
-    <section className="pb-24 pt-10">
+    <section className="pb-24 pt-16">
       <div className="mx-auto w-full max-w-6xl px-6">
-        <div className="flex items-center justify-between mb-8">
-          <h2 className="text-2xl font-semibold tracking-tight">Start with a template</h2>
+        <div className="flex items-center justify-between mb-10">
+          <h2 className="text-2xl font-bold tracking-tight text-foreground">Start with a template</h2>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {TEMPLATES.map((template, index) => (
             <div 
               key={index}
               onClick={() => handleTemplateClick(template.prompt)}
-              className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card text-left transition-all hover:border-primary/50 hover:shadow-lg hover:-translate-y-1 cursor-pointer"
+              className="group flex flex-col overflow-hidden rounded-xl border border-border/50 bg-card/80 text-left transition-all duration-300 hover:border-primary/40 hover:shadow-lg hover:-translate-y-1 hover:bg-card/90 cursor-pointer"
             >
               <div className="relative h-44 w-full overflow-hidden bg-muted">
                 <img 
@@ -77,9 +77,10 @@ export function Templates() {
                   loading="lazy"
                   className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                 />
+                <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               </div>
               <div className="p-6 pt-5">
-                <h3 className="font-medium text-lg mb-2">{template.title}</h3>
+                <h3 className="font-semibold text-lg mb-2 group-hover:text-primary transition-colors">{template.title}</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">
                   {template.description}
                 </p>

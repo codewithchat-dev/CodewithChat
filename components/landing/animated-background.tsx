@@ -25,9 +25,9 @@ export function AnimatedBackground() {
 
     // Particle settings
     const particles: Particle[] = []
-    const particleCount = Math.min(Math.floor(window.innerWidth / 15), 100)
-    const connectionDistance = 150
-    const mouseRadius = 200
+    const particleCount = Math.min(Math.floor(window.innerWidth / 8), 150)
+    const connectionDistance = 200
+    const mouseRadius = 300
 
     let mouse = { x: -1000, y: -1000 }
     
@@ -54,17 +54,21 @@ export function AnimatedBackground() {
       constructor() {
         this.x = Math.random() * window.innerWidth
         this.y = Math.random() * window.innerHeight
-        this.vx = (Math.random() - 0.5) * 0.5
-        this.vy = (Math.random() - 0.5) * 0.5
-        this.baseSize = Math.random() * 2 + 1
+        this.vx = (Math.random() - 0.5) * 0.8
+        this.vy = (Math.random() - 0.5) * 0.8
+        this.baseSize = Math.random() * 3 + 2
         this.size = this.baseSize
         
-        // Randomly assign a subtle color
+        // Randomly assign a subtle blue theme color
         const colors = [
-          'rgba(147, 197, 253, 0.8)', // blue-300
-          'rgba(167, 139, 250, 0.8)', // violet-400
-          'rgba(94, 234, 212, 0.8)', // teal-300
-          'rgba(255, 255, 255, 0.6)'
+          'rgba(59, 130, 246, 0.9)', // blue-500
+          'rgba(96, 165, 250, 0.8)', // blue-400
+          'rgba(147, 197, 253, 0.7)', // blue-300
+          'rgba(191, 219, 254, 0.6)', // blue-200
+          'rgba(6, 182, 212, 0.8)', // cyan-500
+          'rgba(34, 211, 238, 0.7)', // cyan-400
+          'rgba(99, 102, 241, 0.8)', // indigo-500
+          // 'rgba(255, 255, 255, 0.7)'
         ]
         this.color = colors[Math.floor(Math.random() * colors.length)]
       }
@@ -151,10 +155,10 @@ export function AnimatedBackground() {
             const mouseDist = Math.sqrt(Math.pow(mouse.x - midX, 2) + Math.pow(mouse.y - midY, 2))
             
             if (mouseDist < mouseRadius) {
-                ctx.strokeStyle = `rgba(167, 139, 250, ${opacity * 0.8})` // violet glow
+                ctx.strokeStyle = `rgba(59, 130, 246, ${opacity * 0.9})` // blue glow
                 ctx.lineWidth = 1.5
             } else {
-                ctx.strokeStyle = `rgba(147, 197, 253, ${opacity * 0.2})` // subtle blue
+                ctx.strokeStyle = `rgba(96, 165, 250, ${opacity * 0.3})` // subtle blue
                 ctx.lineWidth = 1
             }
             
@@ -179,8 +183,8 @@ export function AnimatedBackground() {
   return (
     <canvas
       ref={canvasRef}
-      className="absolute inset-0 -z-10 w-full h-full opacity-60 pointer-events-none"
-      style={{ mixBlendMode: 'screen' }}
+      className="absolute inset-0 z-0 w-full h-full opacity-40 pointer-events-none"
+      // style={{ mixBlendMode: 'screen' }}
     />
   )
 }

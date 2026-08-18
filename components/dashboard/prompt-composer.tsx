@@ -187,7 +187,7 @@ export function PromptComposer({
 
   return (
     <div className="relative w-full">
-      <div className="relative flex flex-col bg-card/50 border border-border/60 hover:border-border rounded-2xl transition-all focus-within:border-primary/60 overflow-hidden">
+      <div className="relative flex flex-col bg-card border border-border/60 hover:border-border rounded-2xl transition-all focus-within:border-primary/60 overflow-hidden">
         {creditsExhausted && (
           <div className="px-4 py-3 border-b border-amber-500/20 bg-amber-500/10 flex flex-col gap-2">
             <div className="flex items-start gap-2">
@@ -215,7 +215,7 @@ export function PromptComposer({
 
         {!creditsExhausted && showCreditsBar && requiresCredit && (
           <div className="px-4 pt-3 pb-0">
-            <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1.5">
+            <div className="flex items-center justify-between text-[10px] text-foreground/80 mb-1.5">
               <span className="flex items-center gap-1">
                 <Zap className="size-3 text-amber-500 fill-amber-500" />
                 {credits} credit{credits === 1 ? '' : 's'} left
@@ -254,7 +254,7 @@ export function PromptComposer({
                 ? 'Ask a question (code updates need credits)…'
                 : placeholder
           }
-          className={`${compact ? (attachedImage ? 'min-h-[40px]' : 'min-h-[88px]') : (attachedImage ? 'min-h-[60px]' : 'min-h-[120px]')} resize-none border-0 bg-transparent px-4 py-4 text-sm focus-visible:ring-0 placeholder:text-muted-foreground/60 shadow-none disabled:opacity-60`}
+          className={`${compact ? (attachedImage ? 'min-h-[40px]' : 'min-h-[88px]') : (attachedImage ? 'min-h-[60px]' : 'min-h-[120px]')} resize-none border-0 bg-transparent px-4 py-4 text-sm focus-visible:ring-0 placeholder:text-foreground/60 shadow-none disabled:opacity-60`}
         />
 
         <div className="flex items-center justify-between px-3 pb-3 gap-2">

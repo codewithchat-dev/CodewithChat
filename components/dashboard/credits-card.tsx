@@ -37,16 +37,16 @@ export function CreditsCard() {
   const progress = creditsProgress(maxCredits, credits)
 
   return (
-    <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
+    <div className="rounded-lg border border-border/50 bg-card/80 p-4 shadow-sm">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold">Credits</p>
+        <p className="text-sm font-semibold text-foreground">Credits</p>
         <Zap className="size-4 text-yellow-500 fill-yellow-500" />
       </div>
       <Progress value={progress} className="mt-3 h-2" />
-      <p className="mt-2 text-xs text-muted-foreground font-medium">
+      <p className="mt-2 text-xs text-foreground/80 font-medium">
         {used} / {maxCredits} daily credits used
       </p>
-      <Button asChild className="w-full mt-4 text-xs h-8 bg-primary text-primary-foreground hover:bg-primary/90">
+      <Button asChild className="w-full mt-4 text-xs h-8 bg-primary text-primary-foreground hover:bg-brand-hover shadow-md shadow-primary/20">
         <Link href="/pricing">Upgrade to Pro</Link>
       </Button>
     </div>

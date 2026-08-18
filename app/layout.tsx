@@ -7,13 +7,14 @@ import { ClerkProvider } from '@clerk/nextjs'
 import { shadcn } from '@clerk/ui/themes'
 import NextTopLoader from 'nextjs-toploader'
 import { CommandMenu } from '@/components/command-menu'
+import { AuthRedirectHandler } from '@/components/auth-redirect-handler'
 import './globals.css'
 
 const fontSans = Outfit({ subsets: ['latin'], variable: '--font-sans' })
 const fontMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono' })
 
 export const metadata: Metadata = {
-  title: 'CodewithChat - AI Studio',
+  title: 'CodewithChat',
   description:
     'A professional AI software engineering mentor that helps you design, build, and deploy production-ready SaaS applications step-by-step.',
   generator: 'v0.app',
@@ -39,7 +40,6 @@ export default function RootLayout({
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"
-          enableSystem
           disableTransitionOnChange
         >
           <NextTopLoader 
@@ -53,7 +53,16 @@ export default function RootLayout({
             speed={200} 
             shadow="0 0 10px hsl(var(--foreground)),0 0 5px hsl(var(--foreground))" 
           />
-          <ClerkProvider appearance={{ theme: shadcn }}>
+          <ClerkProvider 
+            appearance={{ 
+              theme: shadcn,
+              elements: {
+                rootBox: "mx-auto",
+                card: "shadow-xl"
+              }
+            }}
+          >
+            <AuthRedirectHandler />
             {children}
             <CommandMenu />
             <Toaster />

@@ -16,10 +16,10 @@ export const planSchema = z.object({
   previewFiles: z.array(z.object({
     path: z.string(),
     content: z.string()
-  })).optional().describe('DEPRECATED: Leave this array empty. All files should go into fullStackFiles.'),
+  })).optional().describe('CRITICAL: Generate a complete React + TypeScript + TailwindCSS project here. This is what will be displayed in the Sandpack preview. You MUST include: /App.tsx (main entry point), /index.css (with @tailwind directives), and all component files in /components/. Do not output just placeholders; write robust, production-ready code for the requested app idea.'),
   fullStackFiles: z.array(z.object({
     path: z.string(),
     content: z.string()
-  })).optional().describe('CRITICAL: Generate a complete Next.js (App Router) + Supabase + Vercel AI SDK project here. The user will download these files as a ZIP to deploy to production. You MUST include: /package.json, /app/layout.tsx, /app/page.tsx, /lib/supabase.ts (or equivalent), and Next.js configuration files. This is separate from previewFiles. Do not output just placeholders; write robust, production-ready code for the requested app idea.'),
-  dependencies: z.record(z.string(), z.string()).describe('CRITICAL AND MANDATORY: Required npm packages. If your code imports ANY external package (e.g., canvas-confetti, recharts, framer-motion), you MUST explicitly list it here (e.g. { "canvas-confetti": "latest" }). NEVER use "@vercel/ai", the correct package is "ai". Failure to do so will CRASH the preview with a red screen of death!')
+  })).optional().describe('DEPRECATED: Leave this array empty. All files should go into previewFiles.'),
+  dependencies: z.record(z.string(), z.string()).describe('CRITICAL AND MANDATORY: Required npm packages for Sandpack. If your code imports ANY external package (e.g., canvas-confetti, recharts, framer-motion), you MUST explicitly list it here (e.g. { "canvas-confetti": "latest" }). ALWAYS include lucide-react for icons. Never include build tools like vite, @vitejs/plugin-react, etc. as Sandpack handles those automatically.')
 })
