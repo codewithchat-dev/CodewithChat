@@ -11,7 +11,7 @@ import { AnimatedBackground } from '@/components/landing/animated-background'
 import { HeroPreview } from '@/components/landing/hero-preview'
 
 const PLACEHOLDER_PHRASES = [
-  "Ask CodewithChat to build a SaaS dashboard...",
+  "Ask CodewithChat to build a college website...",
   "Ask CodewithChat to build an e-commerce store...",
   "Ask CodewithChat to build a portfolio website...",
   "Ask CodewithChat to build a healthcare scheduling app...",
@@ -259,7 +259,7 @@ export function Hero() {
           </form>
           
           <div className="mt-8 flex flex-wrap items-center justify-center gap-2 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300 fill-mode-both">
-            {["Build a SaaS dashboard", "Create an e-commerce store", "Make a portfolio website", "Build a healthcare scheduling app"].map((suggestion, i) => (
+            {["Build a college website", "Create an e-commerce store", "Make a portfolio website", "Build a healthcare scheduling app"].map((suggestion, i) => (
               <button
                 key={suggestion}
                 type="button"

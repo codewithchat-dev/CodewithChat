@@ -15,7 +15,7 @@ import { PromptComposer } from '@/components/dashboard/prompt-composer'
 import { MAX_DAILY_CREDITS } from '@/lib/credits'
 
 const PLACEHOLDER_PHRASES = [
-  "Build a SaaS dashboard with Next.js...",
+  "Build a college website...",
   "Build an e-commerce store...",
   "Build a portfolio website...",
   "Build a healthcare scheduling app...",
