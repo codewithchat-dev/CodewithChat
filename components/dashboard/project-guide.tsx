@@ -1,14 +1,44 @@
 'use client'
 
 import { useMemo } from 'react'
+import type {
+  ElementType,
+  ReactNode,
+} from 'react'
+
 import {
-  Rocket, Globe, Search, Gauge, ShieldCheck, Database,
-  Package, GitBranch, Key, Lock, Zap,
-  CheckCircle2, ExternalLink, BookOpen, Layers, Cpu,
-  FileText, Copy, ChevronRight, Star, ListChecks
+  Rocket,
+  Globe,
+  Search,
+  Gauge,
+  ShieldCheck,
+  Database,
+  Package,
+  GitBranch,
+  Key,
+  Lock,
+  Zap,
+  CheckCircle2,
+  ExternalLink,
+  BookOpen,
+  Layers,
+  FileText,
+  Copy,
+  ChevronRight,
+  ListChecks,
+  FolderTree,
+  Terminal,
 } from 'lucide-react'
+
 import { toast } from 'sonner'
-import { PublishProjectModal } from '@/components/dashboard/publish-project-modal'
+
+import {
+  PublishProjectModal,
+} from '@/components/dashboard/publish-project-modal'
+
+// ─────────────────────────────────────────────────────────────
+// TYPES
+// ─────────────────────────────────────────────────────────────
 
 interface PlanStep {
   title?: string
@@ -16,15 +46,44 @@ interface PlanStep {
   codeSnippet?: string
   isCommand?: boolean
   fileTarget?: string
-  link?: { text: string; url: string }
+
+  link?: {
+    text: string
+    url: string
+  }
+}
+
+interface ProjectFile {
+  path?: string
+  content?: string
 }
 
 interface Plan {
   overview?: string
-  steps?: (PlanStep | null | undefined)[]
-  previewFiles?: ({ path?: string; content?: string } | null | undefined)[]
-  fullStackFiles?: ({ path?: string; content?: string } | null | undefined)[]
-  dependencies?: Record<string, string>
+
+  steps?: Array<
+    PlanStep | null | undefined
+  >
+
+  /**
+   * previewFiles now contains the COMPLETE
+   * real Vite project.
+   */
+  previewFiles?: Array<
+    ProjectFile | null | undefined
+  >
+
+  /**
+   * Legacy only.
+   */
+  fullStackFiles?: Array<
+    ProjectFile | null | undefined
+  >
+
+  dependencies?: Record<
+    string,
+    string
+  >
 }
 
 interface ProjectGuideProps {
@@ -34,451 +93,1147 @@ interface ProjectGuideProps {
   tech: string
 }
 
-function CodeBlock({ code, language = 'bash' }: { code: string; language?: string }) {
-  const copy = () => {
-    navigator.clipboard.writeText(code)
-    toast.success('Copied to clipboard!')
+interface EnvVariable {
+  key: string
+  example: string
+}
+
+// ─────────────────────────────────────────────────────────────
+// CODE BLOCK
+// ─────────────────────────────────────────────────────────────
+
+function CodeBlock({
+  code,
+  language = 'bash',
+}: {
+  code: string
+  language?: string
+}) {
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(
+        code,
+      )
+
+      toast.success(
+        'Copied to clipboard!',
+      )
+    } catch {
+      toast.error(
+        'Could not copy to clipboard.',
+      )
+    }
   }
+
   return (
-    <div className="relative rounded-lg border border-border bg-[#0d1117] overflow-hidden my-2">
-      <div className="flex items-center justify-between px-4 py-2 bg-muted/30 border-b border-border">
-        <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">{language}</span>
-        <button onClick={copy} className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors">
-          <Copy className="size-3" /> Copy
+    <div className="relative my-2 overflow-hidden rounded-lg border border-border bg-[#0d1117]">
+      <div className="flex items-center justify-between border-b border-border bg-muted/30 px-4 py-2">
+        <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          {language}
+        </span>
+
+        <button
+          type="button"
+          onClick={copy}
+          className="flex items-center gap-1 text-[10px] text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <Copy className="size-3" />
+
+          Copy
         </button>
       </div>
-      <pre className="p-4 text-xs text-emerald-400 font-mono overflow-x-auto whitespace-pre-wrap break-words">{code}</pre>
+
+      <pre className="overflow-x-auto whitespace-pre-wrap break-words p-4 font-mono text-xs text-emerald-400">
+        {code}
+      </pre>
     </div>
   )
 }
 
-function Section({ icon: Icon, title, color, children }: {
-  icon: React.ElementType
+// ─────────────────────────────────────────────────────────────
+// SECTION
+// ─────────────────────────────────────────────────────────────
+
+function Section({
+  icon: Icon,
+  title,
+  color,
+  children,
+}: {
+  icon: ElementType
   title: string
   color: string
-  children: React.ReactNode
+  children: ReactNode
 }) {
   return (
-    <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-      <div className={`flex items-center gap-3 px-5 py-4 border-b border-border ${color}`}>
-        <div className="size-8 rounded-lg bg-background/50 flex items-center justify-center">
+    <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+      <div
+        className={`flex items-center gap-3 border-b border-border px-5 py-4 ${color}`}
+      >
+        <div className="flex size-8 items-center justify-center rounded-lg bg-background/50">
           <Icon className="size-4" />
         </div>
-        <h3 className="font-semibold text-sm">{title}</h3>
+
+        <h3 className="text-sm font-semibold">
+          {title}
+        </h3>
       </div>
-      <div className="p-5 space-y-3 text-sm text-muted-foreground leading-relaxed">
+
+      <div className="space-y-3 p-5 text-sm leading-relaxed text-muted-foreground">
         {children}
       </div>
     </div>
   )
 }
 
-export function ProjectGuide({ plan, projectId, idea, tech }: ProjectGuideProps) {
+// ─────────────────────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────────────────────
 
-  const projectType = useMemo(() => {
-    const lower = idea.toLowerCase()
-    if (lower.includes('ecommerce') || lower.includes('shop') || lower.includes('store') || lower.includes('product')) return 'ecommerce'
-    if (lower.includes('blog') || lower.includes('cms') || lower.includes('article')) return 'blog'
-    if (lower.includes('dashboard') || lower.includes('admin') || lower.includes('analytics')) return 'dashboard'
-    if (lower.includes('portfolio') || lower.includes('resume') || lower.includes('personal')) return 'portfolio'
-    if (lower.includes('saas') || lower.includes('subscription') || lower.includes('payment')) return 'saas'
-    if (lower.includes('social') || lower.includes('chat') || lower.includes('message')) return 'social'
-    return 'general'
-  }, [idea])
+function normalizePath(
+  path: string,
+): string {
+  const normalized = path
+    .trim()
+    .replace(/\\/g, '/')
 
-  const packages = useMemo(() => {
-    if (!plan.dependencies) return []
-    return Object.entries(plan.dependencies).map(([name, version]) => ({ name, version }))
-  }, [plan.dependencies])
+  return normalized.startsWith('/')
+    ? normalized
+    : `/${normalized}`
+}
 
-  const envVars = useMemo(() => {
-    const envFile = plan.fullStackFiles?.find(f => f?.path?.includes('.env'))
-    if (envFile?.content) {
-      return envFile.content.split('\n')
-        .filter(line => line.includes('=') && !line.startsWith('#') && line.trim())
-        .map(line => {
-          const [key, ...rest] = line.split('=')
-          return { key: key.trim(), example: rest.join('=').trim() || 'YOUR_VALUE_HERE' }
-        })
-    }
-    const vars: { key: string; example: string }[] = [
-      { key: 'NEXT_PUBLIC_SUPABASE_URL', example: 'https://your-project.supabase.co' },
-      { key: 'NEXT_PUBLIC_SUPABASE_ANON_KEY', example: 'your-anon-public-key-here' },
-    ]
-    if (projectType === 'ecommerce' || projectType === 'saas') {
-      vars.push({ key: 'VITE_STRIPE_PUBLIC_KEY', example: 'pk_live_xxxxxxxxxxxx' })
-    }
-    return vars
-  }, [plan.fullStackFiles, tech, projectType])
+function parseEnvFile(
+  content: string,
+): EnvVariable[] {
+  return content
+    .split('\n')
+    .map(line => line.trim())
+    .filter(
+      line =>
+        Boolean(line) &&
+        !line.startsWith('#') &&
+        line.includes('='),
+    )
+    .map(line => {
+      const separator =
+        line.indexOf('=')
 
-  const projectTypeConfig = useMemo(() => {
-    const configs: Record<string, { title: string; description: string; steps: string[] }> = {
-      ecommerce: {
-        title: 'E-Commerce Website',
-        description: 'You have built an e-commerce website with product listings, cart management, and payment processing. Complete the steps below before going live.',
-        steps: [
-          'Create a Stripe account and obtain live API keys — test keys only work in development',
-          'Upload product images to a CDN like Cloudinary or AWS S3 — local images will not work in production',
-          'Set up a MongoDB database to store cart items, orders, and user accounts',
-          'Configure a payment webhook endpoint in the Stripe Dashboard to handle events',
-          'Ensure your domain has an SSL certificate — payment processors require HTTPS',
-        ]
-      },
-      blog: {
-        title: 'Blog / CMS Website',
-        description: 'You have built a blog or content management website. Connect a headless CMS to manage your content efficiently.',
-        steps: [
-          'Create a free account on Sanity.io or Contentful as your headless CMS',
-          'Set up slug-based routing for individual blog post pages',
-          'Automatically generate a sitemap.xml for better search engine indexing',
-          'Add a comment system using Disqus or a custom MongoDB-based solution',
-          'Add an RSS feed so readers can subscribe to new content',
-        ]
-      },
-      portfolio: {
-        title: 'Portfolio Website',
-        description: 'You have built a personal portfolio website. Add a custom domain and proper SEO to make it stand out professionally.',
-        steps: [
-          'Purchase a custom domain (e.g., yourname.com) from Namecheap or GoDaddy',
-          'Update all meta tags with your real name, profile photo, and description',
-          'Add Google Analytics to track visitors and page views',
-          'Set up a contact form using Resend or EmailJS',
-          'Replace placeholder project links with real GitHub repository URLs',
-        ]
-      },
-      dashboard: {
-        title: 'Dashboard / Admin Panel',
-        description: 'You have built a dashboard or admin panel. You will need a backend API and proper authentication to display real data.',
-        steps: [
-          'Implement authentication using NextAuth.js or Clerk',
-          'Add role-based access control — not all users should have admin privileges',
-          'Define your MongoDB data schemas clearly before storing production data',
-          'Replace all dummy chart data with real API calls',
-          'Add CSV or PDF export functionality for data reports',
-        ]
-      },
-      saas: {
-        title: 'SaaS Application',
-        description: 'You have built a SaaS application. Subscription management, user accounts, and payments are the core features to get right.',
-        steps: [
-          'Set up Stripe Billing with monthly and yearly subscription plans',
-          'Design a clear user onboarding flow: Sign Up → Payment → Dashboard',
-          'Implement usage limits per plan (e.g., Free: 5 projects, Pro: unlimited)',
-          'Configure transactional emails using Resend or SendGrid',
-          'Add a customer support chat widget using Intercom or Crisp',
-        ]
-      },
-      social: {
-        title: 'Social / Chat Application',
-        description: 'You have built a social or chat application. Real-time features require WebSocket or a managed service like Pusher.',
-        steps: [
-          'Implement real-time messaging with Pusher or Socket.io',
-          'Set up Cloudinary for user profile pictures and media uploads',
-          'Properly index message history in MongoDB for fast retrieval',
-          'Configure Firebase Cloud Messaging for push notifications',
-          'Add rate limiting to prevent spam and abuse',
-        ]
-      },
-      general: {
-        title: 'Web Application',
-        description: 'You have built a web application. Follow the steps below to make it production-ready.',
-        steps: [
-          'Store all sensitive values in a .env file — never hardcode them in your source code',
-          'Implement proper error handling with try/catch blocks throughout the application',
-          'Build loading states and empty state UIs for a polished user experience',
-          'Test your layout thoroughly on mobile devices and different screen sizes',
-          'Connect a custom domain before sharing publicly',
-        ]
+      const key = line
+        .slice(0, separator)
+        .trim()
+
+      const value = line
+        .slice(separator + 1)
+        .trim()
+
+      return {
+        key,
+        example:
+          value ||
+          'YOUR_VALUE_HERE',
       }
-    }
-    return configs[projectType] || configs.general
-  }, [projectType])
+    })
+    .filter(variable =>
+      Boolean(variable.key),
+    )
+}
 
-  const gitignoreContent = `node_modules/
+function getFileLanguage(
+  path?: string,
+): string {
+  if (!path) return 'text'
+
+  const extension =
+    path
+      .split('.')
+      .pop()
+      ?.toLowerCase()
+
+  switch (extension) {
+    case 'tsx':
+      return 'tsx'
+
+    case 'ts':
+      return 'typescript'
+
+    case 'jsx':
+      return 'jsx'
+
+    case 'js':
+      return 'javascript'
+
+    case 'json':
+      return 'json'
+
+    case 'css':
+      return 'css'
+
+    case 'sql':
+      return 'sql'
+
+    case 'md':
+      return 'markdown'
+
+    default:
+      return extension || 'text'
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// MAIN COMPONENT
+// ─────────────────────────────────────────────────────────────
+
+export function ProjectGuide({
+  plan,
+  projectId,
+  idea,
+  tech,
+}: ProjectGuideProps) {
+  // ───────────────────────────────────────────────────────────
+  // PROJECT FILES
+  // ───────────────────────────────────────────────────────────
+
+  const projectFiles =
+    useMemo(() => {
+      return (
+        plan.previewFiles
+          ?.filter(
+            (
+              file,
+            ): file is ProjectFile =>
+              Boolean(
+                file?.path &&
+                  typeof file.content ===
+                    'string',
+              ),
+          )
+          .map(file => ({
+            path: normalizePath(
+              file.path!,
+            ),
+
+            content:
+              file.content ?? '',
+          })) ?? []
+      )
+    }, [plan.previewFiles])
+
+  const projectFileMap =
+    useMemo(() => {
+      return Object.fromEntries(
+        projectFiles.map(file => [
+          file.path,
+          file.content,
+        ]),
+      )
+    }, [projectFiles])
+
+  // ───────────────────────────────────────────────────────────
+  // PACKAGE.JSON
+  // ───────────────────────────────────────────────────────────
+
+  const packageJson =
+    useMemo(() => {
+      const content =
+        projectFileMap[
+          '/package.json'
+        ]
+
+      if (!content) {
+        return null
+      }
+
+      try {
+        return JSON.parse(
+          content,
+        ) as {
+          scripts?: Record<
+            string,
+            string
+          >
+
+          dependencies?: Record<
+            string,
+            string
+          >
+
+          devDependencies?: Record<
+            string,
+            string
+          >
+        }
+      } catch {
+        return null
+      }
+    }, [projectFileMap])
+
+  // ───────────────────────────────────────────────────────────
+  // PACKAGES
+  // ───────────────────────────────────────────────────────────
+
+  const packages =
+    useMemo(() => {
+      const merged = {
+        ...(packageJson?.dependencies ??
+          {}),
+
+        ...(plan.dependencies ??
+          {}),
+      }
+
+      return Object.entries(
+        merged,
+      )
+        .map(
+          ([name, version]) => ({
+            name,
+            version,
+          }),
+        )
+        .sort((a, b) =>
+          a.name.localeCompare(
+            b.name,
+          ),
+        )
+    }, [
+      packageJson,
+      plan.dependencies,
+    ])
+
+  // ───────────────────────────────────────────────────────────
+  // ENVIRONMENT VARIABLES
+  // ───────────────────────────────────────────────────────────
+
+  const envVars =
+    useMemo(() => {
+      const envFile =
+        projectFiles.find(file =>
+          [
+            '/.env.example',
+            '/.env.local.example',
+            '/.env.example.local',
+          ].includes(file.path),
+        )
+
+      if (!envFile?.content) {
+        return []
+      }
+
+      return parseEnvFile(
+        envFile.content,
+      )
+    }, [projectFiles])
+
+  const envFileContent =
+    useMemo(() => {
+      if (!envVars.length) {
+        return ''
+      }
+
+      return envVars
+        .map(
+          variable =>
+            `${variable.key}=${variable.example}`,
+        )
+        .join('\n')
+    }, [envVars])
+
+  // ───────────────────────────────────────────────────────────
+  // DETECT FEATURES
+  // ───────────────────────────────────────────────────────────
+
+  const usesSupabase =
+    useMemo(() => {
+      if (
+        packages.some(
+          pkg =>
+            pkg.name ===
+            '@supabase/supabase-js',
+        )
+      ) {
+        return true
+      }
+
+      return projectFiles.some(
+        file =>
+          file.path.startsWith(
+            '/supabase/',
+          ) ||
+          file.path.includes(
+            '/supabase.',
+          ) ||
+          file.path.includes(
+            '/supabase/',
+          ),
+      )
+    }, [
+      packages,
+      projectFiles,
+    ])
+
+  const usesStripe =
+    useMemo(
+      () =>
+        packages.some(pkg =>
+          pkg.name
+            .toLowerCase()
+            .includes('stripe'),
+        ) ||
+        envVars.some(variable =>
+          variable.key
+            .toLowerCase()
+            .includes('stripe'),
+        ),
+      [packages, envVars],
+    )
+
+  // ───────────────────────────────────────────────────────────
+  // GITIGNORE
+  // ───────────────────────────────────────────────────────────
+
+  const gitignoreContent =
+    useMemo(() => {
+      const generated =
+        projectFileMap[
+          '/.gitignore'
+        ]
+
+      if (generated) {
+        return generated
+      }
+
+      return `node_modules/
+dist/
 .env
 .env.local
 .env.production
-.next/
-dist/
-build/
-.DS_Store
 *.log
-.vercel`
+.DS_Store
+.vercel/`
+    }, [projectFileMap])
 
-  const envFileContent = envVars.map(v => `${v.key}=${v.example}`).join('\n')
+  // ───────────────────────────────────────────────────────────
+  // GIT COMMANDS
+  // ───────────────────────────────────────────────────────────
 
-  const gitCommands = `# Step 1: Create a new repository on github.com
-# Go to github.com → New Repository → Create
-
-# Step 2: Run these commands inside your project folder
-git init
+  const gitCommands = `git init
 git add .
 git commit -m "Initial commit"
-
-# Step 3: Link to your GitHub repository
-git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
 git branch -M main
+git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
 git push -u origin main`
 
-  const envExplanation: Record<string, string> = {
-    MONGODB_URI: 'Get this from MongoDB Atlas — Cluster → Connect → Connect your application',
-    STRIPE_SECRET_KEY: 'Get from Stripe Dashboard → Developers → API Keys',
-    STRIPE_PUBLISHABLE_KEY: 'Get from Stripe Dashboard → Developers → API Keys',
-    NEXTAUTH_SECRET: 'Generate a random string: run `openssl rand -base64 32` in your terminal',
-    NEXT_PUBLIC_SITE_URL: 'The final URL of your website after deployment',
-  }
+  // ───────────────────────────────────────────────────────────
+  // RUN COMMANDS
+  // ───────────────────────────────────────────────────────────
+
+  const installCommands = `npm install
+npm run dev`
+
+  // ───────────────────────────────────────────────────────────
+  // PROJECT TYPE
+  // ───────────────────────────────────────────────────────────
+
+  const projectType =
+    useMemo(() => {
+      const text =
+        idea.toLowerCase()
+
+      if (
+        /ecommerce|e-commerce|shop|store|product|cart/.test(
+          text,
+        )
+      ) {
+        return 'E-Commerce'
+      }
+
+      if (
+        /blog|cms|article|news/.test(
+          text,
+        )
+      ) {
+        return 'Blog / Content'
+      }
+
+      if (
+        /dashboard|admin|analytics/.test(
+          text,
+        )
+      ) {
+        return 'Dashboard'
+      }
+
+      if (
+        /portfolio|resume|personal/.test(
+          text,
+        )
+      ) {
+        return 'Portfolio'
+      }
+
+      if (
+        /saas|subscription/.test(
+          text,
+        )
+      ) {
+        return 'SaaS'
+      }
+
+      if (
+        /social|chat|message/.test(
+          text,
+        )
+      ) {
+        return 'Social / Chat'
+      }
+
+      return 'Web Application'
+    }, [idea])
+
+  // ───────────────────────────────────────────────────────────
+  // CHECKLIST
+  // ───────────────────────────────────────────────────────────
+
+  const checklist =
+    useMemo(() => {
+      const items = [
+        {
+          label:
+            'Mobile responsiveness verified',
+
+          icon: Gauge,
+
+          color:
+            'text-cyan-400',
+        },
+
+        {
+          label:
+            'Error and loading states tested',
+
+          icon: ShieldCheck,
+
+          color:
+            'text-orange-400',
+        },
+
+        {
+          label:
+            '.env files excluded from Git',
+
+          icon: Lock,
+
+          color:
+            'text-rose-400',
+        },
+
+        {
+          label:
+            'Code pushed to GitHub',
+
+          icon: GitBranch,
+
+          color:
+            'text-green-400',
+        },
+
+        {
+          label:
+            'Production domain configured',
+
+          icon: Globe,
+
+          color:
+            'text-blue-400',
+        },
+
+        {
+          label:
+            'SEO title and description reviewed',
+
+          icon: Search,
+
+          color:
+            'text-emerald-400',
+        },
+      ]
+
+      if (usesSupabase) {
+        items.splice(2, 0, {
+          label:
+            'Supabase environment variables configured',
+
+          icon: Key,
+
+          color:
+            'text-amber-400',
+        })
+
+        items.splice(3, 0, {
+          label:
+            'Supabase RLS policies verified',
+
+          icon: Database,
+
+          color:
+            'text-purple-400',
+        })
+      }
+
+      if (usesStripe) {
+        items.push({
+          label:
+            'Stripe production keys and webhooks configured',
+
+          icon: Zap,
+
+          color:
+            'text-violet-400',
+        })
+      }
+
+      return items
+    }, [
+      usesSupabase,
+      usesStripe,
+    ])
+
+  // ───────────────────────────────────────────────────────────
+  // RENDER
+  // ───────────────────────────────────────────────────────────
 
   return (
-    <div className="absolute inset-0 overflow-y-auto p-6 bg-background/50">
-      <div className="max-w-3xl mx-auto space-y-6 pb-12">
+    <div className="absolute inset-0 overflow-y-auto bg-background/50 p-6">
+      <div className="mx-auto max-w-3xl space-y-6 pb-12">
+        {/* HEADER */}
 
-        {/* Header */}
-        <div className="rounded-xl border border-primary/20 bg-primary/5 p-6 relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-4 opacity-5">
+        <div className="relative overflow-hidden rounded-xl border border-primary/20 bg-primary/5 p-6">
+          <div className="absolute right-0 top-0 p-4 opacity-5">
             <Rocket className="size-40" />
           </div>
-          <div className="flex items-center gap-2 mb-2">
+
+          <div className="mb-2 flex items-center gap-2">
             <BookOpen className="size-5 text-primary" />
-            <h2 className="text-xl font-bold text-primary">Production Guide</h2>
+
+            <h2 className="text-xl font-bold text-primary">
+              Production Guide
+            </h2>
           </div>
-          <h3 className="font-semibold text-base mb-1">{projectTypeConfig.title}</h3>
-          <p className="text-sm text-muted-foreground leading-relaxed max-w-[90%] relative z-10">
-            {projectTypeConfig.description}
+
+          <h3 className="mb-1 text-base font-semibold">
+            {projectType}
+          </h3>
+
+          <p className="relative z-10 max-w-[90%] text-sm leading-relaxed text-muted-foreground">
+            Your project was generated
+            using{' '}
+            <strong className="text-foreground">
+              {tech}
+            </strong>
+            . Follow this guide to run,
+            configure, export and deploy
+            it safely.
           </p>
         </div>
 
-        {/* Project Overview */}
+        {/* OVERVIEW */}
+
         {plan.overview && (
-          <Section icon={Layers} title="What Was Built" color="bg-blue-500/5 text-blue-400">
-            <p className="text-foreground">{plan.overview}</p>
+          <Section
+            icon={Layers}
+            title="What Was Built"
+            color="bg-blue-500/5 text-blue-400"
+          >
+            <p className="text-foreground">
+              {plan.overview}
+            </p>
           </Section>
         )}
 
-        {/* Installed Packages */}
-        {packages.length > 0 && (
-          <Section icon={Package} title="Installed npm Packages" color="bg-purple-500/5 text-purple-400">
-            <p>The following packages were automatically included in your project:</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
-              {packages.map(pkg => (
-                <div key={pkg.name} className="flex items-center justify-between bg-muted/40 rounded-lg px-3 py-2 text-xs border border-border">
-                  <div className="flex items-center gap-2">
-                    <span className="size-2 rounded-full bg-emerald-500 inline-block" />
-                    <span className="font-mono text-foreground">{pkg.name}</span>
-                  </div>
-                  <span className="text-muted-foreground">{pkg.version}</span>
+        {/* PROJECT STRUCTURE */}
+
+        {projectFiles.length > 0 && (
+          <Section
+            icon={FolderTree}
+            title="Generated Project"
+            color="bg-cyan-500/5 text-cyan-400"
+          >
+            <p>
+              CodewithChat generated a
+              complete project containing{' '}
+              <strong className="text-foreground">
+                {projectFiles.length}
+              </strong>{' '}
+              files.
+            </p>
+
+            <div className="max-h-64 overflow-y-auto rounded-lg border border-border bg-muted/20">
+              {projectFiles.map(file => (
+                <div
+                  key={file.path}
+                  className="flex items-center gap-2 border-b border-border/40 px-3 py-2 font-mono text-xs last:border-b-0"
+                >
+                  <FileText className="size-3 shrink-0 text-muted-foreground" />
+
+                  <span className="truncate text-foreground/80">
+                    {file.path}
+                  </span>
                 </div>
               ))}
             </div>
-            <div className="mt-3 p-3 rounded-lg bg-muted/30 border border-border text-xs">
-              <p className="font-medium text-foreground mb-1">To install all packages in your local VS Code project, run:</p>
-              <CodeBlock code="npm install" language="terminal" />
-            </div>
           </Section>
         )}
 
-        {/* Environment Variables */}
-        {envVars.length > 0 && (
-          <Section icon={Key} title="Environment Variables (.env)" color="bg-amber-500/5 text-amber-400">
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs mb-3">
-              <Lock className="size-4 shrink-0 mt-0.5" />
-              <p><strong>Security Warning:</strong> Never hardcode these values directly in your source code. Always store them in a <code className="bg-black/30 px-1 rounded">.env.local</code> file and add it to <code className="bg-black/30 px-1 rounded">.gitignore</code>.</p>
-            </div>
-            <p>Create a file named <code className="bg-muted px-1 rounded text-foreground">.env.local</code> in your project root and add the following values:</p>
-            <CodeBlock code={envFileContent} language=".env.local" />
-            <div className="space-y-2 mt-2">
-              {envVars.map(v => (
-                <div key={v.key} className="flex items-start gap-3 text-xs">
-                  <ChevronRight className="size-3.5 mt-0.5 text-muted-foreground shrink-0" />
-                  <div>
-                    <span className="font-mono text-foreground font-medium">{v.key}</span>
-                    <span className="ml-2 text-muted-foreground">
-                      — {envExplanation[v.key] ?? 'Copy this value from your service dashboard'}
+        {/* LOCAL SETUP */}
+
+        <Section
+          icon={Terminal}
+          title="Run Locally"
+          color="bg-green-500/5 text-green-400"
+        >
+          <p>
+            Download the project ZIP,
+            extract it, open the folder
+            in VS Code, then run:
+          </p>
+
+          <CodeBlock
+            code={installCommands}
+            language="terminal"
+          />
+
+          <p className="text-xs">
+            Vite normally starts the
+            development server at a local
+            URL shown in your terminal.
+          </p>
+        </Section>
+
+        {/* PACKAGES */}
+
+        {packages.length > 0 && (
+          <Section
+            icon={Package}
+            title="Runtime Packages"
+            color="bg-purple-500/5 text-purple-400"
+          >
+            <p>
+              These runtime packages are
+              used by the generated
+              application:
+            </p>
+
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {packages.map(pkg => (
+                <div
+                  key={pkg.name}
+                  className="flex items-center justify-between rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs"
+                >
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="inline-block size-2 shrink-0 rounded-full bg-emerald-500" />
+
+                    <span className="truncate font-mono text-foreground">
+                      {pkg.name}
                     </span>
                   </div>
+
+                  <span className="ml-2 shrink-0 text-muted-foreground">
+                    {pkg.version}
+                  </span>
                 </div>
               ))}
             </div>
           </Section>
         )}
 
-        {/* .gitignore */}
-        <Section icon={FileText} title="What is .gitignore?" color="bg-slate-500/5 text-slate-400">
-          <p>
-            <strong className="text-foreground">.gitignore</strong> is a file that tells Git which files <strong className="text-red-400">not to upload</strong> to GitHub. The most important entries are:
-          </p>
-          <ul className="space-y-1 mt-2 text-xs">
-            {[
-              ['node_modules/', 'Contains millions of files — regenerated automatically with npm install'],
-              ['.env / .env.local', 'Contains secret keys — must never be pushed to GitHub'],
-              ['.next / dist / build', 'Build output files — automatically regenerated when deploying'],
-            ].map(([file, desc]) => (
-              <li key={file} className="flex items-start gap-2">
-                <ChevronRight className="size-3.5 mt-0.5 text-muted-foreground shrink-0" />
-                <span><code className="text-foreground font-mono">{file}</code> — {desc}</span>
-              </li>
-            ))}
-          </ul>
-          <p className="text-xs mt-2">This file is already included in your VS Code Export. Open <code className="bg-muted px-1 rounded text-foreground">.gitignore</code> in the project root to verify it contains:</p>
-          <CodeBlock code={gitignoreContent} language=".gitignore" />
-        </Section>
+        {/* ENVIRONMENT VARIABLES */}
 
-        {/* GitHub Push */}
-        <Section icon={GitBranch} title="How to Push Code to GitHub" color="bg-green-500/5 text-green-400">
-          <ol className="space-y-2 text-xs list-none">
-            {[
-              ['Step 1', 'Download the project ZIP using the Download button in the toolbar'],
-              ['Step 2', 'Extract the ZIP and open the folder in VS Code'],
-              ['Step 3', 'Open the terminal in VS Code and run npm install'],
-              ['Step 4', 'Go to github.com → Click "New Repository" → Create it'],
-              ['Step 5', 'Run the commands below one by one in your terminal'],
-            ].map(([step, desc]) => (
-              <li key={step} className="flex items-start gap-2">
-                <span className="text-xs font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded shrink-0">{step}</span>
-                <span>{desc}</span>
-              </li>
-            ))}
-          </ol>
-          <CodeBlock code={gitCommands} language="terminal" />
-          <div className="flex items-center gap-2 mt-2">
-            <ExternalLink className="size-3.5 text-muted-foreground shrink-0" />
-            <a href="https://github.com/new" target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline">
-              Create a new GitHub repository →
-            </a>
-          </div>
-        </Section>
+        {envVars.length > 0 && (
+          <Section
+            icon={Key}
+            title="Environment Variables"
+            color="bg-amber-500/5 text-amber-400"
+          >
+            <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-300">
+              <Lock className="mt-0.5 size-4 shrink-0" />
 
-        {/* Generated AI Steps */}
-        {plan.steps && plan.steps.length > 0 && (
-          <Section icon={ListChecks} title="Implementation Steps" color="bg-indigo-500/5 text-indigo-400">
-            <p className="text-xs mb-4">The following steps outline how this project was built and the core logic behind it:</p>
-            <div className="space-y-6">
-              {plan.steps.map((step, i) => {
-                if (!step) return null
-                return (
-                  <div key={i} className="flex gap-4">
-                    <div className="flex-shrink-0 size-6 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-xs mt-0.5">{i + 1}</div>
-                    <div className="space-y-2 flex-1 min-w-0">
-                      <h4 className="font-semibold text-foreground text-sm">{step.title}</h4>
-                      {step.description && <p className="text-xs text-muted-foreground leading-relaxed">{step.description}</p>}
-                      {step.codeSnippet && (
-                        <div className="mt-2">
-                          {step.fileTarget && <div className="text-[10px] text-muted-foreground mb-1">{step.fileTarget}</div>}
-                          <CodeBlock 
-                            code={step.codeSnippet} 
-                            language={step.isCommand ? 'terminal' : (step.fileTarget?.split('.').pop() || 'tsx')} 
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
+              <p>
+                <strong>
+                  Security:
+                </strong>{' '}
+                Never commit real API
+                keys or secrets to Git.
+                Keep real values in your
+                local{' '}
+                <code className="rounded bg-black/30 px-1">
+                  .env
+                </code>{' '}
+                file.
+              </p>
+            </div>
+
+            <p>
+              The generated project
+              expects these environment
+              variables:
+            </p>
+
+            <CodeBlock
+              code={envFileContent}
+              language=".env"
+            />
+
+            <div className="space-y-2">
+              {envVars.map(variable => (
+                <div
+                  key={variable.key}
+                  className="flex items-start gap-3 text-xs"
+                >
+                  <ChevronRight className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+
+                  <span className="font-mono font-medium text-foreground">
+                    {variable.key}
+                  </span>
+                </div>
+              ))}
             </div>
           </Section>
         )}
 
-        {/* Project-Specific Steps */}
-        <Section icon={Cpu} title={`${projectTypeConfig.title} — Important Next Steps`} color="bg-rose-500/5 text-rose-400">
-          <p className="text-xs mb-3">These steps are specific to your project type. Complete them in order:</p>
-          <ol className="space-y-3">
-            {projectTypeConfig.steps.map((step, i) => (
-              <li key={i} className="flex items-start gap-3 text-xs">
-                <span className="flex-shrink-0 size-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-[10px]">{i + 1}</span>
-                <span className="leading-relaxed">{step}</span>
-              </li>
-            ))}
-          </ol>
+        {/* GITIGNORE */}
+
+        <Section
+          icon={FileText}
+          title=".gitignore"
+          color="bg-slate-500/5 text-slate-400"
+        >
+          <p>
+            The{' '}
+            <strong className="text-foreground">
+              .gitignore
+            </strong>{' '}
+            file prevents generated
+            dependencies, build output
+            and secret environment files
+            from being committed.
+          </p>
+
+          <CodeBlock
+            code={gitignoreContent}
+            language=".gitignore"
+          />
         </Section>
 
-        {/* Database Setup — Supabase Only */}
-        <Section icon={Database} title="Database Setup (Supabase)" color="bg-emerald-500/5 text-emerald-400">
-          <div className="flex items-center gap-2 mb-3">
-            <Zap className="size-4 text-emerald-400" />
-            <span className="text-xs text-muted-foreground">This project uses <strong className="text-foreground">Supabase</strong> — a free Postgres database with built-in Auth, Storage, and real-time subscriptions.</span>
-          </div>
-          <ol className="space-y-2 text-xs">
-            {[
-              { label: 'Create a free account', link: 'https://supabase.com', desc: '— Click "Start your project", no credit card needed' },
-              { label: 'Create a New Project', link: null, desc: '— Give it a name, set a database password, choose a region' },
-              { label: 'Get your API keys', link: null, desc: '— Project Settings → API → copy Project URL and anon public key' },
-              { label: 'Install the client', link: null, desc: '— Run: npm install @supabase/supabase-js' },
-              { label: 'Add env vars and connect', link: null, desc: '— See the code snippets below' },
-            ].map(({ label, link, desc }, i) => (
-              <li key={i} className="flex items-start gap-2">
-                <span className="flex-shrink-0 size-4 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-[9px]">{i + 1}</span>
+        {/* AI STEPS */}
+
+        {plan.steps &&
+          plan.steps.length > 0 && (
+            <Section
+              icon={ListChecks}
+              title="Implementation Steps"
+              color="bg-indigo-500/5 text-indigo-400"
+            >
+              <div className="space-y-6">
+                {plan.steps.map(
+                  (
+                    step,
+                    index,
+                  ) => {
+                    if (!step) {
+                      return null
+                    }
+
+                    return (
+                      <div
+                        key={index}
+                        className="flex gap-4"
+                      >
+                        <div className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-indigo-500/20 text-xs font-bold text-indigo-400">
+                          {index + 1}
+                        </div>
+
+                        <div className="min-w-0 flex-1 space-y-2">
+                          <h4 className="text-sm font-semibold text-foreground">
+                            {step.title ||
+                              `Step ${index + 1}`}
+                          </h4>
+
+                          {step.description && (
+                            <p className="text-xs leading-relaxed text-muted-foreground">
+                              {
+                                step.description
+                              }
+                            </p>
+                          )}
+
+                          {step.codeSnippet && (
+                            <div className="mt-2">
+                              {step.fileTarget && (
+                                <div className="mb-1 font-mono text-[10px] text-muted-foreground">
+                                  {
+                                    step.fileTarget
+                                  }
+                                </div>
+                              )}
+
+                              <CodeBlock
+                                code={
+                                  step.codeSnippet
+                                }
+                                language={
+                                  step.isCommand
+                                    ? 'terminal'
+                                    : getFileLanguage(
+                                        step.fileTarget,
+                                      )
+                                }
+                              />
+                            </div>
+                          )}
+
+                          {step.link && (
+                            <a
+                              href={
+                                step.link.url
+                              }
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                            >
+                              {
+                                step.link.text
+                              }
+
+                              <ExternalLink className="size-3" />
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  },
+                )}
+              </div>
+            </Section>
+          )}
+
+        {/* SUPABASE */}
+
+        {usesSupabase && (
+          <Section
+            icon={Database}
+            title="Supabase Setup"
+            color="bg-emerald-500/5 text-emerald-400"
+          >
+            <div className="flex items-start gap-2">
+              <Zap className="mt-0.5 size-4 shrink-0 text-emerald-400" />
+
+              <p className="text-xs">
+                This project contains a
+                Supabase integration.
+                Connect it to your own
+                Supabase project before
+                using database,
+                authentication, storage
+                or realtime features.
+              </p>
+            </div>
+
+            <ol className="space-y-3 text-xs">
+              <li className="flex gap-2">
+                <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 font-bold text-emerald-400">
+                  1
+                </span>
+
                 <span>
-                  {link ? (
-                    <a href={link} target="_blank" rel="noreferrer" className="text-primary hover:underline font-medium">{label}</a>
-                  ) : (
-                    <strong className="text-foreground">{label}</strong>
-                  )}
-                  {' '}{desc}
+                  Create or select a
+                  Supabase project.
                 </span>
               </li>
-            ))}
-          </ol>
-          <div className="mt-3 space-y-2">
-            <p className="text-xs font-medium text-foreground">.env.local file:</p>
-            <CodeBlock code={`NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here`} language=".env.local" />
-            <p className="text-xs font-medium text-foreground">lib/supabase.ts — connection file:</p>
-            <CodeBlock code={`import { createClient } from '@supabase/supabase-js'
+
+              <li className="flex gap-2">
+                <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 font-bold text-emerald-400">
+                  2
+                </span>
+
+                <span>
+                  Copy your project URL
+                  and publishable key into
+                  your local environment
+                  variables.
+                </span>
+              </li>
+
+              <li className="flex gap-2">
+                <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 font-bold text-emerald-400">
+                  3
+                </span>
+
+                <span>
+                  Apply the generated SQL
+                  migrations from the{' '}
+                  <code className="font-mono text-foreground">
+                    /supabase/migrations
+                  </code>{' '}
+                  folder.
+                </span>
+              </li>
+
+              <li className="flex gap-2">
+                <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 font-bold text-emerald-400">
+                  4
+                </span>
+
+                <span>
+                  Review Row Level
+                  Security policies before
+                  production.
+                </span>
+              </li>
+            </ol>
+
+            <CodeBlock
+              code={`VITE_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_KEY`}
+              language=".env"
+            />
+
+            <CodeBlock
+              code={`import { createClient } from '@supabase/supabase-js'
 
 export const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-)
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+)`}
+              language="typescript"
+            />
 
-// Fetch data example:
-const { data, error } = await supabase.from('products').select('*')
+            <a
+              href="https://supabase.com/docs"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+            >
+              Supabase Documentation
 
-// Insert data example:
-const { error } = await supabase.from('orders').insert({ product_id: 1, qty: 2 })
+              <ExternalLink className="size-3" />
+            </a>
+          </Section>
+        )}
 
-// Auth example:
-await supabase.auth.signUp({ email, password })
-await supabase.auth.signInWithPassword({ email, password })`} language="typescript" />
-          </div>
-          <div className="flex items-center gap-2 mt-3">
-            <ExternalLink className="size-3 text-muted-foreground" />
-            <a href="https://supabase.com/docs" target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline">Supabase Documentation →</a>
-          </div>
-        </Section>
+        {/* GITHUB */}
 
-        {/* Production Checklist */}
-        <Section icon={Rocket} title="Pre-Launch Checklist" color="bg-primary/5 text-primary">
-          <p className="text-xs mb-3">Verify each item before deploying your website:</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <Section
+          icon={GitBranch}
+          title="Push to GitHub"
+          color="bg-green-500/5 text-green-400"
+        >
+          <ol className="space-y-2 text-xs">
             {[
-              { label: 'Custom domain connected', icon: Globe, color: 'text-blue-400' },
-              { label: 'SEO meta tags configured', icon: Search, color: 'text-emerald-400' },
-              { label: 'Supabase URL & Anon Key set in .env', icon: Key, color: 'text-amber-400' },
-              { label: '.env file added to .gitignore', icon: Lock, color: 'text-rose-400' },
-              { label: 'Supabase tables created & tested', icon: Database, color: 'text-purple-400' },
-              { label: 'Mobile responsiveness verified', icon: Gauge, color: 'text-cyan-400' },
-              { label: 'Error handling implemented', icon: ShieldCheck, color: 'text-orange-400' },
-              { label: 'Code pushed to GitHub', icon: GitBranch, color: 'text-green-400' },
-            ].map(({ label, icon: Icon, color }) => (
-              <div key={label} className="flex items-center gap-2 bg-muted/30 rounded-lg px-3 py-2 text-xs border border-border">
-                <Icon className={`size-3.5 shrink-0 ${color}`} />
-                <span>{label}</span>
-              </div>
-            ))}
+              'Download and extract the project ZIP.',
+              'Open the project folder in VS Code.',
+              'Run npm install and test the project locally.',
+              'Create an empty repository on GitHub.',
+              'Run the commands below from the project folder.',
+            ].map(
+              (
+                description,
+                index,
+              ) => (
+                <li
+                  key={
+                    description
+                  }
+                  className="flex items-start gap-2"
+                >
+                  <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-xs font-bold text-primary">
+                    {index + 1}
+                  </span>
+
+                  <span>
+                    {description}
+                  </span>
+                </li>
+              ),
+            )}
+          </ol>
+
+          <CodeBlock
+            code={gitCommands}
+            language="terminal"
+          />
+
+          <a
+            href="https://github.com/new"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+          >
+            Create GitHub repository
+
+            <ExternalLink className="size-3" />
+          </a>
+        </Section>
+
+        {/* PRODUCTION CHECKLIST */}
+
+        <Section
+          icon={Rocket}
+          title="Pre-Launch Checklist"
+          color="bg-primary/5 text-primary"
+        >
+          <p className="text-xs">
+            Verify these items before
+            deploying your application:
+          </p>
+
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {checklist.map(
+              ({
+                label,
+                icon: Icon,
+                color,
+              }) => (
+                <div
+                  key={label}
+                  className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs"
+                >
+                  <Icon
+                    className={`size-3.5 shrink-0 ${color}`}
+                  />
+
+                  <span>
+                    {label}
+                  </span>
+                </div>
+              ),
+            )}
           </div>
         </Section>
 
-        {/* Ready to Deploy */}
-        <div className="bg-gradient-to-r from-primary/10 to-violet-500/10 border border-primary/20 rounded-xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+        {/* DEPLOY */}
+
+        <div className="flex flex-col items-center justify-between gap-4 rounded-xl border border-primary/20 bg-gradient-to-r from-primary/10 to-violet-500/10 p-5 sm:flex-row">
           <div className="flex items-center gap-3">
-            <CheckCircle2 className="size-8 text-primary shrink-0" />
+            <CheckCircle2 className="size-8 shrink-0 text-primary" />
+
             <div>
-              <h4 className="font-semibold">Everything ready?</h4>
-              <p className="text-xs text-muted-foreground">Complete the checklist above, then publish your project.</p>
+              <h4 className="font-semibold">
+                Ready to deploy?
+              </h4>
+
+              <p className="text-xs text-muted-foreground">
+                Test the project
+                locally, configure its
+                environment variables,
+                then publish it.
+              </p>
             </div>
           </div>
-          <PublishProjectModal projectId={projectId} />
-        </div>
 
+          <PublishProjectModal
+            projectId={projectId}
+          />
+        </div>
       </div>
     </div>
   )

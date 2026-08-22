@@ -1,6 +1,13 @@
 'use client'
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
+
 import {
   SandpackProvider,
   SandpackCodeEditor,
@@ -10,110 +17,537 @@ import {
   useSandpack,
   defaultDark,
 } from '@codesandbox/sandpack-react'
-import { RefreshCw, ExternalLink, AlertCircle, Loader2 } from 'lucide-react'
 
-export type SandpackView = 'preview' | 'code'
-export type ViewportSize = 'desktop' | 'tablet' | 'mobile'
+import {
+  AlertCircle,
+  Loader2,
+  RefreshCw,
+} from 'lucide-react'
+
+export type SandpackView =
+  | 'preview'
+  | 'code'
+
+export type ViewportSize =
+  | 'desktop'
+  | 'tablet'
+  | 'mobile'
 
 interface SandpackPreviewProps {
   files: Record<string, string>
-  dependencies?: Record<string, string>
+
+  dependencies?: Record<
+    string,
+    string
+  >
+
   view?: SandpackView
+
   isTerminalOpen?: boolean
+
   onCloseTerminal?: () => void
-  onPreviewError?: (message: string) => void
+
+  onPreviewError?: (
+    message: string,
+  ) => void
+
   previewKey?: number
-  /** 'preview' = flat Sandpack app; 'project' = full Vite/Next repo layout (code view only) */
+
   fileMode?: 'preview' | 'project'
+
   activeFile?: string | null
+
   tech?: string
-  /** Opens full-screen preview in a new browser tab */
+
   openPreviewUrl?: string
-  /** Whether the files are empty/loading */
+
   isLoading?: boolean
-  /** Viewport size for the preview iframe */
+
   viewportSize?: ViewportSize
 }
 
-function ActiveFileOpener({ filePath }: { filePath?: string | null }) {
-  const { sandpack } = useSandpack()
+// ─────────────────────────────────────────────────────────────
+// PATH HELPERS
+// ─────────────────────────────────────────────────────────────
+
+function normalizePath(
+  path: string,
+): string {
+  const normalized = path
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(/\/+/g, '/')
+
+  if (!normalized) {
+    return '/'
+  }
+
+  return normalized.startsWith('/')
+    ? normalized
+    : `/${normalized}`
+}
+
+function toRuntimePath(
+  path: string,
+): string {
+  const normalized =
+    normalizePath(path)
+
+  if (
+    normalized.startsWith('/src/')
+  ) {
+    return normalized.slice(
+      '/src'.length,
+    )
+  }
+
+  return normalized
+}
+
+// ─────────────────────────────────────────────────────────────
+// DEPENDENCIES
+// ─────────────────────────────────────────────────────────────
+
+const BLOCKED_DEPENDENCIES =
+  new Set([
+    'next',
+    'vite',
+    '@vitejs/plugin-react',
+    '@vercel/ai',
+    '@supabase/ssr',
+    '@supabase/auth-helpers-nextjs',
+    'typescript',
+    'tailwindcss',
+    'postcss',
+    'autoprefixer',
+  ])
+
+const KNOWN_RUNTIME_VERSIONS:
+  Record<string, string> = {
+    react: '18.2.0',
+
+    'react-dom':
+      '18.2.0',
+
+    'react-router-dom':
+      '^6.28.0',
+
+    'lucide-react':
+      '^0.468.0',
+
+    clsx:
+      '^2.1.1',
+
+    'tailwind-merge':
+      '^2.5.4',
+
+    '@supabase/supabase-js':
+      '^2.45.0',
+
+    'framer-motion':
+      '^11.0.0',
+
+    recharts:
+      '^2.13.0',
+
+    'date-fns':
+      '^4.0.0',
+  }
+
+function shouldBlockDependency(
+  name: string,
+): boolean {
+  if (
+    BLOCKED_DEPENDENCIES.has(
+      name,
+    )
+  ) {
+    return true
+  }
+
+  if (
+    name.startsWith(
+      '@supabase/ssr',
+    )
+  ) {
+    return true
+  }
+
+  return false
+}
+
+/**
+ * Converts:
+ *
+ * react-router-dom/server
+ * -> react-router-dom
+ *
+ * @supabase/supabase-js
+ * -> @supabase/supabase-js
+ */
+function getPackageName(
+  importSource: string,
+): string | null {
+  const source =
+    importSource.trim()
+
+  if (
+    !source ||
+    source.startsWith('.') ||
+    source.startsWith('/') ||
+    source.startsWith('@/') ||
+    source.startsWith('http://') ||
+    source.startsWith('https://') ||
+    source.startsWith('data:') ||
+    source.startsWith('node:')
+  ) {
+    return null
+  }
+
+  if (source.startsWith('@')) {
+    const parts =
+      source.split('/')
+
+    if (
+      parts.length >= 2
+    ) {
+      return `${parts[0]}/${parts[1]}`
+    }
+
+    return source
+  }
+
+  return (
+    source.split('/')[0] ??
+    null
+  )
+}
+
+/**
+ * Defensive dependency scanner.
+ *
+ * Even if the AI forgets to put:
+ *
+ * react-router-dom
+ *
+ * inside package.json / plan.dependencies,
+ * we still detect the import from App.tsx.
+ */
+function discoverDependenciesFromFiles(
+  files: Record<string, string>,
+): Record<string, string> {
+  const discovered:
+    Record<string, string> = {}
+
+  const addDependency = (
+    source: string,
+  ) => {
+    const packageName =
+      getPackageName(source)
+
+    if (!packageName) {
+      return
+    }
+
+    if (
+      shouldBlockDependency(
+        packageName,
+      )
+    ) {
+      return
+    }
+
+    discovered[packageName] =
+      KNOWN_RUNTIME_VERSIONS[
+        packageName
+      ] ?? 'latest'
+  }
+
+  for (
+    const [path, content]
+    of Object.entries(files)
+  ) {
+    if (
+      !/\.(tsx?|jsx?)$/.test(
+        path,
+      )
+    ) {
+      continue
+    }
+
+    // import X from 'package'
+    // import { X } from 'package'
+    // export { X } from 'package'
+    const fromRegex =
+      /\b(?:import|export)\s+(?:type\s+)?[\s\S]*?\s+from\s+['"]([^'"]+)['"]/g
+
+    // import 'package'
+    const sideEffectRegex =
+      /\bimport\s+['"]([^'"]+)['"]/g
+
+    // import('package')
+    const dynamicImportRegex =
+      /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g
+
+    let match:
+      RegExpExecArray | null
+
+    while (
+      (
+        match =
+          fromRegex.exec(
+            content,
+          )
+      ) !== null
+    ) {
+      if (match[1]) {
+        addDependency(
+          match[1],
+        )
+      }
+    }
+
+    while (
+      (
+        match =
+          sideEffectRegex.exec(
+            content,
+          )
+      ) !== null
+    ) {
+      if (match[1]) {
+        addDependency(
+          match[1],
+        )
+      }
+    }
+
+    while (
+      (
+        match =
+          dynamicImportRegex.exec(
+            content,
+          )
+      ) !== null
+    ) {
+      if (match[1]) {
+        addDependency(
+          match[1],
+        )
+      }
+    }
+  }
+
+  return discovered
+}
+
+// ─────────────────────────────────────────────────────────────
+// ACTIVE FILE
+// ─────────────────────────────────────────────────────────────
+
+function ActiveFileOpener({
+  filePath,
+}: {
+  filePath?: string | null
+}) {
+  const { sandpack } =
+    useSandpack()
 
   useEffect(() => {
-    if (!filePath) return
-    const normalized = filePath.startsWith('/') ? filePath : `/${filePath}`
-    if (sandpack.files[normalized]) {
-      sandpack.openFile(normalized)
+    if (!filePath) {
+      return
     }
-  }, [filePath, sandpack])
+
+    const runtimePath =
+      toRuntimePath(
+        filePath,
+      )
+
+    if (
+      sandpack.files[
+        runtimePath
+      ]
+    ) {
+      sandpack.openFile(
+        runtimePath,
+      )
+    }
+  }, [
+    filePath,
+    sandpack,
+  ])
 
   return null
 }
 
-function SandpackErrorWatcher({ onError }: { onError: (message: string) => void }) {
-  const { sandpack } = useSandpack()
-  const reportedError = useRef<string | null>(null)
+// ─────────────────────────────────────────────────────────────
+// ERROR REPORTER
+// ─────────────────────────────────────────────────────────────
+
+function SandpackErrorReporter({
+  onError,
+}: {
+  onError?: (
+    message: string,
+  ) => void
+}) {
+  const { sandpack } =
+    useSandpack()
+
+  const lastReportedError =
+    useRef<string | null>(
+      null,
+    )
+
+  const errorMessage =
+    sandpack.error?.message ??
+    null
 
   useEffect(() => {
-    const message = sandpack.error?.message ?? null
-    if (message && message !== reportedError.current) {
-      reportedError.current = message
-      onError(message)
+    if (!errorMessage) {
+      lastReportedError.current =
+        null
+
+      return
     }
-    if (!message) {
-      reportedError.current = null
+
+    if (
+      errorMessage ===
+      lastReportedError.current
+    ) {
+      return
     }
-  }, [sandpack.error, onError])
+
+    lastReportedError.current =
+      errorMessage
+
+    onError?.(
+      errorMessage,
+    )
+  }, [
+    errorMessage,
+    onError,
+  ])
 
   return null
 }
+
+// ─────────────────────────────────────────────────────────────
+// PREVIEW STATUS
+// ─────────────────────────────────────────────────────────────
 
 function PreviewStatusOverlay({
-  onError,
   isEmpty,
   onRefresh,
 }: {
-  onError?: (message: string) => void
-  isEmpty?: boolean
-  onRefresh?: () => void
+  isEmpty: boolean
+  onRefresh: () => void
 }) {
-  const { sandpack } = useSandpack()
-  const status = sandpack.status
-  const errorMessage = sandpack.error?.message
+  const { sandpack } =
+    useSandpack()
 
-  useEffect(() => {
-    if (errorMessage) onError?.(errorMessage)
-  }, [errorMessage, onError])
+  const status =
+    sandpack.status
 
-  // Show loading for empty state or running status
-  if (isEmpty || (!errorMessage && status === 'running')) {
+  const errorMessage =
+    sandpack.error?.message
+
+  // ─── COMPILE ERROR ────────────────────────────────────
+
+  if (errorMessage) {
     return (
-      <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#0a0a0a]/90 backdrop-blur-sm p-6">
-        <div className="flex flex-col items-center gap-3 text-zinc-400">
-          <Loader2 className="size-8 animate-spin text-primary" />
-          <p className="text-sm">{isEmpty ? 'Waiting for code generation...' : 'Compiling preview…'}</p>
-          <p className="text-xs text-zinc-500">Preview will appear automatically</p>
+      <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#0a0a0a]/95 p-6 backdrop-blur-sm">
+        <div className="max-w-md space-y-3 text-center">
+          <AlertCircle className="mx-auto size-10 text-red-400" />
+
+          <p className="text-sm font-medium text-red-300">
+            Preview failed to compile
+          </p>
+
+          <p className="max-h-40 overflow-y-auto break-words font-mono text-xs leading-relaxed text-zinc-400">
+            {errorMessage}
+          </p>
+
+          <button
+            type="button"
+            onClick={
+              onRefresh
+            }
+            className="mx-auto mt-3 flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            <RefreshCw className="size-3.5" />
+
+            Refresh Preview
+          </button>
         </div>
       </div>
     )
   }
 
-  // Show error if there is one
-  if (errorMessage) {
+  // ─── TIMEOUT ──────────────────────────────────────────
+
+  if (
+    status === 'timeout'
+  ) {
     return (
-      <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#0a0a0a]/90 backdrop-blur-sm p-6">
-        <div className="max-w-md text-center space-y-3">
-          <AlertCircle className="size-10 text-red-400 mx-auto" />
-          <p className="text-sm font-medium text-red-300">Preview failed to compile</p>
-          <p className="text-xs text-zinc-400 font-mono break-words max-h-32 overflow-y-auto">{errorMessage}</p>
-          <p className="text-xs text-zinc-500 mt-2">Try refreshing the preview or checking the file structure.</p>
-          {onRefresh && (
-            <button
-              onClick={onRefresh}
-              className="mt-3 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
-            >
-              Refresh Preview
-            </button>
-          )}
+      <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#0a0a0a]/95 p-6 backdrop-blur-sm">
+        <div className="max-w-md space-y-3 text-center">
+          <AlertCircle className="mx-auto size-10 text-amber-400" />
+
+          <p className="text-sm font-medium text-zinc-200">
+            Preview runtime timed out
+          </p>
+
+          <p className="text-xs leading-relaxed text-zinc-400">
+            The browser preview runtime did not become ready in time.
+          </p>
+
+          <button
+            type="button"
+            onClick={
+              onRefresh
+            }
+            className="mx-auto flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+          >
+            <RefreshCw className="size-3.5" />
+
+            Try Again
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // ─── EMPTY ────────────────────────────────────────────
+
+  if (isEmpty) {
+    return (
+      <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#0a0a0a]/90">
+        <div className="flex flex-col items-center gap-3 text-zinc-400">
+          <Loader2 className="size-8 animate-spin text-primary" />
+
+          <p className="text-sm">
+            Waiting for project files...
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  // ─── INITIAL / COMPILING ──────────────────────────────
+
+  if (
+    status === 'initial' ||
+    status === 'running'
+  ) {
+    return (
+      <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-[#0a0a0a]/70 backdrop-blur-[1px]">
+        <div className="flex items-center gap-2 rounded-full border border-zinc-800 bg-[#151515] px-4 py-2 shadow-xl">
+          <Loader2 className="size-4 animate-spin text-primary" />
+
+          <span className="text-xs text-zinc-300">
+            Preparing preview…
+          </span>
         </div>
       </div>
     )
@@ -122,350 +556,595 @@ function PreviewStatusOverlay({
   return null
 }
 
-function PreviewToolbar({
-  openPreviewUrl,
-  onRefresh,
-}: {
-  openPreviewUrl?: string
-  onRefresh?: () => void
-}) {
-  return (
-    <div className="h-9 shrink-0 flex items-center justify-between px-3 border-b border-[#2a2a2a] bg-[#141414]">
-      <span className="text-xs text-zinc-500">Live preview</span>
-      <div className="flex items-center gap-1">
-        {onRefresh && (
-          <button
-            type="button"
-            onClick={onRefresh}
-            className="p-1.5 rounded text-zinc-500 hover:text-zinc-200 hover:bg-white/5 transition-colors"
-            title="Refresh preview"
-          >
-            <RefreshCw className="size-3.5" />
-          </button>
-        )}
-        {openPreviewUrl && (
-          <a
-            href={openPreviewUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="p-1.5 rounded text-zinc-500 hover:text-zinc-200 hover:bg-white/5 transition-colors"
-            title="Open in new tab"
-          >
-            <ExternalLink className="size-3.5" />
-          </a>
-        )}
-      </div>
-    </div>
+// ─────────────────────────────────────────────────────────────
+// FILE SAFETY
+// ─────────────────────────────────────────────────────────────
+
+function stripHugeBase64(
+  content: string,
+): string {
+  if (!content) {
+    return content
+  }
+
+  return content.replace(
+    /data:image\/[^;]+;base64,[A-Za-z0-9+/=]{1000,}/g,
+    'https://placehold.co/1200x800?text=Preview+Image',
   )
 }
 
-const INDEX_HTML = `<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Preview</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-      * { box-sizing: border-box; }
-      body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-    </style>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
-  </body>
-</html>`
-
-const INDEX_TSX = `import React from 'react'
-import { createRoot } from 'react-dom/client'
-import App from './App'
-
-const root = createRoot(document.getElementById('root')!)
-root.render(<App />)
-`
+// ─────────────────────────────────────────────────────────────
+// MAIN COMPONENT
+// ─────────────────────────────────────────────────────────────
 
 export function SandpackPreview({
   files,
+
   dependencies = {},
+
   view = 'preview',
-  isTerminalOpen = false,
-  onCloseTerminal,
+
   onPreviewError,
+
   previewKey = 0,
+
   fileMode = 'preview',
+
   activeFile = null,
-  tech = 'React + TypeScript',
-  openPreviewUrl,
-  isLoading = false,
+
   viewportSize = 'desktop',
 }: SandpackPreviewProps) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [localPreviewKey, setLocalPreviewKey] = useState(0)
+  const [
+    localPreviewKey,
+    setLocalPreviewKey,
+  ] = useState(0)
 
-  const handlePreviewError = useCallback((message: string) => {
-    console.error('[Sandpack] Preview error:', message)
-    onPreviewError?.(message)
-  }, [onPreviewError])
+  // ───────────────────────────────────────────────────────────
+  // ERROR CALLBACK
+  // ───────────────────────────────────────────────────────────
 
-  const sanitizedDeps = useMemo(() => {
-    const blocked = new Set(['@vercel/ai', '@supabase/ssr', '@supabase/auth-helpers-nextjs', 'next', 'vite', '@vitejs/plugin-react'])
-    return Object.fromEntries(
-      Object.entries(dependencies).filter(([name]) => !blocked.has(name) && !name.startsWith('@supabase/ssr')),
+  const handlePreviewError =
+    useCallback(
+      (
+        message: string,
+      ) => {
+        console.error(
+          '[Sandpack] Preview error:',
+          message,
+        )
+
+        onPreviewError?.(
+          message,
+        )
+      },
+      [
+        onPreviewError,
+      ],
     )
-  }, [dependencies])
 
-  const mergedDeps = useMemo(() => ({
-    ...sanitizedDeps,
-    'lucide-react': '^0.400.0', // pinned to avoid React 19 useCache errors in Sandpack
-    clsx: 'latest',
-    'tailwind-merge': 'latest',
-    'react': '^18.2.0',
-    'react-dom': '^18.2.0',
-  }), [sanitizedDeps])
+  // ───────────────────────────────────────────────────────────
+  // DISCOVER DEPENDENCIES FROM FILES
+  // ───────────────────────────────────────────────────────────
 
-  const sandpackFiles = useMemo(() => {
-    const result: Record<string, { code: string; active?: boolean }> = {}
+  const discoveredDependencies =
+    useMemo(
+      () =>
+        discoverDependenciesFromFiles(
+          files,
+        ),
+      [
+        files,
+      ],
+    )
 
-    console.log('[Sandpack] Processing files:', Object.keys(files))
-    console.log('[Sandpack] File mode:', fileMode, 'Tech:', tech)
+  // ───────────────────────────────────────────────────────────
+  // SANITIZE PROVIDED DEPENDENCIES
+  // ───────────────────────────────────────────────────────────
 
-    // Helper to strip massive base64 images that crash the Sandpack bundler
-    const stripHugeBase64 = (content: string) => {
-      if (!content) return content
-      return content.replace(
-        /data:image\/[^;]+;base64,[A-Za-z0-9+/=]{1000,}/g,
-        'https://images.unsplash.com/photo-1626814026160-2237a95fc5a0?q=80&w=2070'
+  const sanitizedDependencies =
+    useMemo<
+      Record<string, string>
+    >(() => {
+      return Object.fromEntries(
+        Object.entries(
+          dependencies,
+        ).filter(
+          (
+            [name, version],
+          ) =>
+            Boolean(
+              name,
+            ) &&
+            typeof version ===
+              'string' &&
+            Boolean(
+              version,
+            ) &&
+            !shouldBlockDependency(
+              name,
+            ),
+        ),
       )
-    }
+    }, [
+      dependencies,
+    ])
 
-    // Simple direct file processing for preview mode
-    for (const [path, content] of Object.entries(files)) {
-      const normalizedPath = path.startsWith('/') ? path : `/${path}`
-      
-      // Skip problematic files and config files that Sandpack doesn't need
-      if (normalizedPath.includes('vite.config') ||
-          normalizedPath.includes('tsconfig') ||
-          normalizedPath === '/package.json' ||
-          normalizedPath === '/index.html' ||
-          normalizedPath === '/tailwind.config.js' ||
-          normalizedPath === '/postcss.config.js' ||
-          normalizedPath === '/next.config.js') {
-        continue
-      }
+  // ───────────────────────────────────────────────────────────
+  // FINAL RUNTIME DEPENDENCIES
+  // ───────────────────────────────────────────────────────────
 
-      // Convert /src/* paths to root level for Sandpack
-      let sandpackPath = normalizedPath
-      if (normalizedPath.startsWith('/src/')) {
-        sandpackPath = normalizedPath.replace('/src/', '/')
-      }
+  const runtimeDependencies =
+    useMemo<
+      Record<string, string>
+    >(
+      () => {
+        const merged: Record<string, string> = {
+          /**
+           * Lowest priority:
+           * automatically discovered imports.
+           */
+          ...discoveredDependencies,
 
-      result[sandpackPath] = { code: stripHugeBase64(content) }
-    }
+          /**
+           * Higher priority:
+           * package.json / plan dependencies received from parent.
+           */
+          ...sanitizedDependencies,
 
-    // Ensure critical files exist
-    if (!result['/App.tsx'] && files['/src/App.tsx']) {
-      result['/App.tsx'] = { code: stripHugeBase64(files['/src/App.tsx']) }
-    }
-    if (!result['/App.tsx'] && files['/App.tsx']) {
-      result['/App.tsx'] = { code: stripHugeBase64(files['/App.tsx']) }
-    }
-    if (!result['/index.css'] && files['/src/index.css']) {
-      result['/index.css'] = { code: stripHugeBase64(files['/src/index.css']) }
-    }
-    if (!result['/index.css'] && files['/index.css']) {
-      result['/index.css'] = { code: stripHugeBase64(files['/index.css']) }
-    }
+          /**
+           * Keep React runtime stable.
+           */
+          react:
+            '18.2.0',
 
-    console.log('[Sandpack] Final files for Sandpack:', Object.keys(result))
+          'react-dom':
+            '18.2.0',
 
-    // Set active file
-    if (activeFile) {
-      const normalized = activeFile.startsWith('/') ? activeFile : `/${activeFile}`
-      let sandpackPath = normalized
-      if (normalized.startsWith('/src/')) {
-        sandpackPath = normalized.replace('/src/', '/')
-      }
-      if (result[sandpackPath]) {
-        result[sandpackPath] = { ...result[sandpackPath], active: true }
-      }
-    } else if (result['/App.tsx']) {
-      result['/App.tsx'] = { ...result['/App.tsx'], active: true }
-    }
+          /**
+           * Common packages only use fallback versions
+           * when actually required / supplied.
+           */
+          'lucide-react':
+            sanitizedDependencies[
+              'lucide-react'
+            ] ??
+            discoveredDependencies[
+              'lucide-react'
+            ] ??
+            '^0.468.0',
 
-    // Safety check: if no files, create a simple fallback
-    if (Object.keys(result).length === 0) {
-      console.warn('[Sandpack] No files available, creating fallback')
-      result['/App.tsx'] = { 
-        code: `export default function App() {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 flex items-center justify-center p-4">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold text-white mb-4">Your App is Ready</h1>
-        <p className="text-gray-300 mb-6">Code generation completed successfully!</p>
-        <div className="bg-gray-800 rounded-lg p-6 text-left">
-          <p className="text-green-400 text-sm mb-2">✓ Project structure created</p>
-          <p className="text-green-400 text-sm mb-2">✓ Dependencies installed</p>
-          <p className="text-green-400 text-sm">✓ Ready for development</p>
-        </div>
-      </div>
-    </div>
-  )
-}`,
-        active: true 
-      }
-    }
+          clsx:
+            sanitizedDependencies[
+              'clsx'
+            ] ??
+            discoveredDependencies[
+              'clsx'
+            ] ??
+            '^2.1.1',
 
-    // If App.tsx exists but might be broken, add error boundary wrapper
-    if (result['/App.tsx'] && result['/App.tsx'].code.includes('slice')) {
-      console.warn('[Sandpack] App.tsx might have runtime errors, wrapping with error boundary')
-      result['/App.tsx'] = {
-        code: `import React, { useState } from 'react'
+          'tailwind-merge':
+            sanitizedDependencies[
+              'tailwind-merge'
+            ] ??
+            discoveredDependencies[
+              'tailwind-merge'
+            ] ??
+            '^2.5.4',
+        }
 
-export default function App() {
-  const [error, setError] = useState<string | null>(null)
-  
-  // Simple working fallback for preview
-  const sampleMovies = [
-    { id: 1, title: 'Movie 1', rating: 8.5, year: 2024 },
-    { id: 2, title: 'Movie 2', rating: 7.8, year: 2023 },
-    { id: 3, title: 'Movie 3', rating: 9.0, year: 2024 },
-  ]
+        /**
+         * Extra guarantee for the exact problem you are
+         * currently hitting.
+         *
+         * Only install react-router-dom when generated source
+         * actually imports it OR parent supplied it.
+         */
+        const needsReactRouter =
+          Object.values(
+            files,
+          ).some(
+            content =>
+              typeof content ===
+                'string' &&
+              /['"]react-router-dom(?:\/[^'"]*)?['"]/.test(
+                content,
+              ),
+          )
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 flex items-center justify-center p-4">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold text-white mb-4">App Ready</h1>
-          <p className="text-gray-300 mb-6">Generated code has a runtime error. Check the Code tab to fix it.</p>
-          <div className="bg-gray-800 rounded-lg p-6 text-left">
-            <p className="text-red-400 text-sm mb-2">Error: {error}</p>
-            <p className="text-green-400 text-sm">Switch to Code tab to edit and fix the issue</p>
-          </div>
-        </div>
-      </div>
+        if (
+          needsReactRouter
+        ) {
+          merged[
+            'react-router-dom'
+          ] =
+            sanitizedDependencies[
+              'react-router-dom'
+            ] ??
+            discoveredDependencies[
+              'react-router-dom'
+            ] ??
+            '^6.28.0'
+        }
+
+        return Object.fromEntries(
+          Object.entries(
+            merged,
+          ).filter(
+            ([name]) =>
+              !shouldBlockDependency(
+                name,
+              ),
+          ),
+        )
+      },
+      [
+        discoveredDependencies,
+        sanitizedDependencies,
+        files,
+      ],
     )
-  }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 flex flex-col">
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-4xl font-bold text-white mb-8">Movie Preview</h1>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {sampleMovies.map(movie => (
-            <div key={movie.id} className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-              <h3 className="text-white font-semibold mb-2">{movie.title}</h3>
-              <p className="text-gray-400 text-sm">Rating: {movie.rating}/10</p>
-              <p className="text-gray-500 text-xs">{movie.year}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}`,
-        active: true
+  // Debug while developing
+  useEffect(() => {
+    if (
+      process.env.NODE_ENV ===
+      'production'
+    ) {
+      return
+    }
+
+    console.log(
+      '[Sandpack] Runtime dependencies:',
+      runtimeDependencies,
+    )
+  }, [
+    runtimeDependencies,
+  ])
+
+  // ───────────────────────────────────────────────────────────
+  // FILES
+  // ───────────────────────────────────────────────────────────
+
+  const sandpackFiles =
+    useMemo(() => {
+      const result:
+        Record<
+          string,
+          {
+            code: string
+            active?: boolean
+          }
+        > = {}
+
+      for (
+        const [
+          rawPath,
+          rawContent,
+        ] of Object.entries(
+          files,
+        )
+      ) {
+        if (
+          typeof rawContent !==
+          'string'
+        ) {
+          continue
+        }
+
+        const path =
+          normalizePath(
+            rawPath,
+          )
+
+        result[path] = {
+          code:
+            stripHugeBase64(
+              rawContent,
+            ),
+        }
       }
-    }
 
-    // Debug: Log if we have App.tsx but it might be broken
-    if (result['/App.tsx']) {
-      console.log('[Sandpack] App.tsx content length:', result['/App.tsx'].code.length)
-      console.log('[Sandpack] App.tsx preview:', result['/App.tsx'].code.substring(0, 200))
-    }
+      // ─── ACTIVE FILE ──────────────────────────────────
 
-    return result
-  }, [files, fileMode, activeFile, tech])
+      if (activeFile) {
+        const runtimePath =
+          toRuntimePath(
+            activeFile,
+          )
 
-  const isProjectFiles = fileMode === 'project'
+        if (
+          result[
+            runtimePath
+          ]
+        ) {
+          result[
+            runtimePath
+          ] = {
+            ...result[
+              runtimePath
+            ],
 
-  const isVanilla = /html/i.test(tech || '')
-  const isTypeScript = Object.keys(sandpackFiles).some(f => f.endsWith('.ts') || f.endsWith('.tsx'))
+            active: true,
+          }
+        }
+      }
 
-  // Debug: log if no files
-  if (Object.keys(sandpackFiles).length === 0) {
-    console.error('[Sandpack] No files available for preview!')
-  }
+      else if (
+        result[
+          '/App.tsx'
+        ]
+      ) {
+        result[
+          '/App.tsx'
+        ] = {
+          ...result[
+            '/App.tsx'
+          ],
+
+          active: true,
+        }
+      }
+
+      else if (
+        result[
+          '/App.jsx'
+        ]
+      ) {
+        result[
+          '/App.jsx'
+        ] = {
+          ...result[
+            '/App.jsx'
+          ],
+
+          active: true,
+        }
+      }
+
+      // Sandpack template already has its own package.json & tsconfig.
+      // If we pass the generated ones, they override Sandpack's internal config 
+      // and break the Vite dev server or miss dependencies we injected.
+      delete result['/package.json']
+      delete result['/package-lock.json']
+      delete result['/tsconfig.json']
+      delete result['/vite.config.ts']
+      delete result['/vite.config.js']
+      delete result['/tailwind.config.js']
+      delete result['/tailwind.config.ts']
+      delete result['/postcss.config.js']
+
+      return result
+    }, [
+      files,
+      activeFile,
+    ])
+
+  const isProjectFiles =
+    fileMode === 'project'
+
+  const isEmpty =
+    Object.keys(
+      sandpackFiles,
+    ).length === 0
+
+  // ───────────────────────────────────────────────────────────
+  // REFRESH
+  // ───────────────────────────────────────────────────────────
+
+  const refreshPreview =
+    useCallback(() => {
+      setLocalPreviewKey(
+        current =>
+          current + 1,
+      )
+    }, [])
+
+  // ───────────────────────────────────────────────────────────
+  // RENDER
+  // ───────────────────────────────────────────────────────────
 
   return (
-    <div ref={containerRef} className="w-full h-full flex flex-col overflow-hidden bg-[#151515]">
+    <div className="flex h-full w-full flex-col overflow-hidden bg-[#151515]">
       <SandpackProvider
-        key={localPreviewKey}
-        template="react-ts"
-        files={sandpackFiles}
+        key={`${previewKey}-${localPreviewKey}`}
+        template="vite-react-ts"
+        files={
+          sandpackFiles
+        }
         customSetup={{
-          dependencies: mergedDeps,
+          dependencies:
+            runtimeDependencies,
         }}
         options={{
-          externalResources: ['https://cdn.tailwindcss.com'],
-          recompileMode: 'immediate',
-          bundlerURL: 'https://sandpack-bundler.codesandbox.io',
-          startRoute: '/index.html',
+          autorun: true,
+
+          recompileMode:
+            'delayed',
+
+          recompileDelay:
+            300,
+
+          externalResources: [
+            'https://cdn.tailwindcss.com',
+          ],
         }}
-        theme={defaultDark}
-        style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}
+        theme={
+          defaultDark
+        }
+        style={{
+          flex: 1,
+
+          display:
+            'flex',
+
+          flexDirection:
+            'column',
+
+          minHeight:
+            0,
+
+          overflow:
+            'hidden',
+        }}
       >
-        <style dangerouslySetInnerHTML={{ __html: `
-          .sp-wrapper, .sp-layout, .sp-stack, .sp-preview-container, .sp-preview-iframe {
-            height: 100% !important;
-            min-height: 100% !important;
-            flex: 1 !important;
-            width: 100% !important;
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
+              .sp-wrapper,
+              .sp-layout,
+              .sp-stack,
+              .sp-preview-container,
+              .sp-preview-iframe {
+                height: 100% !important;
+                min-height: 100% !important;
+                width: 100% !important;
+              }
+
+              .sp-wrapper,
+              .sp-layout,
+              .sp-stack {
+                flex: 1 !important;
+                min-height: 0 !important;
+              }
+            `,
+          }}
+        />
+
+        <ActiveFileOpener
+          filePath={
+            activeFile
           }
-        `}} />
-        <ActiveFileOpener filePath={activeFile} />
-        {!isProjectFiles && <SandpackErrorWatcher onError={handlePreviewError} />}
-        {/* Main content area */}
-        <div className="flex-1 min-h-0 relative overflow-hidden">
-          {/* CODE VIEW (always shown for project file mode) */}
+        />
+
+        {!isProjectFiles && (
+          <SandpackErrorReporter
+            onError={
+              handlePreviewError
+            }
+          />
+        )}
+
+        <div className="relative min-h-0 flex-1 overflow-hidden">
+          {/* ─────────────────────────────────────────────
+              CODE
+          ───────────────────────────────────────────── */}
+
           <div
-            style={{ display: view === 'code' || isProjectFiles ? 'flex' : 'none' }}
-            className="w-full h-full"
+            style={{
+              display:
+                view ===
+                  'code' ||
+                isProjectFiles
+                  ? 'flex'
+                  : 'none',
+            }}
+            className="h-full w-full"
           >
-            <SandpackLayout style={{ height: '100%', flex: 1, border: 'none', borderRadius: 0, gap: 0 }}>
+            <SandpackLayout
+              style={{
+                height:
+                  '100%',
+
+                flex: 1,
+
+                border:
+                  'none',
+
+                borderRadius:
+                  0,
+
+                gap: 0,
+              }}
+            >
               <SandpackFileExplorer
-                style={{ height: '100%', minWidth: '160px', maxWidth: '200px', fontSize: '12px' }}
+                style={{
+                  height:
+                    '100%',
+
+                  minWidth:
+                    '160px',
+
+                  maxWidth:
+                    '220px',
+
+                  fontSize:
+                    '12px',
+                }}
               />
+
               <SandpackCodeEditor
                 showTabs
                 showLineNumbers
                 showInlineErrors
                 closableTabs
-                style={{ height: '100%', flex: 1 }}
+                style={{
+                  height:
+                    '100%',
+
+                  flex: 1,
+                }}
               />
             </SandpackLayout>
           </div>
 
-          {/* PREVIEW VIEW */}
+          {/* ─────────────────────────────────────────────
+              PREVIEW
+          ───────────────────────────────────────────── */}
+
           <div
-            style={{ display: view === 'preview' && !isProjectFiles ? 'flex' : 'none' }}
-            className="w-full h-full flex-col bg-[#111]"
+            style={{
+              display:
+                view ===
+                  'preview' &&
+                !isProjectFiles
+                  ? 'flex'
+                  : 'none',
+            }}
+            className="h-full w-full flex-col bg-[#111]"
           >
-            <div className="flex-1 min-h-0 relative flex items-center justify-center p-2">
+            <div className="relative flex min-h-0 flex-1 items-center justify-center p-2">
               <PreviewStatusOverlay
-                onError={handlePreviewError}
-                isEmpty={isLoading || Object.keys(sandpackFiles).length === 0}
-                onRefresh={() => setLocalPreviewKey((prev: number) => prev + 1)}
+                isEmpty={
+                  isEmpty
+                }
+                onRefresh={
+                  refreshPreview
+                }
               />
-              <div 
-                className={`w-full h-full transition-all duration-300 ease-in-out bg-white rounded-md overflow-hidden ${
-                  viewportSize === 'mobile' ? 'max-w-[375px] border border-zinc-800 shadow-2xl' :
-                  viewportSize === 'tablet' ? 'max-w-[768px] border border-zinc-800 shadow-2xl' :
-                  'border border-zinc-800/50'
+
+              <div
+                className={`h-full w-full overflow-hidden rounded-md bg-white transition-all duration-300 ease-in-out ${
+                  viewportSize ===
+                  'mobile'
+                    ? 'max-w-[375px] border border-zinc-800 shadow-2xl'
+                    : viewportSize ===
+                        'tablet'
+                      ? 'max-w-[768px] border border-zinc-800 shadow-2xl'
+                      : 'border border-zinc-800/50'
                 }`}
               >
                 <SandpackPreviewPane
-                  showNavigator={false}
-                  showOpenInCodeSandbox={false}
-                  showRefreshButton={false}
-                  style={{ height: '100%', width: '100%' }}
+                  showNavigator={
+                    false
+                  }
+                  showOpenInCodeSandbox={
+                    false
+                  }
+                  showRefreshButton={
+                    false
+                  }
+                  style={{
+                    height:
+                      '100%',
+
+                    width:
+                      '100%',
+                  }}
                 />
               </div>
             </div>
           </div>
         </div>
-
-
       </SandpackProvider>
     </div>
   )

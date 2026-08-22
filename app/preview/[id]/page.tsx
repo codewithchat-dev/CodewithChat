@@ -1,109 +1,147 @@
-'use client'
-
-import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
-import { SandpackProvider, SandpackLayout, SandpackPreview } from '@codesandbox/sandpack-react'
 import { getProjectByIdAction } from '@/app/actions/projects'
-import { planSchema } from '@/lib/schema'
-import { buildInstantPreviewFiles } from '@/lib/preview-files'
-import { z } from 'zod'
-import { Spinner } from '@/components/ui/spinner'
 
-export default function PreviewPage() {
-  const params = useParams()
-  const projectId = params.id as string
-  const [localPlan, setLocalPlan] = useState<z.infer<typeof planSchema> | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [tech, setTech] = useState('React + Tailwind') // default
 
-  useEffect(() => {
-    if (projectId) {
-      getProjectByIdAction(projectId).then(res => {
-        if (res.success && res.data && res.data.code) {
-          try {
-            setLocalPlan(JSON.parse(res.data.code))
-          } catch (err) {
-            console.error("Failed to parse project code:", err)
-          }
-        }
-        setLoading(false)
-      })
+import {
+  buildInstantPreviewFiles,
+} from '@/lib/preview-files'
+
+import {
+  buildFullStackFiles,
+} from '@/lib/fullstack-files'
+
+import {
+  PreviewClient,
+} from './preview-client'
+
+type PageProps = {
+  params: Promise<{
+    id: string
+  }>
+}
+
+export default async function PreviewPage({
+  params,
+}: PageProps) {
+  const { id: projectId } =
+    await params
+
+  const result =
+    await getProjectByIdAction(
+      projectId,
+    )
+
+  if (
+    !result.success ||
+    !result.data ||
+    !result.data.code
+  ) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-background px-6 text-center text-sm text-muted-foreground">
+        No preview available for this
+        project.
+      </div>
+    )
+  }
+
+  try {
+    const plan =
+      JSON.parse(
+        result.data.code,
+      )
+
+    // ─────────────────────────────────────────────
+    // LEGACY SUPPORT
+    // ─────────────────────────────────────────────
+
+    const legacyFullStackFiles =
+      buildFullStackFiles(
+        plan.fullStackFiles,
+      )
+
+    // ─────────────────────────────────────────────
+    // BUILD SANDPACK RUNTIME FILES ON SERVER
+    // ─────────────────────────────────────────────
+
+    const previewFiles =
+      buildInstantPreviewFiles(
+        plan.previewFiles,
+        legacyFullStackFiles,
+        true,
+      )
+
+    if (
+      Object.keys(previewFiles)
+        .length === 0
+    ) {
+      return (
+        <div className="flex h-screen w-screen items-center justify-center bg-background px-6 text-center text-sm text-muted-foreground">
+          This project does not contain
+          runnable preview files.
+        </div>
+      )
     }
-  }, [projectId])
 
-  if (loading) {
+    // ─────────────────────────────────────────────
+    // RUNTIME DEPENDENCIES
+    // ─────────────────────────────────────────────
+
+    const blockedDependencies =
+      new Set([
+        'next',
+
+        'vite',
+
+        '@vitejs/plugin-react',
+
+        '@vercel/ai',
+
+        '@supabase/ssr',
+
+        '@supabase/auth-helpers-nextjs',
+
+        'typescript',
+
+        'tailwindcss',
+
+        'postcss',
+
+        'autoprefixer',
+      ])
+
+    const dependencies =
+      Object.fromEntries(
+        Object.entries(
+          plan.dependencies ?? {},
+        ).filter(
+          ([name]) =>
+            !blockedDependencies.has(
+              name,
+            ),
+        ),
+      ) as Record<
+        string,
+        string
+      >
+
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-background">
-        <Spinner className="size-8 text-primary" />
-      </div>
-    )
-  }
-
-  if (!localPlan) {
-    return (
-      <div className="h-screen w-screen flex items-center justify-center bg-background text-muted-foreground">
-        No preview available for this project.
-      </div>
-    )
-  }
-
-  const hasTsInPreview = localPlan.previewFiles?.some(f => f?.path?.endsWith('.ts') || f?.path?.endsWith('.tsx')) || false
-  const hasTsInFullStack = localPlan.fullStackFiles?.some(f => f?.path?.endsWith('.ts') || f?.path?.endsWith('.tsx')) || false
-  const isTypeScript = hasTsInPreview || hasTsInFullStack
-
-  const fullStackMap = Object.fromEntries(
-    (localPlan.fullStackFiles ?? [])
-      .filter(f => f?.path && f?.content)
-      .map(f => [f!.path!.startsWith('/') ? f!.path! : `/${f!.path!}`, f!.content!]),
-  )
-  const previewFiles = buildInstantPreviewFiles(localPlan.previewFiles, fullStackMap, isTypeScript)
-  const blocked = new Set(['@vercel/ai', '@supabase/ssr', '@supabase/auth-helpers-nextjs', 'next'])
-  const safeDeps = Object.fromEntries(
-    Object.entries(localPlan.dependencies || {}).filter(([name]) => !blocked.has(name)),
-  )
-
-  return (
-    <div className="h-screen w-screen overflow-hidden bg-white relative">
-      <style dangerouslySetInnerHTML={{ __html: `
-        .sp-wrapper,
-        .sp-wrapper .sp-layout,
-        .sp-wrapper .sp-stack,
-        .sp-wrapper .sp-preview-container,
-        .sp-wrapper iframe,
-        .sp-wrapper .sp-code-editor {
-          height: 100% !important;
-          min-height: 100% !important;
-          max-height: 100% !important;
-          flex: 1 !important;
+      <PreviewClient
+        files={previewFiles}
+        dependencies={
+          dependencies
         }
-      `}} />
-      <div className="absolute inset-0 w-full h-full sp-wrapper">
-        <SandpackProvider
-          template={/html/i.test(tech) ? 'static' : isTypeScript ? 'react-ts' : 'react'}
-          theme="dark"
-          files={previewFiles}
-          options={{
-            externalResources: /html/i.test(tech) ? [] : ['https://cdn.tailwindcss.com']
-          }}
-          customSetup={/html/i.test(tech) ? undefined : {
-            dependencies: {
-              'lucide-react': 'latest',
-              clsx: 'latest',
-              'tailwind-merge': 'latest',
-              ...safeDeps,
-            },
-          }}
-        >
-          <SandpackLayout style={{ border: 'none', borderRadius: 0, height: '100%', flex: 1 }}>
-            <SandpackPreview 
-              showNavigator={false} 
-              showRefreshButton={false}
-              showOpenInCodeSandbox={false}
-              style={{ height: '100%', minHeight: '100%' }} 
-            />
-          </SandpackLayout>
-        </SandpackProvider>
+      />
+    )
+  } catch (error) {
+    console.error(
+      '[Preview] Failed to load project:',
+      error,
+    )
+
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-background px-6 text-center text-sm text-muted-foreground">
+        Failed to load this project
+        preview.
       </div>
-    </div>
-  )
+    )
+  }
 }

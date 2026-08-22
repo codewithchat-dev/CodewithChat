@@ -1,25 +1,179 @@
 import { z } from 'zod'
 
-export const planSchema = z.object({
-  overview: z.string().describe('A brief 2-sentence summary of what we are building.'),
-  steps: z.array(z.object({
-    title: z.string().describe('e.g., Step 1: Initialize Next.js Project'),
-    description: z.string().describe('Clear instructions on what to do.'),
-    codeSnippet: z.string().optional().describe('Actual code to copy/paste, or terminal command.'),
-    isCommand: z.boolean().describe('True if the codeSnippet is a terminal command, false if it is file code.'),
-    fileTarget: z.string().optional().describe('If isCommand is false, specify the file path (e.g., app/page.tsx).'),
-    link: z.object({
-      text: z.string(),
-      url: z.string()
-    }).optional().describe('An external link if they need to grab an API key or read docs (e.g., Stripe Dashboard).')
-  })),
-  previewFiles: z.array(z.object({
-    path: z.string(),
-    content: z.string()
-  })).optional().describe('CRITICAL: Generate a complete React + TypeScript + TailwindCSS project here. This is what will be displayed in the Sandpack preview. You MUST include: /App.tsx (main entry point), /index.css (with @tailwind directives), and all component files in /components/. Do not output just placeholders; write robust, production-ready code for the requested app idea.'),
-  fullStackFiles: z.array(z.object({
-    path: z.string(),
-    content: z.string()
-  })).optional().describe('DEPRECATED: Leave this array empty. All files should go into previewFiles.'),
-  dependencies: z.record(z.string(), z.string()).describe('CRITICAL AND MANDATORY: Required npm packages for Sandpack. If your code imports ANY external package (e.g., canvas-confetti, recharts, framer-motion), you MUST explicitly list it here (e.g. { "canvas-confetti": "latest" }). ALWAYS include lucide-react for icons. Never include build tools like vite, @vitejs/plugin-react, etc. as Sandpack handles those automatically.')
+const projectFileSchema = z.object({
+  path: z
+    .string()
+    .describe(
+      'Absolute project file path starting with /. Example: /src/App.tsx',
+    ),
+
+  content: z
+    .string()
+    .describe(
+      'Complete contents of the file.',
+    ),
 })
+
+export const planSchema = z.object({
+  // ─────────────────────────────────────────────
+  // SHORT PROJECT SUMMARY
+  // ─────────────────────────────────────────────
+
+  overview: z
+    .string()
+    .describe(
+      'A maximum 2-sentence summary of what was built. Keep this short because source code generation is the priority.',
+    ),
+
+  // ─────────────────────────────────────────────
+  // SHORT GUIDE
+  // Keep temporarily because ProjectGuide and
+  // BuildActivityFeed currently depend on it.
+  // ─────────────────────────────────────────────
+
+  steps: z.array(
+    z.object({
+      title: z
+        .string()
+        .describe(
+          'Short build/setup step title. Example: Configure Supabase authentication.',
+        ),
+
+      description: z
+        .string()
+        .describe(
+          'Short practical explanation of this setup step.',
+        ),
+
+      codeSnippet: z
+        .string()
+        .optional()
+        .describe(
+          'Optional short command or small configuration snippet. Never duplicate complete project source files here.',
+        ),
+
+      isCommand: z
+        .boolean()
+        .describe(
+          'True when codeSnippet is a terminal command. False when it is a small file/config example.',
+        ),
+
+      fileTarget: z
+        .string()
+        .optional()
+        .describe(
+          'Optional target file path. Example: /src/lib/supabase.ts or /.env.example.',
+        ),
+
+      link: z
+        .object({
+          text: z.string(),
+          url: z.string(),
+        })
+        .optional()
+        .describe(
+          'Optional useful external setup/documentation link.',
+        ),
+    }),
+  )
+    .describe(
+      'Keep the setup guide concise, ideally no more than 3 short steps. Project files are more important than guide text.',
+    ),
+
+  // ─────────────────────────────────────────────
+  // REAL PROJECT SOURCE
+  // Legacy name: previewFiles
+  // ─────────────────────────────────────────────
+
+  previewFiles: z
+    .array(projectFileSchema)
+    .describe(
+      `The COMPLETE real project source code.
+
+This is not a temporary mock preview.
+
+Generate a professional React + Vite + TypeScript project.
+
+Every project should include the required files such as:
+
+/package.json
+/.gitignore
+/index.html
+/vite.config.ts
+/tsconfig.json
+/tsconfig.app.json
+/tailwind.config.js
+/postcss.config.js
+
+/src/main.tsx
+/src/App.tsx
+/src/index.css
+
+And all required components, pages, hooks, utilities, services, types, and data files.
+
+If backend/database/auth/storage is required, also generate the appropriate Supabase files such as:
+
+/.env.example
+/src/lib/supabase.ts
+/supabase/config.toml
+/supabase/migrations/...
+/supabase/seed.sql
+/supabase/functions/...
+
+Every locally imported file MUST exist.
+
+Do not generate placeholder-only files.
+
+The project should be usable for preview, ZIP download, VS Code, GitHub export, and deployment.`,
+    ),
+
+  // ─────────────────────────────────────────────
+  // LEGACY FIELD
+  // Keep temporarily so existing app code doesn't
+  // break. AI must leave it empty.
+  // ─────────────────────────────────────────────
+
+  fullStackFiles: z
+    .array(projectFileSchema)
+    .optional()
+    .describe(
+      'DEPRECATED. Always leave this empty. All frontend, backend integration, Supabase, configuration, and project files belong in previewFiles.',
+    ),
+
+  // ─────────────────────────────────────────────
+  // PREVIEW RUNTIME DEPENDENCIES
+  // ─────────────────────────────────────────────
+
+  dependencies: z
+    .record(
+      z.string(),
+      z.string(),
+    )
+    .describe(
+      `Runtime npm packages imported by the generated source code.
+
+Examples:
+{
+  "lucide-react": "^0.468.0",
+  "react-router-dom": "^7.0.0",
+  "@supabase/supabase-js": "^2.0.0",
+  "framer-motion": "^12.0.0"
+}
+
+Only include packages actually imported at runtime.
+
+Do NOT include build tools here such as:
+vite
+typescript
+tailwindcss
+postcss
+autoprefixer
+@vitejs/plugin-react
+
+Those belong inside the generated /package.json.`,
+    ),
+})
+
+export type Plan = z.infer<typeof planSchema>
+
+export type ProjectFile = z.infer<typeof projectFileSchema>

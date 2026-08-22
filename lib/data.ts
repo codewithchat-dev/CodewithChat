@@ -8,76 +8,94 @@ export type Tool = {
 
 export const tools: Tool[] = [
   {
-    name: 'Next.js',
-    category: 'Framework',
-    purpose: 'Full-stack React framework with server rendering, routing, and API routes.',
+    name: 'React',
+    category: 'Frontend',
+    purpose:
+      'Component-based library for building interactive web interfaces.',
     whenToUse:
-      'Use as the foundation for almost any SaaS web app. Great when you need SEO, server components, and a single codebase for frontend and backend.',
-    href: 'https://nextjs.org',
+      'Used as the foundation of CodewithChat generated web applications.',
+    href: 'https://react.dev',
+  },
+  {
+    name: 'Vite',
+    category: 'Build Tool',
+    purpose:
+      'Fast development server and production build tool for modern web apps.',
+    whenToUse:
+      'Used by default for fast local development, HMR, and production builds.',
+    href: 'https://vite.dev',
+  },
+  {
+    name: 'TypeScript',
+    category: 'Language',
+    purpose:
+      'Typed JavaScript that improves reliability and developer tooling.',
+    whenToUse:
+      'Used by default in generated projects for safer and more maintainable code.',
+    href: 'https://www.typescriptlang.org',
+  },
+  {
+    name: 'Tailwind CSS',
+    category: 'Styling',
+    purpose:
+      'Utility-first CSS framework for building responsive interfaces quickly.',
+    whenToUse:
+      'Used for the visual system, responsive layouts, and reusable UI styling.',
+    href: 'https://tailwindcss.com',
   },
   {
     name: 'Supabase',
-    category: 'Database & Auth',
-    purpose: 'Hosted Postgres database with authentication, storage, and realtime APIs.',
+    category: 'Backend & Auth',
+    purpose:
+      'Hosted Postgres database with authentication, storage, realtime, and Edge Functions.',
     whenToUse:
-      'Reach for it when you want a relational database plus auth without managing servers. Ideal for MVPs that may scale later.',
+      'Use when a generated application needs authentication, persistent data, storage, realtime features, or backend functionality.',
     href: 'https://supabase.com',
-  },
-  {
-    name: 'Neon',
-    category: 'Database',
-    purpose: 'Serverless Postgres with branching and autoscaling.',
-    whenToUse:
-      'Choose when you want pure Postgres with database branching for preview environments and pay-for-what-you-use pricing.',
-    href: 'https://neon.tech',
-  },
-  {
-    name: 'Drizzle ORM',
-    category: 'Data Access',
-    purpose: 'Type-safe SQL query builder and schema toolkit for TypeScript.',
-    whenToUse:
-      'Add it when you want end-to-end type safety between your database schema and application code without heavy abstractions.',
-    href: 'https://orm.drizzle.team',
-  },
-  {
-    name: 'Upstash Redis',
-    category: 'Caching',
-    purpose: 'Serverless Redis for caching, rate limiting, and sessions.',
-    whenToUse:
-      'Introduce it once you need rate limiting, caching of expensive queries, or ephemeral state like queues and sessions.',
-    href: 'https://upstash.com',
   },
   {
     name: 'Stripe',
     category: 'Payments',
-    purpose: 'Payments, subscriptions, and billing infrastructure.',
+    purpose:
+      'Payments, subscriptions, checkout, and billing infrastructure.',
     whenToUse:
-      'Use the moment you need to charge customers. Stripe Checkout and the Customer Portal cover most subscription billing needs.',
+      'Use when an application needs paid plans, subscriptions, or online payments.',
     href: 'https://stripe.com',
   },
   {
-    name: 'Vercel',
-    category: 'Deployment',
-    purpose: 'Deployment platform for frontend frameworks with global edge network.',
+    name: 'Upstash Redis',
+    category: 'Caching',
+    purpose:
+      'Serverless Redis for caching, rate limiting, queues, and temporary state.',
     whenToUse:
-      'Deploy here for zero-config hosting, preview deployments per pull request, and tight Next.js integration.',
-    href: 'https://vercel.com',
+      'Use for rate limiting, caching expensive operations, or temporary application state.',
+    href: 'https://upstash.com',
   },
   {
     name: 'Cloudflare Turnstile',
     category: 'Security',
-    purpose: 'Privacy-friendly CAPTCHA alternative to block bots.',
+    purpose:
+      'Privacy-friendly bot protection for forms and authentication flows.',
     whenToUse:
-      'Add to sign-up and contact forms to stop automated abuse without hurting the experience for real users.',
+      'Add when public forms or authentication endpoints need protection from automated abuse.',
     href: 'https://developers.cloudflare.com/turnstile',
   },
   {
     name: 'Resend',
     category: 'Email',
-    purpose: 'Developer-first transactional email API with React email support.',
+    purpose:
+      'Developer-focused transactional email service.',
     whenToUse:
-      'Use for verification emails, password resets, and receipts once your product has real users.',
+      'Use for verification emails, notifications, password recovery, and transactional messages.',
     href: 'https://resend.com',
+  },
+  {
+    name: 'Vercel',
+    category: 'Deployment',
+    purpose:
+      'Cloud platform for deploying modern frontend applications.',
+    whenToUse:
+      'Use when you want Git-based deployments, preview URLs, custom domains, and CDN delivery.',
+    href: 'https://vercel.com',
   },
 ]
 
@@ -92,75 +110,99 @@ export type BuildStep = {
 export const buildSteps: BuildStep[] = [
   {
     id: 1,
-    title: 'Set up the project',
-    summary: 'Create the repository, install the framework, and configure your tooling.',
+    title: 'Generate the project',
+    summary:
+      'Create a complete production-ready React project from your idea.',
     details: [
-      'Initialize a Next.js App Router project with TypeScript and Tailwind CSS.',
-      'Set up version control with Git and push to GitHub.',
-      'Configure environment variables and a .env.local file for secrets.',
-      'Add formatting and linting (Prettier, ESLint) so the team writes consistent code.',
+      'Generate a React + Vite + TypeScript project.',
+      'Create the required project configuration files.',
+      'Configure Tailwind CSS and the global design system.',
+      'Generate a clean component and folder structure.',
     ],
-    tools: ['Next.js', 'Vercel'],
+    tools: [
+      'React',
+      'Vite',
+      'TypeScript',
+      'Tailwind CSS',
+    ],
   },
   {
     id: 2,
-    title: 'Create the UI',
-    summary: 'Build the core pages and a reusable component system before wiring up data.',
+    title: 'Build the interface',
+    summary:
+      'Create responsive pages and reusable components for the product.',
     details: [
-      'Scaffold the main routes: landing page, auth screens, and the dashboard shell.',
-      'Install a component library so you do not reinvent buttons, inputs, and dialogs.',
-      'Design mobile-first, then layer in tablet and desktop breakpoints.',
-      'Keep components small and composable to make later changes painless.',
+      'Generate the main pages and application layout.',
+      'Create reusable components instead of duplicating UI.',
+      'Use responsive layouts for mobile, tablet, and desktop.',
+      'Add polished loading, empty, hover, and interaction states.',
     ],
-    tools: ['Next.js'],
+    tools: [
+      'React',
+      'Tailwind CSS',
+    ],
   },
   {
     id: 3,
-    title: 'Set up the database',
-    summary: 'Model your data and connect a real database instead of mock state.',
+    title: 'Connect the backend',
+    summary:
+      'Add real data, authentication, and storage when the application requires them.',
     details: [
-      'Sketch your tables and relationships before writing migrations.',
-      'Provision a Postgres database and connect it through a type-safe data layer.',
-      'Write migrations so schema changes are versioned and repeatable.',
-      'Seed sample data so you can develop against realistic content.',
+      'Create the database schema required by the application.',
+      'Generate versioned database migrations.',
+      'Connect the frontend through a reusable Supabase client.',
+      'Use Row Level Security to protect user data.',
     ],
-    tools: ['Supabase', 'Neon', 'Drizzle ORM'],
+    tools: ['Supabase'],
   },
   {
     id: 4,
     title: 'Add authentication',
-    summary: 'Let users sign up, sign in, and access only their own data.',
+    summary:
+      'Add secure sign-up, sign-in, sessions, and protected application areas.',
     details: [
-      'Start with email and password authentication before adding social logins.',
-      'Protect server actions and API routes by checking the session on every request.',
-      'Scope every database query to the authenticated user to prevent data leaks.',
-      'Add bot protection to your auth forms.',
+      'Create authentication screens and flows.',
+      'Protect private application routes.',
+      'Scope user data to the authenticated account.',
+      'Add bot protection when appropriate.',
     ],
-    tools: ['Supabase', 'Cloudflare Turnstile'],
+    tools: [
+      'Supabase',
+      'Cloudflare Turnstile',
+    ],
   },
   {
     id: 5,
-    title: 'Build core features',
-    summary: 'Implement the workflows that deliver your product’s main value.',
+    title: 'Add product features',
+    summary:
+      'Implement the workflows and integrations that make the application useful.',
     details: [
-      'Prioritize the single workflow that defines your MVP and ship it end-to-end.',
-      'Add caching and rate limiting around expensive or abuse-prone endpoints.',
-      'Wire up billing once users get value and are ready to pay.',
-      'Instrument key actions so you can measure activation and retention.',
+      'Build the main product workflow end-to-end.',
+      'Add payments only when the product requires billing.',
+      'Use rate limiting or caching where appropriate.',
+      'Add email notifications when the workflow requires them.',
     ],
-    tools: ['Upstash Redis', 'Stripe'],
+    tools: [
+      'Stripe',
+      'Upstash Redis',
+      'Resend',
+    ],
   },
   {
     id: 6,
-    title: 'Deploy',
-    summary: 'Ship to production with previews, monitoring, and transactional email.',
+    title: 'Preview and deploy',
+    summary:
+      'Test the generated project and ship it to production.',
     details: [
-      'Connect the repository to a hosting platform for automatic preview deployments.',
-      'Move secrets into the platform’s environment variable manager.',
-      'Set up transactional email for verification and notifications.',
-      'Add basic analytics and error monitoring before announcing your launch.',
+      'Preview the generated application while building.',
+      'Verify responsive behavior and interactions.',
+      'Configure production environment variables.',
+      'Deploy the finished repository to a hosting platform.',
     ],
-    tools: ['Vercel', 'Resend'],
+    tools: [
+      'Vite',
+      'Vercel',
+    ],
   },
 ]
 
@@ -178,28 +220,44 @@ export const recentProjects: Project[] = [
   {
     id: 'taskflow',
     name: 'TaskFlow',
-    description: 'Team task manager with shared boards and due-date reminders.',
-    stack: ['Next.js', 'Supabase', 'Stripe'],
+    description:
+      'Team task manager with shared boards and due-date reminders.',
+    stack: [
+      'React',
+      'Vite',
+      'Supabase',
+    ],
     progress: 72,
     stage: 'Build core features',
     updated: '2 hours ago',
   },
   {
-    id: 'inboxzero',
-    name: 'InboxZero',
-    description: 'AI email triage assistant that drafts replies for support teams.',
-    stack: ['Next.js', 'Neon', 'Upstash Redis'],
-    progress: 40,
-    stage: 'Set up the database',
+    id: 'shopflow',
+    name: 'ShopFlow',
+    description:
+      'Modern storefront with products, cart, accounts, and checkout.',
+    stack: [
+      'React',
+      'Vite',
+      'Supabase',
+      'Stripe',
+    ],
+    progress: 45,
+    stage: 'Connect the backend',
     updated: 'Yesterday',
   },
   {
-    id: 'ledgerly',
-    name: 'Ledgerly',
-    description: 'Lightweight invoicing and expense tracking for freelancers.',
-    stack: ['Next.js', 'Supabase'],
-    progress: 18,
-    stage: 'Create the UI',
+    id: 'launchboard',
+    name: 'LaunchBoard',
+    description:
+      'Clean SaaS dashboard with authentication and analytics.',
+    stack: [
+      'React',
+      'Vite',
+      'Supabase',
+    ],
+    progress: 20,
+    stage: 'Build the interface',
     updated: '3 days ago',
   },
 ]

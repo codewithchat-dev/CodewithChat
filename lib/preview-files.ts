@@ -1,312 +1,6 @@
-const ENTRY_ALIASES = new Set([
-  '/app/page.tsx',
-  '/app/page.js',
-  '/page.tsx',
-  '/page.js',
-  '/src/app.tsx',
-  '/src/app.jsx',
-])
-
-export function normalizePreviewPath(path: string, useTypeScript = true): string {
-  const filePath = path.startsWith('/') ? path : `/${path}`
-  if (ENTRY_ALIASES.has(filePath.toLowerCase())) {
-    return useTypeScript ? '/App.tsx' : '/App.js'
-  }
-  return filePath
-}
-
-export function buildPreviewFiles(
-  previewFiles: Array<{ path?: string; content?: string } | null | undefined> | undefined,
-  useTypeScript = true,
-): Record<string, string> {
-  const filesObj: Record<string, string> = {}
-  if (!previewFiles?.length) return filesObj
-
-  for (const file of previewFiles) {
-    if (!file?.path || !file?.content) continue
-    const normalizedPath = normalizePreviewPath(file.path, useTypeScript)
-    filesObj[normalizedPath] = file.content
-  }
-
-  return filesObj
-}
-
-export function hasPreviewEntry(files: Record<string, string>): boolean {
-  return Boolean(
-    files['/App.tsx'] || files['/App.js'] ||
-    files['/index.html'] || files['index.html'] ||
-    files['/src/App.tsx'] || files['src/App.tsx'] ||
-    files['/src/App.jsx'] || files['src/App.jsx'] ||
-    files['/src/main.tsx'] || files['src/main.tsx']
-  )
-}
-
-/** Paths copied from a Next.js fullStack project into Sandpack preview. */
-const FULLSTACK_PREVIEW_PREFIXES = ['/components/', '/lib/', '/hooks/', '/types/', '/utils/', '/data/']
-
-function computeRootRelativeImport(fromFile: string, importPath: string): string {
-  const fromDir = fromFile.includes('/')
-    ? fromFile.slice(0, fromFile.lastIndexOf('/'))
-    : ''
-  const fromParts = fromDir.split('/').filter(Boolean)
-  if (fromParts.length === 0) return `./${importPath}`
-  return `${'../'.repeat(fromParts.length)}${importPath}`
-}
-
-/** Strip Next.js-only syntax so fullStackFiles can run in Sandpack. */
-export function transformForSandpack(content: string, filePath: string): string {
-  let code = content
-
-  code = code.replace(/['"]use server['"]\s*;?\s*\n/g, '')
-  code = code.replace(/import\s+['"]server-only['"]\s*\n/g, '')
-  code = code.replace(/export\s+const\s+metadata[\s\S]*?\n(?=\s*(?:export|function|const|class|'use client'))/g, '')
-  code = code.replace(/import\s+type\s+\{[^}]*Metadata[^}]*\}\s*from\s*['"]next['"]\s*\n/g, '')
-
-  code = code.replace(/import\s+Image\s+from\s*['"]next\/image['"]\s*\n/g, '')
-  code = code.replace(/<Image(\s)/g, '<img$1')
-  code = code.replace(/<\/Image>/g, '</img>')
-
-  code = code.replace(/import\s+Link\s+from\s*['"]next\/link['"]\s*\n/g, '')
-  code = code.replace(/import\s*\{\s*Link\s*\}\s*from\s*['"]next\/link['"]\s*\n/g, '')
-  code = code.replace(/<Link(\s)/g, '<a$1')
-  code = code.replace(/<\/Link>/g, '</a>')
-
-  code = code.replace(/import\s*\{[^}]*\}\s*from\s*['"]next\/font[^'"]*['"]\s*\n/g, '')
-  code = code.replace(/import\s+\w+\s+from\s*['"]next\/font[^'"]*['"]\s*\n/g, '')
-  code = code.replace(/className=\{[\w.]+\.className\}/g, 'className=""')
-
-  code = code.replace(
-    /from\s+['"]@\/([^'"]+)['"]/g,
-    (_match, importPath: string) => `from '${computeRootRelativeImport(filePath, importPath)}'`,
-  )
-
-  code = code.replace(/import\s*\{[^}]*\}\s*from\s*['"]next\/navigation['"]\s*\n/g, '')
-  code = code.replace(/import\s*\{[^}]*\}\s*from\s*['"]next\/headers['"]\s*\n/g, '')
-  code = code.replace(/import\s*\{[^}]*\}\s*from\s*['"]next\/cache['"]\s*\n/g, '')
-  code = code.replace(/import\s*\{[^}]*\}\s*from\s*['"]@supabase[^'"]*['"]\s*\n/g, '')
-  code = code.replace(/import\s*\{[^}]*\}\s*from\s*['"]@supabase\/auth-helpers-nextjs['"]\s*\n/g, '')
-  code = code.replace(/import\s*\{[^}]*\}\s*from\s*['"]@supabase\/ssr['"]\s*\n/g, '')
-  code = code.replace(/import\s*\{[^}]*\}\s*from\s*['"]ai['"]\s*\n/g, '')
-  code = code.replace(/import\s*\{[^}]*\}\s*from\s*['"]@ai-sdk[^'"]*['"]\s*\n/g, '')
-  code = code.replace(/import\s+.*from\s*['"][^'"]*\.css['"]\s*\n/g, '')
-
-  code = code.replace(/export\s+default\s+async\s+function/g, 'export default function')
-
-  if (
-    /useState|useEffect|useRef|useCallback|useMemo|useReducer|onClick|onChange/.test(code) &&
-    !code.includes("'use client'") &&
-    !code.includes('"use client"')
-  ) {
-    code = `'use client'\n\n${code}`
-  }
-
-  return code
-}
-
-const SUPABASE_STUB = `export function createClient() {
-  return {
-    auth: {
-      getUser: async () => ({ data: { user: null }, error: null }),
-      signInWithPassword: async () => ({ data: { user: null }, error: null }),
-      signOut: async () => ({ error: null }),
-    },
-    from: () => ({
-      select: () => ({ data: [], error: null }),
-      insert: () => ({ data: null, error: null }),
-      update: () => ({ data: null, error: null }),
-      delete: () => ({ data: null, error: null }),
-    }),
-  }
-}
-`
-
-const UTILS_STUB = `import { clsx, type ClassValue } from 'clsx'
-import { twMerge } from 'tailwind-merge'
-
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
-}
-`
-
-function normalizeFullStackPath(path: string): string {
-  return path.startsWith('/') ? path : `/${path}`
-}
-
-/**
- * Detect if this is a Vite project (vs Next.js)
- */
-export function isViteProject(fullStackFiles: Record<string, string>): boolean {
-  return Boolean(
-    fullStackFiles['/src/App.tsx'] ||
-    fullStackFiles['src/App.tsx'] ||
-    fullStackFiles['/src/App.jsx'] ||
-    fullStackFiles['src/App.jsx'] ||
-    fullStackFiles['/vite.config.ts'] ||
-    fullStackFiles['vite.config.ts']
-  )
-}
-
-/**
- * For Vite projects: convert to Sandpack-compatible format.
- * - Remaps /src/App.tsx → /App.tsx, /src/components/* → /components/*
- * - Strips @tailwind directives (we use CDN instead)
- * - Removes index.html, vite.config.ts, tailwind.config.js etc.
- * - Fixes relative imports that change due to path remapping
- */
-export function extractPreviewFromVite(
-  fullStackFiles: Record<string, string>,
-): Record<string, string> {
-  // Files to skip entirely (Sandpack / CDN handles these)
-  const SKIP_PATHS = new Set([
-    '/vite.config.ts', '/vite.config.js',
-    '/tailwind.config.js', '/tailwind.config.ts',
-    '/postcss.config.js', '/postcss.config.cjs',
-    '/tsconfig.json', '/tsconfig.node.json', '/tsconfig.app.json',
-    '/index.html',
-    '/src/main.tsx', '/src/main.jsx', '/src/main.ts', '/src/main.js',
-  ])
-
-  // First pass: build a path remapping table
-  // /src/foo/bar.tsx → /foo/bar.tsx
-  const remapPath = (rawPath: string): string => {
-    const p = rawPath.startsWith('/') ? rawPath : `/${rawPath}`
-    if (p.startsWith('/src/')) return p.slice(4) // '/src/App.tsx' → '/App.tsx'
-    return p
-  }
-
-  const result: Record<string, string> = {}
-
-  for (const [rawPath, content] of Object.entries(fullStackFiles)) {
-    const original = rawPath.startsWith('/') ? rawPath : `/${rawPath}`
-    const lower = original.toLowerCase()
-
-    // Skip non-essential files
-    if (
-      SKIP_PATHS.has(lower) ||
-      lower.includes('.lock') ||
-      lower.endsWith('.gitignore') ||
-      lower === '/readme.md' ||
-      lower === '/package.json'
-    ) {
-      continue
-    }
-
-    const targetPath = remapPath(original)
-
-    let code = content
-
-    // Strip @tailwind / @layer base directives from CSS (we use CDN Tailwind)
-    if (lower.endsWith('.css')) {
-      code = code
-        .replace(/@tailwind\s+\S+;?\s*/g, '')
-        .replace(/@layer\s+base\s*\{[\s\S]*?\}/g, '')
-        .trim()
-      // If CSS is now empty, skip it
-      if (!code) continue
-    }
-
-    // Fix relative imports: if a file moved from /src/X to /X,
-    // an import like '../components/Foo' may now need to be './components/Foo'
-    if (lower.endsWith('.tsx') || lower.endsWith('.ts') || lower.endsWith('.jsx') || lower.endsWith('.js')) {
-      // Remap any import from 'src/...' absolute-style
-      code = code.replace(/from\s+['"]src\/([^'"]+)['"]/g, (_m, p: string) => `from './${p}'`)
-
-      // Strip CSS imports (handled by CDN)
-      code = code.replace(/import\s+['"][^'"]*\.css['"]\s*;?\s*\n?/g, '')
-
-      // Strip 'use client' (not needed in Sandpack)
-      code = code.replace(/^['"](use client)['"];?\s*\n/m, '')
-    }
-
-    result[targetPath] = code
-  }
-
-  return result
-}
-
-
-/**
- * Builds instant Sandpack preview files from a Next.js fullStack project.
- * Maps app/page.tsx → App.tsx and copies client-side components.
- */
-export function extractPreviewFromFullStack(
-  fullStackFiles: Record<string, string>,
-): Record<string, string> {
-  // If it's a Vite project, handle it differently
-  if (isViteProject(fullStackFiles)) {
-    return extractPreviewFromVite(fullStackFiles)
-  }
-
-  const result: Record<string, string> = {}
-
-  for (const [rawPath, content] of Object.entries(fullStackFiles)) {
-    const path = normalizeFullStackPath(rawPath)
-    const lower = path.toLowerCase()
-
-    if (
-      lower === '/package.json' ||
-      lower.endsWith('.config.js') ||
-      lower.endsWith('.config.mjs') ||
-      lower.endsWith('.config.ts') ||
-      lower.startsWith('/app/api/') ||
-      lower.startsWith('/pages/api/') ||
-      lower.includes('.env')
-    ) {
-      continue
-    }
-
-    if (FULLSTACK_PREVIEW_PREFIXES.some(prefix => lower.startsWith(prefix))) {
-      if (lower.includes('supabase') && lower.endsWith('.ts')) {
-        result[path] = SUPABASE_STUB
-        continue
-      }
-      if (lower === '/lib/utils.ts' || lower === '/lib/utils.js') {
-        result[path] = UTILS_STUB
-        continue
-      }
-      result[path] = transformForSandpack(content, path)
-    }
-  }
-
-  const pageContent =
-    fullStackFiles['/app/page.tsx'] ??
-    fullStackFiles['app/page.tsx'] ??
-    fullStackFiles['/app/page.js'] ??
-    fullStackFiles['app/page.js'] ??
-    fullStackFiles['/App.tsx'] ??
-    fullStackFiles['/App.js']
-
-  if (pageContent) {
-    const appCode = transformForSandpack(pageContent, '/App.tsx')
-    result['/App.tsx'] = appCode.includes('export default')
-      ? appCode
-      : `export default function App() {\n  return (\n    ${appCode}\n  );\n}`
-  }
-
-  if (!result['/lib/utils.ts'] && Object.values(result).some(c => c.includes("from './lib/utils'") || c.includes('from "../lib/utils"'))) {
-    result['/lib/utils.ts'] = UTILS_STUB
-  }
-
-  return result
-}
-
-/** Prefer previewFiles; fall back to extracting from fullStackFiles. */
-export function buildInstantPreviewFiles(
-  previewFiles: Array<{ path?: string; content?: string } | null | undefined> | undefined,
-  fullStackFiles: Record<string, string>,
-  useTypeScript = true,
-): Record<string, string> {
-  const extracted = extractPreviewFromFullStack(fullStackFiles)
-  if (hasPreviewEntry(extracted)) {
-    return repairPreviewFiles(extracted).files
-  }
-
-  const fromPreview = buildPreviewFiles(previewFiles, useTypeScript)
-  if (hasPreviewEntry(fromPreview)) {
-    return repairPreviewFiles(fromPreview).files
-  }
-  
-  return repairPreviewFiles(extracted).files
+export interface ProjectFileInput {
+  path?: string
+  content?: string
 }
 
 export interface PreviewValidationIssue {
@@ -314,7 +8,19 @@ export interface PreviewValidationIssue {
   message: string
 }
 
-// Brand/social icons removed from lucide-react — importing them yields `undefined` at runtime.
+const CODE_EXTENSIONS = [
+  '.tsx',
+  '.ts',
+  '.jsx',
+  '.js',
+  '.css',
+  '.json',
+]
+
+/**
+ * These brand/social icons should not be imported
+ * directly from lucide-react.
+ */
 const INVALID_LUCIDE_ICONS = new Set([
   'Facebook',
   'Twitter',
@@ -330,28 +36,1123 @@ const INVALID_LUCIDE_ICONS = new Set([
   'Whatsapp',
 ])
 
-const FILE_EXTENSIONS = ['.tsx', '.ts', '.jsx', '.js']
+/**
+ * Build/dev dependencies that should not be installed
+ * inside the Sandpack browser runtime.
+ */
+const BLOCKED_RUNTIME_DEPENDENCIES = new Set([
+  'next',
+  'vite',
+  '@vitejs/plugin-react',
+  'typescript',
+  'tailwindcss',
+  'postcss',
+  'autoprefixer',
+  '@vercel/ai',
+  '@supabase/ssr',
+  '@supabase/auth-helpers-nextjs',
+])
 
-function resolveImportBasePath(fromFile: string, importPath: string): string | null {
-  if (!importPath.startsWith('.')) return null
+// ─────────────────────────────────────────────────────────────
+// PATH HELPERS
+// ─────────────────────────────────────────────────────────────
 
-  const fromDir = fromFile.includes('/')
-    ? fromFile.slice(0, fromFile.lastIndexOf('/'))
-    : ''
+export function normalizePreviewPath(
+  path: string,
+  _useTypeScript = true,
+): string {
+  const trimmed = path.trim()
 
-  const segments = importPath.split('/')
-  const resolvedParts: string[] = fromDir ? fromDir.split('/').filter(Boolean) : []
-
-  for (const segment of segments) {
-    if (segment === '.') continue
-    if (segment === '..') {
-      resolvedParts.pop()
-      continue
-    }
-    resolvedParts.push(segment)
+  if (!trimmed) {
+    return '/'
   }
 
-  return `/${resolvedParts.join('/')}`
+  const normalized = trimmed
+    .replace(/\\/g, '/')
+    .replace(/\/+/g, '/')
+
+  return normalized.startsWith('/')
+    ? normalized
+    : `/${normalized}`
+}
+
+function dirname(path: string): string {
+  const normalized = normalizePreviewPath(path)
+  const index = normalized.lastIndexOf('/')
+
+  if (index <= 0) {
+    return '/'
+  }
+
+  return normalized.slice(0, index)
+}
+
+function relativePath(
+  fromFile: string,
+  targetPath: string,
+): string {
+  const fromParts = dirname(fromFile)
+    .split('/')
+    .filter(Boolean)
+
+  const targetParts = normalizePreviewPath(targetPath)
+    .split('/')
+    .filter(Boolean)
+
+  let common = 0
+
+  while (
+    common < fromParts.length &&
+    common < targetParts.length &&
+    fromParts[common] === targetParts[common]
+  ) {
+    common += 1
+  }
+
+  const upCount =
+    fromParts.length - common
+
+  const result = [
+    ...Array(upCount).fill('..'),
+    ...targetParts.slice(common),
+  ].join('/')
+
+  if (!result) {
+    return './'
+  }
+
+  if (
+    result.startsWith('.') ||
+    result.startsWith('/')
+  ) {
+    return result
+  }
+
+  return `./${result}`
+}
+
+// ─────────────────────────────────────────────────────────────
+// PROJECT FILE MAP
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Converts generated previewFiles into the canonical
+ * real project structure.
+ *
+ * Example:
+ *
+ * /package.json
+ * /vite.config.ts
+ * /src/main.tsx
+ * /src/App.tsx
+ * /src/components/*
+ * /supabase/*
+ */
+export function buildPreviewFiles(
+  previewFiles:
+    | Array<ProjectFileInput | null | undefined>
+    | undefined,
+
+  useTypeScript = true,
+): Record<string, string> {
+  const result: Record<string, string> = {}
+
+  if (!previewFiles?.length) {
+    return result
+  }
+
+  for (const file of previewFiles) {
+    if (
+      !file?.path ||
+      typeof file.content !== 'string'
+    ) {
+      continue
+    }
+
+    const path = normalizePreviewPath(
+      file.path,
+      useTypeScript,
+    )
+
+    result[path] = file.content
+  }
+
+  return result
+}
+
+// ─────────────────────────────────────────────────────────────
+// DEPENDENCY DISCOVERY
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Converts an import source into its npm package name.
+ *
+ * Examples:
+ *
+ * react-router-dom -> react-router-dom
+ * react-router-dom/server -> react-router-dom
+ *
+ * @supabase/supabase-js -> @supabase/supabase-js
+ * @supabase/supabase-js/foo -> @supabase/supabase-js
+ *
+ * ./Navbar -> null
+ * @/components/Navbar -> null
+ */
+function getPackageNameFromImport(
+  source: string,
+): string | null {
+  if (
+    source.startsWith('.') ||
+    source.startsWith('/') ||
+    source.startsWith('@/') ||
+    source.startsWith('http://') ||
+    source.startsWith('https://')
+  ) {
+    return null
+  }
+
+  if (source.startsWith('@')) {
+    const parts = source.split('/')
+
+    if (parts.length >= 2) {
+      return `${parts[0]}/${parts[1]}`
+    }
+
+    return source
+  }
+
+  return source.split('/')[0] || null
+}
+
+/**
+ * Used only if the generated package.json forgot
+ * to include a package that the source imports.
+ */
+function getFallbackRuntimeVersion(
+  packageName: string,
+): string {
+  switch (packageName) {
+    case 'react':
+      return '^18.2.0'
+
+    case 'react-dom':
+      return '^18.2.0'
+
+    case 'react-router-dom':
+      return '^6.28.0'
+
+    case 'lucide-react':
+      return '^0.468.0'
+
+    case 'clsx':
+      return '^2.1.1'
+
+    case 'tailwind-merge':
+      return '^2.5.4'
+
+    case '@supabase/supabase-js':
+      return '^2.45.0'
+
+    case 'framer-motion':
+      return '^11.0.0'
+
+    case 'date-fns':
+      return '^4.0.0'
+
+    case 'recharts':
+      return '^2.13.0'
+
+    default:
+      return 'latest'
+  }
+}
+
+/**
+ * Scans generated TS/JS source files and detects
+ * external npm imports automatically.
+ *
+ * This means even if AI forgets:
+ *
+ * "react-router-dom": "..."
+ *
+ * in package.json, preview can still run.
+ */
+function discoverRuntimeDependencies(
+  previewFiles:
+    | Array<ProjectFileInput | null | undefined>
+    | undefined,
+): Record<string, string> {
+  const discovered: Record<string, string> = {}
+
+  for (const file of previewFiles ?? []) {
+    if (
+      !file?.path ||
+      typeof file.content !== 'string'
+    ) {
+      continue
+    }
+
+    const path =
+      normalizePreviewPath(file.path)
+
+    if (!/\.(tsx?|jsx?)$/.test(path)) {
+      continue
+    }
+
+    const sources = new Set<string>()
+
+    /**
+     * Handles:
+     *
+     * import X from 'foo'
+     * import { X } from 'foo'
+     * export { X } from 'foo'
+     */
+    const fromRegex =
+      /\b(?:import|export)\s+[\s\S]*?\s+from\s+['"]([^'"]+)['"]/g
+
+    /**
+     * Handles:
+     *
+     * import 'foo'
+     */
+    const sideEffectRegex =
+      /\bimport\s+['"]([^'"]+)['"]/g
+
+    /**
+     * Handles:
+     *
+     * import('foo')
+     */
+    const dynamicImportRegex =
+      /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g
+
+    let match: RegExpExecArray | null
+
+    while (
+      (match =
+        fromRegex.exec(file.content)) !== null
+    ) {
+      if (match[1]) {
+        sources.add(match[1])
+      }
+    }
+
+    while (
+      (match =
+        sideEffectRegex.exec(file.content)) !== null
+    ) {
+      if (match[1]) {
+        sources.add(match[1])
+      }
+    }
+
+    while (
+      (match =
+        dynamicImportRegex.exec(file.content)) !== null
+    ) {
+      if (match[1]) {
+        sources.add(match[1])
+      }
+    }
+
+    for (const source of sources) {
+      const packageName =
+        getPackageNameFromImport(source)
+
+      if (!packageName) {
+        continue
+      }
+
+      if (
+        BLOCKED_RUNTIME_DEPENDENCIES.has(
+          packageName,
+        )
+      ) {
+        continue
+      }
+
+      discovered[packageName] =
+        getFallbackRuntimeVersion(
+          packageName,
+        )
+    }
+  }
+
+  return discovered
+}
+
+/**
+ * Gets ALL packages required by the preview.
+ *
+ * Priority:
+ *
+ * import scanner
+ * ↓
+ * generated package.json
+ * ↓
+ * explicit plan.dependencies
+ *
+ * Explicit dependency values win.
+ */
+export function getProjectRuntimeDependencies(
+  previewFiles:
+    | Array<ProjectFileInput | null | undefined>
+    | undefined,
+
+  explicitDependencies: Record<string, string> = {},
+): Record<string, string> {
+  const packageFile =
+    previewFiles?.find(file => {
+      if (!file?.path) {
+        return false
+      }
+
+      return (
+        normalizePreviewPath(file.path) ===
+        '/package.json'
+      )
+    })
+
+  let packageDependencies: Record<string, string> = {}
+
+  // ─── PACKAGE.JSON ─────────────────────────────────────
+
+  if (packageFile?.content) {
+    try {
+      const packageJson = JSON.parse(
+        packageFile.content,
+      ) as {
+        dependencies?: unknown
+      }
+
+      if (
+        packageJson.dependencies &&
+        typeof packageJson.dependencies === 'object' &&
+        !Array.isArray(packageJson.dependencies)
+      ) {
+        packageDependencies =
+          Object.fromEntries(
+            Object.entries(
+              packageJson.dependencies,
+            ).filter(
+              (
+                entry,
+              ): entry is [string, string] =>
+                typeof entry[1] === 'string',
+            ),
+          )
+      }
+    } catch (error) {
+      console.error(
+        '[Preview] Failed to parse generated package.json:',
+        error,
+      )
+    }
+  }
+
+  // ─── IMPORT SCANNER ───────────────────────────────────
+
+  const discoveredDependencies =
+    discoverRuntimeDependencies(
+      previewFiles,
+    )
+
+  // ─── MERGE ────────────────────────────────────────────
+
+  const merged = {
+    ...discoveredDependencies,
+    ...packageDependencies,
+    ...explicitDependencies,
+  }
+
+  return Object.fromEntries(
+    Object.entries(merged).filter(
+      ([name]) =>
+        !BLOCKED_RUNTIME_DEPENDENCIES.has(
+          name,
+        ),
+    ),
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
+// PROJECT DETECTION
+// ─────────────────────────────────────────────────────────────
+
+export function hasPreviewEntry(
+  files: Record<string, string>,
+): boolean {
+  return Boolean(
+    // Canonical Vite
+    files['/src/main.tsx'] ||
+      files['/src/main.jsx'] ||
+      files['/src/main.ts'] ||
+      files['/src/main.js'] ||
+
+      // Sandpack runtime
+      files['/index.tsx'] ||
+      files['/index.jsx'] ||
+      files['/App.tsx'] ||
+      files['/App.jsx'] ||
+
+      // Legacy
+      files['/app/page.tsx'] ||
+      files['/app/page.jsx'],
+  )
+}
+
+export function isViteProject(
+  files: Record<string, string>,
+): boolean {
+  return Boolean(
+    files['/vite.config.ts'] ||
+      files['/vite.config.js'] ||
+      files['/src/main.tsx'] ||
+      files['/src/main.jsx'] ||
+      files['/src/App.tsx'] ||
+      files['/src/App.jsx'],
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
+// IMPORT ALIAS REWRITE
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Converts:
+ *
+ * @/components/Navbar
+ *
+ * into a relative path suitable for the flattened
+ * Sandpack runtime.
+ */
+function rewriteSrcAliases(
+  content: string,
+  sourceFile: string,
+): string {
+  return content.replace(
+    /(['"])@\/([^'"]+)\1/g,
+    (
+      _match,
+      quote: string,
+      aliasPath: string,
+    ) => {
+      const canonicalTarget =
+        `/src/${aliasPath}`
+
+      const previewSource =
+        sourceFile.startsWith('/src/')
+          ? sourceFile.slice(4)
+          : sourceFile
+
+      const previewTarget =
+        canonicalTarget.startsWith('/src/')
+          ? canonicalTarget.slice(4)
+          : canonicalTarget
+
+      const relative =
+        relativePath(
+          previewSource,
+          previewTarget,
+        )
+
+      return `${quote}${relative}${quote}`
+    },
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
+// SANDPACK SOURCE TRANSFORM
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Only changes the PREVIEW COPY.
+ *
+ * The source stored in the database and downloaded ZIP
+ * remains unchanged.
+ */
+export function transformForSandpack(
+  content: string,
+  filePath: string,
+): string {
+  let code = content
+
+  // Remove framework directives not needed in Vite preview.
+  code = code
+    .replace(
+      /^\s*['"]use client['"];?\s*$/gm,
+      '',
+    )
+    .replace(
+      /^\s*['"]use server['"];?\s*$/gm,
+      '',
+    )
+
+  // Convert @/... imports.
+  code = rewriteSrcAliases(
+    code,
+    filePath,
+  )
+
+  /**
+   * Preview-only Supabase values.
+   *
+   * Prevents createClient() from crashing immediately
+   * before the user connects their own Supabase project.
+   *
+   * These are NOT written to the real project.
+   */
+  code = code
+    .replace(
+      /import\.meta\.env\.VITE_SUPABASE_URL/g,
+      JSON.stringify(
+        'https://preview.supabase.co',
+      ),
+    )
+    .replace(
+      /import\.meta\.env\.VITE_SUPABASE_PUBLISHABLE_KEY/g,
+      JSON.stringify(
+        'preview-public-key',
+      ),
+    )
+    .replace(
+      /import\.meta\.env\.VITE_SUPABASE_ANON_KEY/g,
+      JSON.stringify(
+        'preview-anon-key',
+      ),
+    )
+
+  return code
+}
+
+// ─────────────────────────────────────────────────────────────
+// VITE → SANDPACK RUNTIME
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Real project:
+ *
+ * /src/App.tsx
+ * /src/components/Navbar.tsx
+ *
+ * Sandpack runtime:
+ *
+ * /App.tsx
+ * /components/Navbar.tsx
+ *
+ * Only the preview representation is flattened.
+ */
+export function extractPreviewFromVite(
+  projectFiles: Record<string, string>,
+): Record<string, string> {
+  const result: Record<string, string> = {}
+
+  for (
+    const [rawPath, rawContent]
+    of Object.entries(projectFiles)
+  ) {
+    const path =
+      normalizePreviewPath(rawPath)
+
+    if (!path.startsWith('/src/')) {
+      continue
+    }
+
+    /**
+     * We generate a custom Sandpack entry below,
+     * so the Vite main entry isn't copied.
+     */
+    if (
+      path === '/src/main.tsx' ||
+      path === '/src/main.jsx' ||
+      path === '/src/main.ts' ||
+      path === '/src/main.js'
+    ) {
+      continue
+    }
+
+    // /src/App.tsx -> /App.tsx
+    const previewPath =
+      path.slice('/src'.length)
+
+    let content = rawContent
+
+    // ─── CSS ────────────────────────────────────────────
+
+    if (path.endsWith('.css')) {
+      /**
+       * Tailwind utilities are currently supplied through
+       * the external Tailwind preview runtime.
+       *
+       * Keep custom CSS.
+       */
+      content = content
+        .replace(
+          /@tailwind\s+(base|components|utilities)\s*;?/g,
+          '',
+        )
+        .trim()
+    }
+
+    // ─── TS / JS ────────────────────────────────────────
+
+    else if (
+      /\.(tsx?|jsx?)$/.test(path)
+    ) {
+      content =
+        transformForSandpack(
+          content,
+          path,
+        )
+    }
+
+    result[previewPath] =
+      content
+  }
+
+  const hasTsApp =
+    Boolean(result['/App.tsx'])
+
+  const hasJsApp =
+    Boolean(
+      result['/App.jsx'] ||
+        result['/App.js'],
+    )
+
+  const hasCss =
+    Boolean(result['/index.css'])
+
+  const cssImport =
+    hasCss
+      ? `import './index.css'`
+      : ''
+
+  // ───────────────────────────────────────────────────────
+  // TYPESCRIPT ENTRY
+  // ───────────────────────────────────────────────────────
+
+  if (hasTsApp) {
+    result['/index.tsx'] = `
+import React from 'react'
+import { createRoot } from 'react-dom/client'
+${cssImport}
+
+const rootElement = document.getElementById('root')
+
+if (!rootElement) {
+  throw new Error('Root element was not found')
+}
+
+const root = createRoot(rootElement)
+
+async function startPreview() {
+  try {
+    const appModule = await import('./App')
+
+    if (!appModule.default) {
+      throw new Error(
+        'App.tsx does not provide a default export.',
+      )
+    }
+
+    const App = appModule.default
+
+    root.render(
+      <React.StrictMode>
+        <App />
+      </React.StrictMode>,
+    )
+  } catch (error) {
+    console.error(
+      '[Preview Runtime Error]',
+      error,
+    )
+
+    const message =
+      error instanceof Error
+        ? error.message
+        : String(error)
+
+    root.render(
+      <div
+        style={{
+          minHeight: '100vh',
+          background: '#09090b',
+          color: '#fafafa',
+          padding: '32px',
+          fontFamily: 'system-ui, sans-serif',
+        }}
+      >
+        <h2
+          style={{
+            margin: '0 0 12px',
+            fontSize: '20px',
+            fontWeight: 700,
+          }}
+        >
+          Preview runtime error
+        </h2>
+
+        <p
+          style={{
+            margin: '0 0 16px',
+            color: '#a1a1aa',
+            fontSize: '13px',
+          }}
+        >
+          The generated project loaded, but one of its runtime modules failed.
+        </p>
+
+        <pre
+          style={{
+            margin: 0,
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+            color: '#fca5a5',
+            fontSize: '13px',
+            lineHeight: 1.6,
+          }}
+        >
+          {message}
+        </pre>
+      </div>,
+    )
+  }
+}
+
+startPreview()
+`.trim()
+  }
+
+  // ───────────────────────────────────────────────────────
+  // JAVASCRIPT ENTRY
+  // ───────────────────────────────────────────────────────
+
+  else if (hasJsApp) {
+    result['/index.jsx'] = `
+import React from 'react'
+import { createRoot } from 'react-dom/client'
+${cssImport}
+
+const rootElement = document.getElementById('root')
+
+if (!rootElement) {
+  throw new Error('Root element was not found')
+}
+
+const root = createRoot(rootElement)
+
+async function startPreview() {
+  try {
+    const appModule = await import('./App')
+
+    if (!appModule.default) {
+      throw new Error(
+        'App.jsx does not provide a default export.',
+      )
+    }
+
+    const App = appModule.default
+
+    root.render(
+      <React.StrictMode>
+        <App />
+      </React.StrictMode>,
+    )
+  } catch (error) {
+    console.error(
+      '[Preview Runtime Error]',
+      error,
+    )
+
+    const message =
+      error instanceof Error
+        ? error.message
+        : String(error)
+
+    root.render(
+      <div
+        style={{
+          minHeight: '100vh',
+          background: '#09090b',
+          color: '#fafafa',
+          padding: '32px',
+          fontFamily: 'system-ui, sans-serif',
+        }}
+      >
+        <h2
+          style={{
+            margin: '0 0 12px',
+            fontSize: '20px',
+            fontWeight: 700,
+          }}
+        >
+          Preview runtime error
+        </h2>
+
+        <pre
+          style={{
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+            color: '#fca5a5',
+            fontSize: '13px',
+            lineHeight: 1.6,
+          }}
+        >
+          {message}
+        </pre>
+      </div>,
+    )
+  }
+}
+
+startPreview()
+`.trim()
+  }
+
+  return result
+}
+
+// ─────────────────────────────────────────────────────────────
+// LEGACY PROJECT SUPPORT
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Temporary support for projects generated with the
+ * old fullStackFiles architecture.
+ */
+export function extractPreviewFromFullStack(
+  fullStackFiles: Record<string, string>,
+): Record<string, string> {
+  if (
+    Object.keys(fullStackFiles).length === 0
+  ) {
+    return {}
+  }
+
+  if (isViteProject(fullStackFiles)) {
+    return extractPreviewFromVite(
+      fullStackFiles,
+    )
+  }
+
+  const result: Record<string, string> = {}
+
+  const legacyPage =
+    fullStackFiles['/app/page.tsx'] ??
+    fullStackFiles['app/page.tsx'] ??
+    fullStackFiles['/page.tsx'] ??
+    fullStackFiles['page.tsx'] ??
+    fullStackFiles['/App.tsx'] ??
+    fullStackFiles['App.tsx']
+
+  if (legacyPage) {
+    result['/App.tsx'] =
+      transformForSandpack(
+        legacyPage,
+        '/App.tsx',
+      )
+  }
+
+  const legacyPrefixes = [
+    '/components/',
+    '/hooks/',
+    '/lib/',
+    '/types/',
+    '/utils/',
+    '/data/',
+    '/context/',
+    '/pages/',
+  ]
+
+  for (
+    const [rawPath, content]
+    of Object.entries(fullStackFiles)
+  ) {
+    const path =
+      normalizePreviewPath(rawPath)
+
+    if (
+      !legacyPrefixes.some(
+        prefix =>
+          path.startsWith(prefix),
+      )
+    ) {
+      continue
+    }
+
+    result[path] =
+      transformForSandpack(
+        content,
+        path,
+      )
+  }
+
+  if (
+    result['/App.tsx'] &&
+    !result['/index.tsx']
+  ) {
+    result['/index.tsx'] = `
+import React from 'react'
+import { createRoot } from 'react-dom/client'
+
+const rootElement = document.getElementById('root')
+
+if (!rootElement) {
+  throw new Error('Root element was not found')
+}
+
+const root = createRoot(rootElement)
+
+async function startPreview() {
+  try {
+    const appModule = await import('./App')
+    const App = appModule.default
+
+    root.render(
+      <React.StrictMode>
+        <App />
+      </React.StrictMode>,
+    )
+  } catch (error) {
+    console.error(
+      '[Preview Runtime Error]',
+      error,
+    )
+
+    const message =
+      error instanceof Error
+        ? error.message
+        : String(error)
+
+    root.render(
+      <div
+        style={{
+          minHeight: '100vh',
+          padding: '32px',
+          background: '#09090b',
+          color: '#fafafa',
+          fontFamily: 'system-ui, sans-serif',
+        }}
+      >
+        <h2>Preview runtime error</h2>
+
+        <pre
+          style={{
+            color: '#fca5a5',
+            whiteSpace: 'pre-wrap',
+          }}
+        >
+          {message}
+        </pre>
+      </div>,
+    )
+  }
+}
+
+startPreview()
+`.trim()
+  }
+
+  return result
+}
+
+// ─────────────────────────────────────────────────────────────
+// MAIN PREVIEW BUILDER
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * New architecture:
+ *
+ * previewFiles = complete real project
+ *
+ * fullStackFiles = legacy fallback only
+ */
+export function buildInstantPreviewFiles(
+  previewFiles:
+    | Array<ProjectFileInput | null | undefined>
+    | undefined,
+
+  fullStackFiles: Record<string, string> = {},
+
+  useTypeScript = true,
+): Record<string, string> {
+  const project =
+    buildPreviewFiles(
+      previewFiles,
+      useTypeScript,
+    )
+
+  // ─── NEW PROJECT ──────────────────────────────────────
+
+  if (hasPreviewEntry(project)) {
+    if (isViteProject(project)) {
+      return extractPreviewFromVite(
+        project,
+      )
+    }
+
+    return project
+  }
+
+  // ─── LEGACY PROJECT ───────────────────────────────────
+
+  const legacy =
+    extractPreviewFromFullStack(
+      fullStackFiles,
+    )
+
+  if (hasPreviewEntry(legacy)) {
+    return legacy
+  }
+
+  return {}
+}
+
+// ─────────────────────────────────────────────────────────────
+// IMPORT RESOLUTION
+// ─────────────────────────────────────────────────────────────
+
+function resolveImportBasePath(
+  fromFile: string,
+  importPath: string,
+): string | null {
+  if (importPath.startsWith('@/')) {
+    return `/src/${importPath.slice(2)}`
+  }
+
+  if (!importPath.startsWith('.')) {
+    return null
+  }
+
+  const fromDir =
+    dirname(fromFile)
+
+  const parts =
+    fromDir
+      .split('/')
+      .filter(Boolean)
+
+  for (
+    const segment of importPath.split('/')
+  ) {
+    if (
+      !segment ||
+      segment === '.'
+    ) {
+      continue
+    }
+
+    if (segment === '..') {
+      parts.pop()
+      continue
+    }
+
+    parts.push(segment)
+  }
+
+  return `/${parts.join('/')}`
 }
 
 function resolveRelativeImport(
@@ -359,386 +1160,445 @@ function resolveRelativeImport(
   fromFile: string,
   importPath: string,
 ): string | null {
-  const basePath = resolveImportBasePath(fromFile, importPath)
-  if (!basePath) return null
+  const basePath =
+    resolveImportBasePath(
+      fromFile,
+      importPath,
+    )
 
-  for (const ext of FILE_EXTENSIONS) {
-    const candidate = `${basePath}${ext}`
-    if (Object.prototype.hasOwnProperty.call(files, candidate)) return candidate
+  if (!basePath) {
+    return null
   }
 
-  for (const ext of FILE_EXTENSIONS) {
-    const indexCandidate = `${basePath}/index${ext}`
-    if (Object.prototype.hasOwnProperty.call(files, indexCandidate)) return indexCandidate
-  }
-
-  if (Object.prototype.hasOwnProperty.call(files, basePath)) return basePath
-  return null
-}
-
-function suggestMissingFilePath(fromFile: string, importPath: string): string {
-  const basePath = resolveImportBasePath(fromFile, importPath) ?? importPath
-
-  if (/\.(tsx?|jsx?)$/.test(importPath)) {
+  if (
+    Object.prototype.hasOwnProperty.call(
+      files,
+      basePath,
+    )
+  ) {
     return basePath
   }
 
-  const lastPart = importPath.split('/').pop() || ''
-  if (lastPart === 'types' || lastPart === 'utils' || lastPart === 'lib' || lastPart === 'data') {
-    return `${basePath}/index.ts`
+  for (
+    const extension
+    of CODE_EXTENSIONS
+  ) {
+    const candidate =
+      `${basePath}${extension}`
+
+    if (
+      Object.prototype.hasOwnProperty.call(
+        files,
+        candidate,
+      )
+    ) {
+      return candidate
+    }
   }
 
-  return `${basePath}.tsx`
+  for (
+    const extension
+    of CODE_EXTENSIONS
+  ) {
+    const candidate =
+      `${basePath}/index${extension}`
+
+    if (
+      Object.prototype.hasOwnProperty.call(
+        files,
+        candidate,
+      )
+    ) {
+      return candidate
+    }
+  }
+
+  return null
 }
 
-function hasDefaultExport(content: string): boolean {
-  return /export\s+default\s/.test(content)
-}
+// ─────────────────────────────────────────────────────────────
+// IMPORT PARSER
+// ─────────────────────────────────────────────────────────────
 
-function hasNamedExport(content: string, name: string): boolean {
-  const trimmed = name.trim()
-  if (!trimmed) return false
-  return (
-    new RegExp(`export\\s+(?:function|const|class|type|interface)\\s+${trimmed}\\b`).test(content) ||
-    new RegExp(`export\\s*{[^}]*\\b${trimmed}\\b`).test(content)
-  )
-}
-
-function parseImports(content: string): Array<{
+interface ParsedImport {
   source: string
   defaultImport?: string
   namedImports: string[]
-}> {
-  const imports: Array<{
-    source: string
-    defaultImport?: string
-    namedImports: string[]
-  }> = []
+}
 
-  const importRegex = /import\s+([\s\S]*?)\s+from\s+['"]([^'"]+)['"]/g
+function parseImports(
+  content: string,
+): ParsedImport[] {
+  const imports: ParsedImport[] = []
+
+  const importRegex =
+    /import\s+(?:type\s+)?([\s\S]*?)\s+from\s+['"]([^'"]+)['"]/g
+
   let match: RegExpExecArray | null
 
-  while ((match = importRegex.exec(content)) !== null) {
-    const clause = match[1].trim()
-    const source = match[2]
+  while (
+    (match =
+      importRegex.exec(content)) !== null
+  ) {
+    const clause =
+      match[1]?.trim() ?? ''
 
-    if (clause.startsWith('type ')) continue
+    const source =
+      match[2]?.trim() ?? ''
 
-    let defaultImport: string | undefined
+    if (!source) {
+      continue
+    }
+
+    let defaultImport:
+      | string
+      | undefined
+
     const namedImports: string[] = []
 
     if (clause.startsWith('{')) {
-      const names = clause.replace(/^{|}$/g, '').split(',')
+      const names =
+        clause
+          .replace(/^{|}$/g, '')
+          .split(',')
+
       for (const name of names) {
-        const cleaned = name.trim().split(/\s+as\s+/)[0]?.trim()
-        if (cleaned) namedImports.push(cleaned)
+        const cleaned =
+          name
+            .trim()
+            .split(/\s+as\s+/)[0]
+            ?.trim()
+
+        if (cleaned) {
+          namedImports.push(
+            cleaned,
+          )
+        }
       }
-    } else if (clause.includes('{')) {
-      const [defaultPart, namedPart] = clause.split('{')
-      defaultImport = defaultPart.replace(/,/g, '').trim() || undefined
-      const names = namedPart.replace(/}/g, '').split(',')
-      for (const name of names) {
-        const cleaned = name.trim().split(/\s+as\s+/)[0]?.trim()
-        if (cleaned) namedImports.push(cleaned)
-      }
-    } else {
-      defaultImport = clause.replace(/,/g, '').trim() || undefined
     }
 
-    imports.push({ source, defaultImport, namedImports })
+    else if (
+      clause.includes('{')
+    ) {
+      const openBrace =
+        clause.indexOf('{')
+
+      const defaultPart =
+        clause
+          .slice(
+            0,
+            openBrace,
+          )
+          .replace(/,/g, '')
+          .trim()
+
+      defaultImport =
+        defaultPart ||
+        undefined
+
+      const namedPart =
+        clause.slice(
+          openBrace + 1,
+        )
+
+      for (
+        const name
+        of namedPart
+          .replace(/}/g, '')
+          .split(',')
+      ) {
+        const cleaned =
+          name
+            .trim()
+            .split(/\s+as\s+/)[0]
+            ?.trim()
+
+        if (cleaned) {
+          namedImports.push(
+            cleaned,
+          )
+        }
+      }
+    }
+
+    else if (
+      !clause.startsWith('*')
+    ) {
+      defaultImport =
+        clause
+          .replace(/,/g, '')
+          .trim() ||
+        undefined
+    }
+
+    imports.push({
+      source,
+      defaultImport,
+      namedImports,
+    })
   }
 
   return imports
 }
 
-export function validatePreviewFiles(files: Record<string, string>): PreviewValidationIssue[] {
-  const issues: PreviewValidationIssue[] = []
-  const missingFiles = new Map<string, { importPath: string; usedBy: string[] }>()
+function hasDefaultExport(
+  content: string,
+): boolean {
+  return /export\s+default\b/.test(
+    content,
+  )
+}
 
-  for (const [filePath, content] of Object.entries(files)) {
-    if (filePath === '/index.html' || filePath === '/index.tsx') continue
+function escapeRegex(
+  value: string,
+): string {
+  return value.replace(
+    /[.*+?^${}()|[\]\\]/g,
+    '\\$&',
+  )
+}
 
-    for (const imp of parseImports(content)) {
-      if (imp.source === 'lucide-react') {
-        for (const icon of imp.namedImports) {
-          if (INVALID_LUCIDE_ICONS.has(icon)) {
+function hasNamedExport(
+  content: string,
+  name: string,
+): boolean {
+  const safeName =
+    escapeRegex(name)
+
+  return Boolean(
+    new RegExp(
+      `export\\s+(?:async\\s+)?(?:function|const|let|var|class|type|interface|enum)\\s+${safeName}\\b`,
+    ).test(content) ||
+
+      new RegExp(
+        `export\\s*\\{[^}]*\\b${safeName}\\b[^}]*\\}`,
+      ).test(content),
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
+// VALIDATION
+// ─────────────────────────────────────────────────────────────
+
+export function validatePreviewFiles(
+  files: Record<string, string>,
+): PreviewValidationIssue[] {
+  const issues:
+    PreviewValidationIssue[] = []
+
+  // ─── ENTRY ────────────────────────────────────────────
+
+  if (
+    !files['/src/main.tsx'] &&
+    !files['/src/main.jsx'] &&
+    !files['/index.tsx'] &&
+    !files['/index.jsx']
+  ) {
+    issues.push({
+      file: '/src/main.tsx',
+
+      message:
+        'Missing application entry point.',
+    })
+  }
+
+  // ─── APP ──────────────────────────────────────────────
+
+  if (
+    !files['/src/App.tsx'] &&
+    !files['/src/App.jsx'] &&
+    !files['/App.tsx'] &&
+    !files['/App.jsx']
+  ) {
+    issues.push({
+      file: '/src/App.tsx',
+
+      message:
+        'Missing main App component.',
+    })
+  }
+
+  // ─── IMPORTS ──────────────────────────────────────────
+
+  for (
+    const [filePath, content]
+    of Object.entries(files)
+  ) {
+    if (
+      !/\.(tsx?|jsx?)$/.test(
+        filePath,
+      )
+    ) {
+      continue
+    }
+
+    for (
+      const imported
+      of parseImports(content)
+    ) {
+      // ─── LUCIDE ───────────────────────────────────────
+
+      if (
+        imported.source ===
+        'lucide-react'
+      ) {
+        for (
+          const icon
+          of imported.namedImports
+        ) {
+          if (
+            INVALID_LUCIDE_ICONS.has(
+              icon,
+            )
+          ) {
             issues.push({
               file: filePath,
-              message: `"${icon}" is not available in lucide-react (brand icons were removed). Use Mail, Phone, MapPin, or inline SVG instead.`,
+
+              message:
+                `"${icon}" is not available in lucide-react. ` +
+                'Use another Lucide icon, text, or inline SVG.',
             })
           }
         }
+
         continue
       }
 
-      if (!imp.source.startsWith('.')) continue
+      // ─── LOCAL IMPORT ─────────────────────────────────
 
-      const resolved = resolveRelativeImport(files, filePath, imp.source)
+      const isLocal =
+        imported.source.startsWith('.') ||
+        imported.source.startsWith('@/')
+
+      if (!isLocal) {
+        continue
+      }
+
+      const resolved =
+        resolveRelativeImport(
+          files,
+          filePath,
+          imported.source,
+        )
+
       if (!resolved) {
-        const suggestedPath = suggestMissingFilePath(filePath, imp.source)
-        const existing = missingFiles.get(suggestedPath)
-        if (existing) {
-          existing.usedBy.push(filePath)
-        } else {
-          missingFiles.set(suggestedPath, { importPath: imp.source, usedBy: [filePath] })
-        }
-        continue
-      }
-
-      const targetContent = files[resolved]
-      if (!targetContent) continue
-
-      if (imp.defaultImport && !hasDefaultExport(targetContent)) {
         issues.push({
           file: filePath,
-          message: `"${imp.defaultImport}" is a default import from "${imp.source}", but ${resolved} has no "export default". Use named import { ${imp.defaultImport} } or add export default.`,
+
+          message:
+            `Missing local import "${imported.source}". ` +
+            'Generate the corresponding project file.',
+        })
+
+        continue
+      }
+
+      const target =
+        files[resolved]
+
+      if (!target) {
+        continue
+      }
+
+      // ─── DEFAULT EXPORT ────────────────────────────────
+
+      if (
+        imported.defaultImport &&
+        !hasDefaultExport(target)
+      ) {
+        issues.push({
+          file: filePath,
+
+          message:
+            `"${imported.defaultImport}" is imported as default from ` +
+            `"${imported.source}", but ${resolved} has no default export.`,
         })
       }
 
-      for (const named of imp.namedImports) {
-        if (!hasNamedExport(targetContent, named) && !hasDefaultExport(targetContent)) {
+      // ─── NAMED EXPORT ──────────────────────────────────
+
+      for (
+        const name
+        of imported.namedImports
+      ) {
+        if (
+          !hasNamedExport(
+            target,
+            name,
+          )
+        ) {
           issues.push({
             file: filePath,
-            message: `Named import "{ ${named} }" from "${imp.source}" does not match exports in ${resolved}. Check default vs named export.`,
-          })
-        } else if (!hasNamedExport(targetContent, named) && hasDefaultExport(targetContent)) {
-          issues.push({
-            file: filePath,
-            message: `"{ ${named} }" imported from "${imp.source}" but ${resolved} only has export default. Use: import ${named} from '${imp.source}'`,
+
+            message:
+              `Named import "{ ${name} }" from "${imported.source}" ` +
+              `does not match an export in ${resolved}.`,
           })
         }
       }
     }
-  }
-
-  for (const [suggestedPath, { importPath, usedBy }] of missingFiles) {
-    issues.unshift({
-      file: usedBy.length > 2 ? `${usedBy.length} files` : usedBy.join(', '),
-      message: `Missing "${suggestedPath}" (imported as "${importPath}"). Add this file to previewFiles with all exported types/interfaces.`,
-    })
   }
 
   return issues
 }
 
-export function formatPreviewIssuesForAI(issues: PreviewValidationIssue[]): string {
-  const summary = issues
-    .slice(0, 8)
-    .map(issue => `- ${issue.file}: ${issue.message}`)
-    .join('\n')
+// ─────────────────────────────────────────────────────────────
+// AI FIX MESSAGE
+// ─────────────────────────────────────────────────────────────
 
-  return `Fix the preview errors. Resolve these issues:\n${summary}\n\nRules: every imported file must exist in previewFiles; if using types, generate /types/index.ts; use "export default function ComponentName" for components; never import Facebook/Twitter/Instagram from lucide-react.`
-}
-
-function componentNameFromPath(path: string): string {
-  const base = path.split('/').pop() || 'Component'
-  return base.replace(/\.(tsx|ts|jsx|js)$/, '')
-}
-
-function generateTypesStub(typeNames: string[]): string {
-  const names = typeNames.length > 0 ? typeNames : ['Product', 'Category', 'CartItem']
-  return names
-    .map(
-      name => `export interface ${name} {
-  id: string
-  name?: string
-  price?: number
-  image?: string
-  category?: string
-  quantity?: number
-  [key: string]: unknown
-}`,
-    )
-    .join('\n\n')
-    .concat('\n')
-}
-
-function generateDataStub(path: string, importHint?: string): string {
-  const isProducts = /product/i.test(path) || /product/i.test(importHint || '')
-  if (isProducts) {
-    return `export const products = [
-  { id: '1', name: 'Organic Milk', price: 62, image: 'https://placehold.co/120x120?text=Milk', category: 'Dairy' },
-  { id: '2', name: 'Fresh Bread', price: 45, image: 'https://placehold.co/120x120?text=Bread', category: 'Bakery' },
-  { id: '3', name: 'Bananas', price: 48, image: 'https://placehold.co/120x120?text=Banana', category: 'Fruits' },
-  { id: '4', name: 'Tomatoes', price: 32, image: 'https://placehold.co/120x120?text=Tomato', category: 'Vegetables' },
-  { id: '5', name: 'Potato Chips', price: 20, image: 'https://placehold.co/120x120?text=Chips', category: 'Snacks' },
-  { id: '6', name: 'Cold Coffee', price: 99, image: 'https://placehold.co/120x120?text=Coffee', category: 'Beverages' },
-];
-export default products;
-`
-  }
-  return `export const data = [] as const;
-export default data;
-`
-}
-
-function generateDefaultComponentStub(name: string): string {
-  const stubs: Record<string, string> = {
-    Footer: `export default function Footer() {
-  return (
-    <footer className="border-t border-border bg-muted/30 px-6 py-8 mt-auto">
-      <div className="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between gap-4 text-sm text-muted-foreground">
-        <p>© ${new Date().getFullYear()} QuickMart</p>
-        <div className="flex gap-4">
-          <span>Privacy</span>
-          <span>Terms</span>
-          <span>Help</span>
-        </div>
-      </div>
-    </footer>
-  );
-}
-`,
-    ProductGrid: `import products from '../data/products';
-
-export default function ProductGrid() {
-  return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-4">
-      {products.map((product) => (
-        <div key={product.id} className="rounded-xl border border-border bg-card p-3 hover:shadow-md transition-shadow">
-          <img src={product.image} alt={product.name} className="w-full h-28 object-cover rounded-lg mb-2" />
-          <p className="text-sm font-medium truncate">{product.name}</p>
-          <p className="text-xs text-muted-foreground mt-1">₹{product.price}</p>
-        </div>
-      ))}
-    </div>
-  );
-}
-`,
-    CategoryFilter: `const categories = ['All', 'Dairy', 'Bakery', 'Fruits', 'Vegetables', 'Snacks', 'Beverages'];
-
-export default function CategoryFilter() {
-  return (
-    <div className="flex gap-2 overflow-x-auto px-4 py-3 border-b border-border">
-      {categories.map((category) => (
-        <button
-          key={category}
-          type="button"
-          className="shrink-0 rounded-full border border-border bg-muted/40 px-4 py-1.5 text-xs font-medium hover:bg-primary hover:text-primary-foreground transition-colors"
-        >
-          {category}
-        </button>
-      ))}
-    </div>
-  );
-}
-`,
-    CartSidebar: `export default function CartSidebar() {
-  return (
-    <aside className="w-full max-w-sm border-l border-border bg-card p-4 hidden lg:block">
-      <h2 className="text-sm font-semibold mb-4">Your Cart</h2>
-      <p className="text-sm text-muted-foreground">Your cart is empty.</p>
-      <button type="button" className="mt-6 w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
-        Checkout
-      </button>
-    </aside>
-  );
-}
-`,
-    Navbar: `export default function Navbar() {
-  return (
-    <header className="sticky top-0 z-10 border-b border-border bg-background/90 backdrop-blur px-4 py-3">
-      <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
-        <span className="text-lg font-bold text-primary">QuickMart</span>
-        <input
-          type="search"
-          placeholder="Search products..."
-          className="flex-1 max-w-md rounded-full border border-border bg-muted/40 px-4 py-2 text-sm"
-        />
-      </div>
-    </header>
-  );
-}
-`,
-  }
-
-  if (stubs[name]) return stubs[name]
-
-  return `export default function ${name}() {
-  return (
-    <div className="rounded-lg border border-dashed border-border/60 bg-muted/20 p-4 text-sm text-muted-foreground">
-      ${name}
-    </div>
-  );
-}
-`
-}
-
-function generateNamedComponentStub(name: string): string {
-  return `export function ${name}() {
-  return (
-    <div className="rounded-lg border border-dashed border-border/60 bg-muted/20 p-4 text-sm text-muted-foreground">
-      ${name}
-    </div>
-  );
-}
-`
-}
-
-function generateStubForImport(
-  path: string,
-  imp: { defaultImport?: string; namedImports: string[] },
+export function formatPreviewIssuesForAI(
+  issues:
+    PreviewValidationIssue[],
 ): string {
-  if (path.includes('/types/') || path.endsWith('/types/index.ts')) {
-    return generateTypesStub(imp.namedImports)
+  if (!issues.length) {
+    return ''
   }
 
-  if (path.includes('/data/')) {
-    return generateDataStub(path, imp.defaultImport || imp.namedImports[0])
-  }
+  const summary =
+    issues
+      .slice(0, 12)
+      .map(
+        issue =>
+          `- ${issue.file}: ${issue.message}`,
+      )
+      .join('\n')
 
-  if (imp.defaultImport) {
-    return generateDefaultComponentStub(imp.defaultImport)
-  }
+  return `Fix the generated project errors.
 
-  if (imp.namedImports.length === 1) {
-    const name = imp.namedImports[0]
-    return `${generateNamedComponentStub(name)}
-export default ${name};
-`
-  }
+${summary}
 
-  if (imp.namedImports.length > 1) {
-    return imp.namedImports.map(generateNamedComponentStub).join('\n\n')
-  }
-
-  return generateDefaultComponentStub(componentNameFromPath(path))
+Rules:
+- Keep the canonical React + Vite + TypeScript project structure.
+- Every local import must point to a real file.
+- Every external runtime import must exist in package.json dependencies.
+- Do not create fake placeholder components.
+- Fix default vs named exports correctly.
+- Keep /src/main.tsx and /src/App.tsx.
+- Keep package.json consistent with actual imports.
+- Never import Facebook, Twitter, Instagram, Youtube, Discord, Linkedin or other brand icons from lucide-react.
+- Return the complete corrected project.`
 }
+
+// ─────────────────────────────────────────────────────────────
+// LEGACY REPAIR API
+// ─────────────────────────────────────────────────────────────
 
 /**
- * Fills in missing relative imports so Sandpack can load instead of showing a blank error screen.
- * Used when the model generated App.tsx but forgot component/data/type files.
+ * Kept temporarily so existing imports don't break.
+ *
+ * Fake missing files are intentionally NOT generated.
  */
-export function repairPreviewFiles(files: Record<string, string>): {
+export function repairPreviewFiles(
+  files: Record<string, string>,
+): {
   files: Record<string, string>
   repairedPaths: string[]
 } {
-  const result = { ...files }
-  const repairedPaths: string[] = []
+  return {
+    files: {
+      ...files,
+    },
 
-  for (let iteration = 0; iteration < 24; iteration++) {
-    let added = false
-
-    for (const [filePath, content] of Object.entries(result)) {
-      if (filePath === '/index.html' || filePath === '/index.tsx') continue
-
-      for (const imp of parseImports(content)) {
-        if (!imp.source.startsWith('.')) continue
-
-        const resolved = resolveRelativeImport(result, filePath, imp.source)
-        if (resolved) continue
-
-        const missingPath = suggestMissingFilePath(filePath, imp.source)
-        if (result[missingPath]) continue
-
-        result[missingPath] = generateStubForImport(missingPath, imp)
-        repairedPaths.push(missingPath)
-        added = true
-      }
-    }
-
-    if (!added) break
+    repairedPaths: [],
   }
-
-  return { files: result, repairedPaths }
 }

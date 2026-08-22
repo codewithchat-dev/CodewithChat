@@ -1,63 +1,164 @@
 import { auth, currentUser } from '@clerk/nextjs/server'
-import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
 
-// GET /api/create-project?idea=...
-// Creates a project and redirects to the project page directly
+import { db } from '@/lib/db'
+import { MAX_DAILY_CREDITS } from '@/lib/credits'
+
+/**
+ * GET /api/create-project?idea=...
+ *
+ * Responsibilities:
+ * 1. Check authentication
+ * 2. Ensure the user exists in our database
+ * 3. Create an empty project shell
+ * 4. Redirect the user to the project editor
+ *
+ * IMPORTANT:
+ * This route does NOT consume a generation credit.
+ * Credits are consumed only when /api/generate-plan actually runs.
+ */
 export async function GET(req: NextRequest) {
-  const { userId } = await auth()
-  
-  if (!userId) {
-    // Not logged in — redirect to sign-in
-    const url = req.nextUrl.clone()
-    url.pathname = '/sign-in'
-    return NextResponse.redirect(url)
-  }
-
-  const idea = req.nextUrl.searchParams.get('idea') || 'Untitled Project'
-
   try {
-    // Ensure user exists in DB
+    // ─────────────────────────────────────────────
+    // AUTH
+    // ─────────────────────────────────────────────
+
+    const { userId } = await auth()
+
+    if (!userId) {
+      const signInUrl = new URL(
+        '/sign-in',
+        req.nextUrl.origin,
+      )
+
+      return NextResponse.redirect(signInUrl)
+    }
+
+    // ─────────────────────────────────────────────
+    // PROJECT IDEA
+    // ─────────────────────────────────────────────
+
+    const rawIdea =
+      req.nextUrl.searchParams
+        .get('idea')
+        ?.trim()
+
+    // Don't create an empty project accidentally
+    if (!rawIdea) {
+      return NextResponse.redirect(
+        new URL(
+          '/dashboard',
+          req.nextUrl.origin,
+        ),
+      )
+    }
+
+    // Keep project title readable.
+    // Full prompt is still saved in `prompt`.
+    const projectTitle =
+      rawIdea.length > 70
+        ? `${rawIdea.slice(0, 67)}...`
+        : rawIdea
+
+    // ─────────────────────────────────────────────
+    // USER
+    // ─────────────────────────────────────────────
+
     let dbUser = await db.user.findUnique({
-      where: { clerkId: userId }
+      where: {
+        clerkId: userId,
+      },
     })
 
+    // First time user
     if (!dbUser) {
-      const user = await currentUser()
-      const email = user?.emailAddresses[0]?.emailAddress || ''
-      
+      const clerkUser =
+        await currentUser()
+
+      const email =
+        clerkUser
+          ?.emailAddresses?.[0]
+          ?.emailAddress ??
+        `${userId}@placeholder.local`
+
       dbUser = await db.user.create({
         data: {
           clerkId: userId,
-          email: email,
-          credits: 5
-        }
+          email,
+
+          // New user starts with 5 daily credits
+          credits: MAX_DAILY_CREDITS,
+
+          // Used by generate-plan to know
+          // when daily credits should reset
+          lastCreditResetAt: new Date(),
+        },
       })
     }
 
-    // Create the project
-    const project = await db.project.create({
-      data: {
-        userId: dbUser.id,
-        title: idea,
-        prompt: idea,
-      }
-    })
+    // ─────────────────────────────────────────────
+    // CREATE PROJECT
+    // ─────────────────────────────────────────────
 
-    // Redirect directly to the project page
-    const tech = 'React + Tailwind'
+    const project =
+      await db.project.create({
+        data: {
+          userId: dbUser.id,
+          title: projectTitle,
+          prompt: rawIdea,
+        },
+      })
+
+    // ─────────────────────────────────────────────
+    // CODEWITHCHAT CANONICAL STACK
+    // ─────────────────────────────────────────────
+
+    const tech =
+      'React + Vite + TypeScript + Tailwind'
+
     const platform = 'Website'
-    const agent = 'Gemini 3.5 Flash'
-    
-    const projectUrl = new URL(`/dashboard/project/${project.id}`, req.nextUrl.origin)
-    projectUrl.searchParams.set('tech', tech)
-    projectUrl.searchParams.set('platform', platform)
-    projectUrl.searchParams.set('agent', agent)
 
-    return NextResponse.redirect(projectUrl)
+    // Keep this aligned with /api/generate-plan
+    const agent = 'Gemini 2.5 Flash'
+
+    // ─────────────────────────────────────────────
+    // REDIRECT TO PROJECT EDITOR
+    // ─────────────────────────────────────────────
+
+    const projectUrl = new URL(
+      `/dashboard/project/${project.id}`,
+      req.nextUrl.origin,
+    )
+
+    projectUrl.searchParams.set(
+      'tech',
+      tech,
+    )
+
+    projectUrl.searchParams.set(
+      'platform',
+      platform,
+    )
+
+    projectUrl.searchParams.set(
+      'agent',
+      agent,
+    )
+
+    return NextResponse.redirect(
+      projectUrl,
+    )
   } catch (error) {
-    console.error('Failed to create project:', error)
-    // Fallback to dashboard on error
-    return NextResponse.redirect(new URL('/dashboard', req.nextUrl.origin))
+    console.error(
+      '[Create Project] Error:',
+      error,
+    )
+
+    return NextResponse.redirect(
+      new URL(
+        '/dashboard',
+        req.nextUrl.origin,
+      ),
+    )
   }
 }
