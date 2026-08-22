@@ -131,6 +131,7 @@ export function Hero() {
       localStorage.setItem('pending_idea', idea)
     }
     
+    // Redirect to the client-side builder page to show a loading spinner during project creation
     const url = `/dashboard/project-builder?idea=${encodeURIComponent(idea)}`
     
     if (userId) {

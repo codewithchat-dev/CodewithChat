@@ -31,6 +31,8 @@ interface SandpackPreviewProps {
   openPreviewUrl?: string
   /** Whether the files are empty/loading */
   isLoading?: boolean
+  /** Viewport size for the preview iframe */
+  viewportSize?: ViewportSize
 }
 
 function ActiveFileOpener({ filePath }: { filePath?: string | null }) {
@@ -196,6 +198,7 @@ export function SandpackPreview({
   tech = 'React + TypeScript',
   openPreviewUrl,
   isLoading = false,
+  viewportSize = 'desktop',
 }: SandpackPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [localPreviewKey, setLocalPreviewKey] = useState(0)
@@ -213,12 +216,12 @@ export function SandpackPreview({
   }, [dependencies])
 
   const mergedDeps = useMemo(() => ({
-    'lucide-react': 'latest',
+    ...sanitizedDeps,
+    'lucide-react': '^0.400.0', // pinned to avoid React 19 useCache errors in Sandpack
     clsx: 'latest',
     'tailwind-merge': 'latest',
     'react': '^18.2.0',
     'react-dom': '^18.2.0',
-    ...sanitizedDeps,
   }), [sanitizedDeps])
 
   const sandpackFiles = useMemo(() => {
@@ -436,21 +439,28 @@ export default function App() {
           {/* PREVIEW VIEW */}
           <div
             style={{ display: view === 'preview' && !isProjectFiles ? 'flex' : 'none' }}
-            className="w-full h-full flex-col bg-[#0a0a0a]"
+            className="w-full h-full flex-col bg-[#111]"
           >
-            <PreviewToolbar openPreviewUrl={openPreviewUrl} />
-            <div className="flex-1 min-h-0 relative flex items-center justify-center">
+            <div className="flex-1 min-h-0 relative flex items-center justify-center p-2">
               <PreviewStatusOverlay
                 onError={handlePreviewError}
                 isEmpty={isLoading || Object.keys(sandpackFiles).length === 0}
                 onRefresh={() => setLocalPreviewKey((prev: number) => prev + 1)}
               />
-              <SandpackPreviewPane
-                showNavigator={false}
-                showOpenInCodeSandbox={false}
-                showRefreshButton={false}
-                style={{ height: '100%', width: '100%' }}
-              />
+              <div 
+                className={`w-full h-full transition-all duration-300 ease-in-out bg-white rounded-md overflow-hidden ${
+                  viewportSize === 'mobile' ? 'max-w-[375px] border border-zinc-800 shadow-2xl' :
+                  viewportSize === 'tablet' ? 'max-w-[768px] border border-zinc-800 shadow-2xl' :
+                  'border border-zinc-800/50'
+                }`}
+              >
+                <SandpackPreviewPane
+                  showNavigator={false}
+                  showOpenInCodeSandbox={false}
+                  showRefreshButton={false}
+                  style={{ height: '100%', width: '100%' }}
+                />
+              </div>
             </div>
           </div>
         </div>

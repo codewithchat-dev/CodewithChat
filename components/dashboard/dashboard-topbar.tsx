@@ -18,16 +18,16 @@ export function DashboardTopbar({
   toggleSidebar?: () => void 
 }) {
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border/50 bg-background/80 px-4 backdrop-blur md:px-6">
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border bg-background px-4 backdrop-blur md:px-6">
       <Sheet>
         <SheetTrigger asChild>
           <Button variant="ghost" size="icon" className="lg:hidden" aria-label="Open menu">
             <Menu className="size-5" />
           </Button>
         </SheetTrigger>
-        <SheetContent side="left" className="w-72 p-0 border-border/50">
+        <SheetContent side="left" className="w-72 p-0 border-border">
           <SheetTitle className="sr-only">Navigation</SheetTitle>
-          <div className="flex h-16 items-center border-b border-border/50 px-6">
+          <div className="flex h-16 items-center border-b border-border px-6">
             <SiteLogo />
           </div>
           <div className="p-3">

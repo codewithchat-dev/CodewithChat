@@ -300,109 +300,64 @@ export function BuildActivityFeed({
       !compact)
 
   return (
-    <div
-      className={
-        compact
-          ? 'overflow-hidden'
-          : 'rounded-xl border border-border bg-card/50 overflow-hidden'
-      }
-    >
-      <div
-        className={`flex items-center justify-between gap-2 ${
-          compact ? 'pb-2' : 'px-3 py-2 border-b border-border/60'
-        }`}
-      >
-        <div className="flex flex-col min-w-0">
-          <span className="text-xs font-semibold text-foreground">
-            {loading ? 'Agent is working…' : 'Agent activity'}
-          </span>
-          {!compact && !loading && completedLabel && (
-            <span className="text-[10px] text-muted-foreground truncate">{completedLabel}</span>
+    <div className={compact ? 'overflow-hidden' : 'h-full flex flex-col overflow-y-auto'}>
+      <div className={compact ? 'space-y-3' : 'p-4 space-y-6'}>
+        
+        {/* Top Header & Paragraph */}
+        <div className="space-y-3">
+          {(liveElapsed || workedFor) && (
+            <p className="text-xs font-medium text-muted-foreground">
+              {loading ? `Thought for ${liveElapsed}` : `Finished in ${workedFor}`}
+            </p>
           )}
-        </div>
-        {(liveElapsed || workedFor) && (
-          <span className="text-[10px] font-semibold text-primary tabular-nums shrink-0">
-            {loading ? `Working ${liveElapsed}` : `Worked ${workedFor}`}
-          </span>
-        )}
-      </div>
-
-      <div className={compact ? 'space-y-2' : 'p-3 space-y-3'}>
-        <div className="overflow-x-auto pb-0.5 -mx-1 px-1">
-          <div className="flex items-center min-w-max">
-            {activities.map((activity, index) => {
-              const isSelected = activity.id === resolvedSelectedId
-              const isLast = index === activities.length - 1
-              const circleSize = compact ? 'size-6' : 'size-7'
-              const stepWidth = compact ? 'w-[56px]' : 'w-[68px]'
-
-              return (
-                <div key={activity.id} className="flex items-center shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedId(activity.id)}
-                    className={`flex flex-col items-center justify-center group`}
-                    title={activity.label}
-                  >
-                    <div
-                      className={`flex ${circleSize} items-center justify-center rounded-full border-2 bg-card transition-colors ${
-                        activity.status === 'done'
-                          ? 'border-emerald-500/60'
-                          : activity.status === 'active'
-                            ? 'border-primary'
-                            : 'border-border'
-                      } ${isSelected ? 'ring-2 ring-primary/30' : ''}`}
-                    >
-                      <ActivityIcon icon={activity.icon} status={activity.status} />
-                    </div>
-                  </button>
-                  {!isLast && (
-                    <div
-                      className={`h-0.5 ${compact ? 'w-4 mb-4' : 'w-5 sm:w-7 mb-5'} shrink-0 rounded-full ${
-                        activity.status === 'done' ? 'bg-emerald-500/50' : 'bg-border'
-                      }`}
-                      aria-hidden
-                    />
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </div>
-
-        {showDetail && selectedActivity && (
-          <div
-            className={`rounded-lg border border-border/60 bg-muted/10 px-2.5 py-2 ${
-              compact ? 'max-h-28 overflow-y-auto' : 'min-h-[52px] px-3 py-2.5'
-            }`}
-          >
-            <p className="text-xs font-medium text-foreground leading-snug">{selectedActivity.label}</p>
-            {selectedActivity.detail && (
-              <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed line-clamp-2">
-                {selectedActivity.status === 'active' && liveElapsed
-                  ? `Thought for ${liveElapsed}`
-                  : selectedActivity.detail}
-              </p>
-            )}
-            {selectedActivity.kind === 'file-group' && (
-              <div className="mt-1.5">
-                <FileGroupDetail activity={selectedActivity} onOpenFile={onOpenFile} />
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {!loading && workedFor && !compact && (
-        <div className="px-3 py-2.5 border-t border-emerald-500/20 bg-emerald-500/5 flex flex-col gap-0.5">
-          <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
-            Worked for {workedFor} — steps, preview UI & project files
+          <p className="text-sm text-foreground leading-relaxed">
+            {plan?.overview || (loading ? "Thinking about how to build this..." : idea || "Understanding your request...")}
           </p>
-          {completedLabel && (
-            <p className="text-[10px] text-muted-foreground">{completedLabel}</p>
-          )}
         </div>
-      )}
+
+        {/* Activity Blocks */}
+        <div className="space-y-2">
+          {activities
+            .filter(a => a.id !== 'analyze' && a.id !== 'overview' && a.id !== 'finished' && a.id !== 'overview-active')
+            .map((activity) => (
+            <div 
+              key={activity.id} 
+              className={`rounded-xl border border-border/40 p-3 flex flex-col gap-2 ${
+                activity.status === 'active' ? 'bg-primary/5 border-primary/20' : 'bg-muted/20'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <ActivityIcon icon={activity.icon} status={activity.status} />
+                <span className="text-xs font-medium text-foreground">{activity.label}</span>
+              </div>
+              
+              {activity.kind === 'file-group' && activity.files && activity.files.length > 0 && (
+                <div className="mt-1 flex flex-col gap-1.5 pl-7">
+                  {activity.files.map(path => (
+                    <button
+                      key={path}
+                      type="button"
+                      onClick={() => onOpenFile?.(path, activity.fileSource ?? 'preview')}
+                      className="text-left text-xs font-mono text-muted-foreground hover:text-primary transition-colors truncate"
+                    >
+                      {path}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {activity.detail && activity.kind !== 'file-group' && (
+                <p className="text-[11px] text-muted-foreground pl-7">
+                  {activity.status === 'active' && liveElapsed && !activity.detail.includes('Thinking')
+                    ? `Working...`
+                    : activity.detail}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+        
+      </div>
     </div>
   )
 }

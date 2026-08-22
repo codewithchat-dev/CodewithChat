@@ -164,7 +164,7 @@ useEffect(() => {
       </div>
 
       <div className="flex-1 mx-4 bg-background rounded-md text-[10px] text-muted-foreground px-3 py-1.5 font-mono border border-border/50 text-center">
-        myapp.codewithchat.com
+        myapp.codewithchat.dev
       </div>
 
       <div className="w-5" />

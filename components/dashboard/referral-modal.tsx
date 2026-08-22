@@ -24,7 +24,7 @@ export function ReferralModal({ open, onOpenChange }: ReferralModalProps) {
   const [copied, setCopied] = useState(false)
 
   // Generate a dummy referral link using their Clerk User ID
-  const referralLink = `https://codewithchat.com?ref=${user?.id?.substring(5, 15) || 'invite'}`
+  const referralLink = `https://codewithchat.dev?ref=${user?.id?.substring(5, 15) || 'invite'}`
 
   const handleCopy = () => {
     navigator.clipboard.writeText(referralLink)

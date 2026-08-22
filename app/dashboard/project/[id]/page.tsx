@@ -8,7 +8,7 @@ import {
   Eye, Code2, BookOpen, ExternalLink,
   RotateCw, Download, MoreHorizontal, Github, Settings,
   Pin, PinOff, Pencil, Check, X, Share2, Rocket,
-  FileCode2,
+  FileCode2, Monitor, Smartphone, Tablet,
   Zap, Lock, Slash, PanelLeftClose, PanelLeftOpen, Gift,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -40,7 +40,7 @@ import { getProjectByIdAction, updateProjectAction, togglePinProjectAction, rena
 
 import { buildInstantPreviewFiles, hasPreviewEntry } from '@/lib/preview-files'
 import { isTrivialMessage, shouldRegenerateCode } from '@/lib/chat-intent'
-import type { SandpackView } from '@/components/ide/SandpackPreview'
+import type { SandpackView, ViewportSize } from '@/components/ide/SandpackPreview'
 
 type CodeSource = 'preview' | 'fullstack'
 
@@ -107,6 +107,7 @@ export default function ProjectPage() {
   const [view, setView] = useState<SandpackView>('preview')
   const [previewKey, setPreviewKey] = useState(0)
   const [rightPanel, setRightPanel] = useState<'preview' | 'guide'>('preview')
+  const [viewportSize, setViewportSize] = useState<ViewportSize>('desktop')
 
   // Plan
   const [mergedDependencies, setMergedDependencies] = useState<Record<string, string>>({})
@@ -543,7 +544,7 @@ export default function ProjectPage() {
           <div className="flex items-center gap-3 min-w-0">
             {/* Logo to go back */}
             <Link href="/dashboard" className="mr-2 hover:opacity-80 transition-opacity">
-              <span className="font-bold italic text-xl tracking-tight">CWC</span>
+              <span className="font-bold italic text-xl tracking-tight">CwC</span>
             </Link>
             <div className="w-px h-5 bg-border/50 shrink-0 mr-1" />
 
@@ -642,14 +643,7 @@ export default function ProjectPage() {
             {/* Chat messages — scrollable */}
             <div className="flex-1 min-h-0 overflow-y-auto p-4">
               <div className="flex flex-col gap-4">
-                {/* Initial state exactly like bolt */}
-                <div className="flex flex-col gap-1.5 px-1 pb-2">
-                  <span className="font-bold italic text-xl tracking-tight mb-2 opacity-90">CWC</span>
-                  <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
-                    <Rocket className="size-4" />
-                    <span>{idea ? 'Reviewing the details...' : 'Loading project...'}</span>
-                  </div>
-                </div>
+                {/* Initial state removed as per request */}
                 
                 {messages.map((msg, i) => (
                   <div
@@ -660,11 +654,7 @@ export default function ProjectPage() {
                         : 'text-foreground/90 py-1 self-start w-full'
                     }`}
                   >
-                    {msg.role !== 'user' && (
-                      <div className="flex items-center gap-2 mb-2 font-medium text-foreground opacity-80 text-[12px]">
-                        <Rocket className="size-3.5" /> Assistant
-                      </div>
-                    )}
+                    {/* Removed Assistant header */}
                     {msg.content}
                   </div>
                 ))}
@@ -672,18 +662,7 @@ export default function ProjectPage() {
                 {/* Agent activity as inline message */}
                 {(loading || activePlan?.overview || activePlan?.steps?.length) && (
                   <div className="text-foreground/90 py-1 self-start w-full">
-                    <div className="flex items-center gap-2 mb-2 font-medium text-foreground opacity-80 text-[12px]">
-                      <Rocket className="size-3.5" /> Assistant
-                      {loading && (
-                        <span className="flex items-center gap-1 text-muted-foreground">
-                          <span className="relative flex h-2 w-2">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-                          </span>
-                          typing...
-                        </span>
-                      )}
-                    </div>
+                    {/* Removed Assistant header */}
                     <BuildActivityFeed
                       plan={activePlan ?? undefined}
                       loading={loading}
@@ -706,21 +685,13 @@ export default function ProjectPage() {
                 onChange={setChatInput}
                 onSubmit={handleSendChat}
                 loading={loading || chatLoading}
-                credits={credits}
-                maxCredits={MAX_DAILY_CREDITS}
-                agent={agent}
-                tech={tech}
-                platform={platform}
                 compact
-                showCreditsBar
-                requiresCredit
-                allowInputWhenExhausted
                 submitHint={
                   shouldRegenerateCode(chatInput) && chatInput.trim()
                     ? 'Send code update'
                     : 'Ask AI'
                 }
-                placeholder='Ask a question or request a change… e.g. "How do I integrate a backend?" or "Add Supabase login"'
+                placeholder='Ask a question with CodewithChat'
               />
             </div>
           </div>
@@ -814,74 +785,125 @@ export default function ProjectPage() {
 
                   <div className="w-px h-5 bg-border shrink-0 ml-1" />
 
-                  {/* Preview / Code tabs */}
-                  <button
-                    type="button"
-                    onClick={() => { setView('preview'); setRightPanel('preview') }}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                      view === 'preview' && rightPanel === 'preview'
-                        ? 'bg-primary/10 text-primary'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-                    }`}
-                  >
-                    <Eye className="size-3.5" />
-                    Preview
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setView('code'); setRightPanel('preview') }}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                      view === 'code' && rightPanel === 'preview'
-                        ? 'bg-primary/10 text-primary'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-                    }`}
-                  >
-                    <Code2 className="size-3.5" />
-                    Code
-                  </button>
+                  {/* Preview / Code tabs (Left) */}
+                  <div className="flex bg-muted/40 p-0.5 rounded-lg border border-border/60">
+                    <button
+                      type="button"
+                      onClick={() => { setView('preview'); setRightPanel('preview') }}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                        view === 'preview' && rightPanel === 'preview'
+                          ? 'bg-card text-foreground shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      <Eye className="size-3.5" />
+                      Preview
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setView('code'); setRightPanel('preview') }}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                        view === 'code' && rightPanel === 'preview'
+                          ? 'bg-card text-foreground shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      <Code2 className="size-3.5" />
+                      Code
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRightPanel('guide')}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                        rightPanel === 'guide'
+                          ? 'bg-card text-foreground shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      <BookOpen className="size-3.5" />
+                      Guide
+                    </button>
+                  </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setRightPanel('guide')}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                      rightPanel === 'guide'
-                        ? 'bg-primary/10 text-primary'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-                    }`}
-                  >
-                    <BookOpen className="size-3.5" />
-                    Guide
-                  </button>
+                  <div className="flex-1 flex justify-center">
+                    {/* URL Bar (Center) */}
+                    {rightPanel === 'preview' && view === 'preview' && (
+                      <div className="flex items-center gap-2 bg-muted/30 border border-border/60 rounded-full px-3 py-1.5 min-w-[300px] max-w-[400px]">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              onClick={() => setPreviewKey(k => k + 1)}
+                              className="text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                              <RotateCw className="size-3.5" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="text-xs">Refresh preview</TooltipContent>
+                        </Tooltip>
+                        <div className="flex-1 text-xs text-center text-muted-foreground font-mono truncate">
+                          codewithchat.dev/preview/{projectId.slice(0,8)}...
+                        </div>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <a
+                              href={`/preview/${projectId}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                              <ExternalLink className="size-3.5" />
+                            </a>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="text-xs">Open in new tab</TooltipContent>
+                        </Tooltip>
+                      </div>
+                    )}
+                  </div>
 
-                  <div className="w-px h-5 bg-border shrink-0 mx-1" />
-
-                  <div className="flex-1" />
-
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <a
-                        href={`/preview/${projectId}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors inline-flex"
-                      >
-                        <ExternalLink className="size-3.5" />
-                      </a>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="text-xs">Open preview in new tab</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        type="button"
-                        onClick={() => setPreviewKey(k => k + 1)}
-                        className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-                      >
-                        <RotateCw className="size-3.5" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="text-xs">Refresh preview</TooltipContent>
-                  </Tooltip>
+                  {/* Viewport Toggles (Right) */}
+                  <div className="flex items-center gap-1">
+                    {rightPanel === 'preview' && view === 'preview' && (
+                      <>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              onClick={() => setViewportSize('desktop')}
+                              className={`p-1.5 rounded-md transition-colors ${viewportSize === 'desktop' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}`}
+                            >
+                              <Monitor className="size-4" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="text-xs">Desktop</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              onClick={() => setViewportSize('tablet')}
+                              className={`p-1.5 rounded-md transition-colors ${viewportSize === 'tablet' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}`}
+                            >
+                              <Tablet className="size-4" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="text-xs">Tablet</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              onClick={() => setViewportSize('mobile')}
+                              className={`p-1.5 rounded-md transition-colors ${viewportSize === 'mobile' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}`}
+                            >
+                              <Smartphone className="size-4" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="text-xs">Mobile</TooltipContent>
+                        </Tooltip>
+                      </>
+                    )}
+                  </div>
                 </div>
 
                 {/* ─── Content ─── */}
@@ -903,8 +925,8 @@ export default function ProjectPage() {
                       onCloseTerminal={() => {}}
                       previewKey={previewKey}
                       tech={tech}
-                      openPreviewUrl={`/preview/${projectId}`}
                       isLoading={loading}
+                      viewportSize={viewportSize}
                     />
                   ) : loading ? (
                     <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground bg-[#151515]">

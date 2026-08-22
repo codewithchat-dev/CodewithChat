@@ -56,9 +56,13 @@ export default function RootLayout({
           <ClerkProvider 
             appearance={{ 
               theme: shadcn,
+              variables: {
+                colorModalBackdrop: 'rgba(0, 0, 0, 0.6)',
+              },
               elements: {
                 rootBox: "mx-auto",
-                card: "shadow-xl"
+                card: "shadow-xl",
+                modalBackdrop: "clerk-modal-backdrop-blur",
               }
             }}
           >

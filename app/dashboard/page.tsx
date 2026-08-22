@@ -116,20 +116,12 @@ export default function DashboardPage() {
         
         <div className="w-full mb-16">
           <PromptComposer
-            value={idea}
-            onChange={setIdea}
-            onSubmit={handleSubmit}
-            credits={credits}
-            maxCredits={MAX_DAILY_CREDITS}
-            agent={agent}
-            tech={tech}
-            platform={platform}
-            onAgentChange={setAgent}
-            onTechChange={setTech}
-            onPlatformChange={setPlatform}
-            placeholder={placeholder}
-            submitHint="Start building"
-          />
+          value={idea}
+          onChange={setIdea}
+          onSubmit={handleSubmit}
+          placeholder={placeholder}
+          submitHint="Start building"
+        />
         </div>
 
         {/* Recent Projects Dock */}

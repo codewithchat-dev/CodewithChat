@@ -260,7 +260,7 @@ export default function PrivacyPage() {
                   </p>
                   <p className="flex items-center gap-2 text-foreground font-semibold">
                     <Mail className="size-4 text-primary" />
-                    <span>privacy@codewithchat.com</span>
+                    <span>hello@codewithchat.dev</span>
                   </p>
                   <p className="text-sm text-muted-foreground/80 mt-6">
                     Last modified: July 22, 2026

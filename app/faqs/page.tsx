@@ -81,7 +81,7 @@ const faqCategories = [
       },
       {
         question: "How does the refund policy work?",
-        answer: "We offer a 14-day money-back guarantee for all premium subscriptions. If you find the service doesn't fit your workflow, email support@codewithchat.com and we will issue a full refund, no questions asked."
+        answer: "We offer a 14-day money-back guarantee for all premium subscriptions. If you find the service doesn't fit your workflow, email hello@codewithchat.dev and we will issue a full refund, no questions asked."
       },
       {
         question: "How do I cancel my subscription?",
@@ -166,7 +166,7 @@ export default function FAQsPage() {
               Our engineering support team is always available to help you configure setups, manage subscriptions, or answer privacy concerns.
             </p>
             <a 
-              href="mailto:support@codewithchat.com" 
+              href="mailto:hello@codewithchat.dev" 
               className="mt-5 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground px-6 py-2.5 text-sm font-semibold hover:opacity-90 shadow-md transition-all"
             >
               Contact Support

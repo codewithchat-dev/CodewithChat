@@ -19,7 +19,7 @@ export function AuthRedirectHandler() {
       // Clear the stored idea
       localStorage.removeItem('pending_idea')
       
-      // Redirect to project builder with the idea
+      // Redirect to project builder to show loading UI
       const url = `/dashboard/project-builder?idea=${encodeURIComponent(pendingIdea)}`
       router.push(url)
     }

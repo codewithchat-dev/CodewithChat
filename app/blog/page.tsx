@@ -247,7 +247,7 @@ export default function BlogPage() {
                     <ArrowUpRight className="absolute right-5 top-5 size-4 text-muted-foreground transition-all duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-primary" />
 
                     <div className="absolute bottom-5 left-5 text-xs font-semibold tracking-wider text-foreground/70">
-                      CWC
+                      CwC
                     </div>
                   </div>
 

@@ -378,4 +378,20 @@
   animation: gradient-mesh 15s ease infinite;
 }
 
+/* ── Clerk Modal Backdrop Blur ─────────────────────────────── */
+/* Blur the page background when login/signup modal is open */
+.clerk-modal-backdrop-blur {
+  backdrop-filter: blur(8px) saturate(120%) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(120%) !important;
+}
+
+/* Also target Clerk's internal backdrop class for broader coverage */
+.cl-modalBackdrop,
+[data-clerk-overlay],
+div[class*="cl-modal"] {
+  backdrop-filter: blur(8px) saturate(120%) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(120%) !important;
+  background: rgba(0, 0, 0, 0.5) !important;
+}
+
 @import '@clerk/ui/themes/shadcn.css';

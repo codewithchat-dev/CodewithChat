@@ -5,7 +5,7 @@ import {
   Rocket, Globe, Search, Gauge, ShieldCheck, Database,
   Package, GitBranch, Key, Lock, Zap,
   CheckCircle2, ExternalLink, BookOpen, Layers, Cpu,
-  FileText, Copy, ChevronRight, Star
+  FileText, Copy, ChevronRight, Star, ListChecks
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { PublishProjectModal } from '@/components/dashboard/publish-project-modal'
@@ -229,7 +229,7 @@ git push -u origin main`
   }
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto p-6 bg-background/50">
+    <div className="absolute inset-0 overflow-y-auto p-6 bg-background/50">
       <div className="max-w-3xl mx-auto space-y-6 pb-12">
 
         {/* Header */}
@@ -346,6 +346,36 @@ git push -u origin main`
             </a>
           </div>
         </Section>
+
+        {/* Generated AI Steps */}
+        {plan.steps && plan.steps.length > 0 && (
+          <Section icon={ListChecks} title="Implementation Steps" color="bg-indigo-500/5 text-indigo-400">
+            <p className="text-xs mb-4">The following steps outline how this project was built and the core logic behind it:</p>
+            <div className="space-y-6">
+              {plan.steps.map((step, i) => {
+                if (!step) return null
+                return (
+                  <div key={i} className="flex gap-4">
+                    <div className="flex-shrink-0 size-6 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-xs mt-0.5">{i + 1}</div>
+                    <div className="space-y-2 flex-1 min-w-0">
+                      <h4 className="font-semibold text-foreground text-sm">{step.title}</h4>
+                      {step.description && <p className="text-xs text-muted-foreground leading-relaxed">{step.description}</p>}
+                      {step.codeSnippet && (
+                        <div className="mt-2">
+                          {step.fileTarget && <div className="text-[10px] text-muted-foreground mb-1">{step.fileTarget}</div>}
+                          <CodeBlock 
+                            code={step.codeSnippet} 
+                            language={step.isCommand ? 'terminal' : (step.fileTarget?.split('.').pop() || 'tsx')} 
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </Section>
+        )}
 
         {/* Project-Specific Steps */}
         <Section icon={Cpu} title={`${projectTypeConfig.title} — Important Next Steps`} color="bg-rose-500/5 text-rose-400">
