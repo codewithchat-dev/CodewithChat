@@ -35,6 +35,11 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Gift,
+  Home,
+  LayoutDashboard,
+  ChevronDown,
+  Coins,
+  LogOut,
 } from 'lucide-react'
 
 import { toast } from 'sonner'
@@ -1228,14 +1233,100 @@ const [viewportSize, setViewportSize] =
           {/* LEFT */}
 
           <div className="flex min-w-0 items-center gap-3">
-            <Link
-              href="/dashboard"
-              className="mr-2 transition-opacity hover:opacity-80"
-            >
-              <span className="text-xl font-bold italic tracking-tight">
-                CwC
-              </span>
-            </Link>
+            {/* CwC LOGO DROPDOWN */}
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="mr-1 flex items-center gap-1.5 rounded-md px-2 py-1 transition-colors hover:bg-muted focus:outline-none"
+                >
+                  <span className="text-xl font-bold italic tracking-tight">
+                    CwC
+                  </span>
+                  <ChevronDown className="size-3 text-muted-foreground" />
+                </button>
+              </DropdownMenuTrigger>
+
+              <DropdownMenuContent
+                align="start"
+                className="w-56"
+              >
+                {/* HOME */}
+                <DropdownMenuItem asChild>
+                  <Link
+                    href="/dashboard"
+                    className="flex items-center gap-2"
+                  >
+                    <Home className="size-3.5" />
+                    <span>Home</span>
+                  </Link>
+                </DropdownMenuItem>
+
+                {/* <DropdownMenuItem asChild>
+                  <Link
+                    href="/dashboard"
+                    className="flex items-center gap-2"
+                  >
+                    <LayoutDashboard className="size-3.5" />
+                    <span>Dashboard</span>
+                  </Link>
+                </DropdownMenuItem> */}
+
+                <DropdownMenuSeparator />
+
+                {/* CREDITS INDICATOR */}
+                <div className="px-2 py-2">
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Coins className="size-3" />
+                      <span>Daily Credits</span>
+                    </div>
+                    <span
+                      className={`text-xs font-semibold ${
+                        credits <= 0
+                          ? 'text-destructive'
+                          : credits <= 2
+                            ? 'text-orange-500'
+                            : 'text-green-500'
+                      }`}
+                    >
+                      {credits}/{MAX_DAILY_CREDITS}
+                    </span>
+                  </div>
+
+                  {/* PROGRESS BAR */}
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        credits <= 0
+                          ? 'bg-destructive'
+                          : credits <= 2
+                            ? 'bg-orange-500'
+                            : 'bg-green-500'
+                      }`}
+                      style={{
+                        width: `${(credits / MAX_DAILY_CREDITS) * 100}%`,
+                      }}
+                    />
+                  </div>
+
+                  {credits <= 0 && (
+                    <p className="mt-1.5 text-[11px] text-destructive">
+                      Credits used up. Upgrade to continue.
+                    </p>
+                  )}
+                </div>
+
+                <DropdownMenuSeparator />
+
+                {/* UPGRADE */}
+                <DropdownMenuItem >
+                  <Gift className="mr-2 size-3.5" />
+                  Upgrade Plan
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             <div className="mr-1 h-5 w-px shrink-0 bg-border/50" />
 
