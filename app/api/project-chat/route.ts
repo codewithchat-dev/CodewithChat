@@ -183,20 +183,10 @@ Icons:
 Routing:
 - react-router-dom when required
 
-Backend:
-- Supabase when backend functionality is required
+Backend (ONLY when user explicitly asks):
+- Supabase for database, auth, storage, realtime
 
-Database:
-- Supabase PostgreSQL
-
-Authentication:
-- Supabase Auth
-
-Storage:
-- Supabase Storage
-
-Realtime:
-- Supabase Realtime
+Do NOT mention or add Supabase for frontend-only projects like clones, landing pages, or UI mockups.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 YOUR ROLE

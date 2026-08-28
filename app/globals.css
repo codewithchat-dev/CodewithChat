@@ -4,96 +4,102 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* CodeWithChat Design System - Light Mode */
-  --background: oklch(0.98 0.005 240);
-  --foreground: oklch(0.12 0.02 240);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.12 0.02 240);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.12 0.02 240);
-  --primary: oklch(0.55 0.18 220);
-  --primary-foreground: oklch(0.98 0 0);
-  --secondary: oklch(0.94 0.01 240);
-  --secondary-foreground: oklch(0.12 0.02 240);
-  --muted: oklch(0.94 0.01 240);
-  --muted-foreground: oklch(0.40 0.02 240);
-  --accent: oklch(0.55 0.18 220);
-  --accent-foreground: oklch(0.98 0 0);
-  --destructive: oklch(0.55 0.25 25);
-  --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.88 0.01 240);
-  --input: oklch(0.88 0.01 240);
-  --ring: oklch(0.55 0.18 220);
-  --chart-1: oklch(0.65 0.22 220);
+  /* Google One / Material Design 3 - Light Mode */
+  --background: oklch(0.99 0 0); /* #FFFFFF */
+  --foreground: oklch(0.2 0 0); /* #1F1F1F */
+  --card: oklch(0.96 0.01 250); /* #F0F4F9 */
+  --card-foreground: oklch(0.2 0 0);
+  --popover: oklch(0.99 0 0);
+  --popover-foreground: oklch(0.2 0 0);
+  --primary: oklch(0.45 0.15 250); /* #0B57D0 */
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.9 0.02 250); /* #D3E3FD */
+  --secondary-foreground: oklch(0.25 0.1 250);
+  --muted: oklch(0.95 0 0); /* #F2F2F2 */
+  --muted-foreground: oklch(0.45 0 0); /* #444746 */
+  --accent: oklch(0.9 0.02 250);
+  --accent-foreground: oklch(0.25 0.1 250);
+  --destructive: oklch(0.5 0.15 25); /* #B3261E */
+  --destructive-foreground: oklch(0.99 0 0);
+  --border: oklch(0.85 0 0); /* #C4C7C5 */
+  --input: oklch(0.85 0 0);
+  --ring: oklch(0.45 0.15 250);
+  --chart-1: oklch(0.45 0.15 250);
   --chart-2: oklch(0.60 0.18 180);
   --chart-3: oklch(0.55 0.14 240);
   --chart-4: oklch(0.70 0.16 290);
   --chart-5: oklch(0.60 0.20 160);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.97 0.01 240);
-  --sidebar-foreground: oklch(0.12 0.02 240);
-  --sidebar-primary: oklch(0.12 0.02 240);
-  --sidebar-primary-foreground: oklch(0.98 0 0);
-  --sidebar-accent: oklch(0.94 0.01 240);
-  --sidebar-accent-foreground: oklch(0.12 0.02 240);
-  --sidebar-border: oklch(0.88 0.01 240);
-  --sidebar-ring: oklch(0.55 0.18 220);
+  --radius: 1.5rem; /* More rounded for MD3 */
+  
+  --sidebar: oklch(0.96 0.01 250);
+  --sidebar-foreground: oklch(0.2 0 0);
+  --sidebar-primary: oklch(0.45 0.15 250);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.9 0.02 250);
+  --sidebar-accent-foreground: oklch(0.25 0.1 250);
+  --sidebar-border: oklch(0.85 0 0);
+  --sidebar-ring: oklch(0.45 0.15 250);
   
   /* CodeWithChat Extended Design Tokens */
-  --surface-elevated: oklch(0.95 0.005 240);
-  --surface-hover: oklch(0.92 0.01 240);
-  --border-hover: oklch(0.75 0.02 240);
-  --text-secondary: oklch(0.35 0.02 240);
-  --text-muted: oklch(0.50 0.015 240);
-  --brand-hover: oklch(0.50 0.20 220);
-  --brand-glow: oklch(0.60 0.15 220);
-  --secondary-accent: oklch(0.55 0.18 280);
+  --surface-elevated: oklch(0.98 0 0);
+  --surface-hover: oklch(0.94 0.01 250);
+  --border-hover: oklch(0.75 0 0);
+  --text-secondary: oklch(0.35 0 0);
+  --text-muted: oklch(0.45 0 0);
+  --brand-hover: oklch(0.40 0.15 250);
+  --brand-glow: oklch(0.50 0.15 250);
+  --secondary-accent: oklch(0.8 0.05 280);
 }
 
 .dark {
-  /* CodeWithChat Design System - Dark Mode (Primary) */
-  --background: oklch(0.11 0.01 240);
-  --foreground: oklch(0.98 0.005 240);
-  --card: oklch(0.14 0.01 240);
-  --card-foreground: oklch(0.98 0.005 240);
-  --popover: oklch(0.14 0.01 240);
-  --popover-foreground: oklch(0.98 0.005 240);
-  --primary: oklch(0.62 0.19 220);
-  --primary-foreground: oklch(0.98 0 0);
-  --secondary: oklch(0.20 0.01 240);
-  --secondary-foreground: oklch(0.98 0.005 240);
-  --muted: oklch(0.20 0.01 240);
-  --muted-foreground: oklch(0.75 0.01 240);
-  --accent: oklch(0.62 0.19 220);
-  --accent-foreground: oklch(0.98 0 0);
-  --destructive: oklch(0.55 0.25 25);
-  --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.24 0.01 240);
-  --input: oklch(0.24 0.01 240);
-  --ring: oklch(0.62 0.19 220);
-  --chart-1: oklch(0.62 0.19 220);
+  /* Google One / Material Design 3 - Dark Mode */
+  --background: oklch(0.18 0.005 265); /* #131314 */
+  --foreground: oklch(0.99 0 0); /* Pure Bright White */
+  --card: oklch(0.22 0.01 265); /* #1E1F20 */
+  --card-foreground: oklch(0.99 0 0);
+  --popover: oklch(0.22 0.01 265);
+  --popover-foreground: oklch(0.99 0 0);
+  
+  /* UPDATED: Vibrant Google Blue for Dark Mode instead of Sky Blue */
+  --primary: oklch(0.60 0.18 255); 
+  --primary-foreground: oklch(0.99 0 0); /* White text for vibrant blue */
+  
+  --secondary: oklch(0.28 0.04 255); /* #334155 */
+  --secondary-foreground: oklch(0.88 0.06 250); /* #C2E7FF */
+  --muted: oklch(0.26 0 0); /* #444746 */
+  --muted-foreground: oklch(0.8 0 0); /* #C4C7C5 */
+  --accent: oklch(0.28 0.04 255);
+  --accent-foreground: oklch(0.88 0.06 250);
+  --destructive: oklch(0.75 0.15 25); /* #F2B8B5 */
+  --destructive-foreground: oklch(0.3 0.15 25); /* #601410 */
+  --border: oklch(0.35 0 0); /* #444746 */
+  --input: oklch(0.35 0 0);
+  
+  --ring: oklch(0.60 0.18 255);
+  --chart-1: oklch(0.60 0.18 255);
   --chart-2: oklch(0.58 0.16 180);
   --chart-3: oklch(0.54 0.12 240);
   --chart-4: oklch(0.68 0.14 290);
   --chart-5: oklch(0.58 0.18 160);
-  --sidebar: oklch(0.14 0.01 240);
-  --sidebar-foreground: oklch(0.98 0.005 240);
-  --sidebar-primary: oklch(0.62 0.19 220);
-  --sidebar-primary-foreground: oklch(0.98 0 0);
-  --sidebar-accent: oklch(0.20 0.01 240);
-  --sidebar-accent-foreground: oklch(0.98 0.005 240);
-  --sidebar-border: oklch(0.24 0.01 240);
-  --sidebar-ring: oklch(0.62 0.19 220);
+  
+  --sidebar: oklch(0.22 0.01 265);
+  --sidebar-foreground: oklch(0.99 0 0);
+  --sidebar-primary: oklch(0.60 0.18 255);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.28 0.04 255);
+  --sidebar-accent-foreground: oklch(0.88 0.06 250);
+  --sidebar-border: oklch(0.35 0 0);
+  --sidebar-ring: oklch(0.60 0.18 255);
   
   /* CodeWithChat Extended Design Tokens - Dark Mode */
-  --surface-elevated: oklch(0.17 0.01 240);
-  --surface-hover: oklch(0.22 0.01 240);
-  --border-hover: oklch(0.35 0.015 240);
-  --text-secondary: oklch(0.85 0.01 240);
-  --text-muted: oklch(0.70 0.01 240);
-  --brand-hover: oklch(0.68 0.20 220);
-  --brand-glow: oklch(0.58 0.16 220);
-  --secondary-accent: oklch(0.62 0.18 280);
+  --surface-elevated: oklch(0.25 0.01 265);
+  --surface-hover: oklch(0.28 0.01 265);
+  --border-hover: oklch(0.45 0 0);
+  --text-secondary: oklch(0.90 0 0); /* Brightened secondary text */
+  --text-muted: oklch(0.75 0 0); /* Brightened muted text */
+  --brand-hover: oklch(0.65 0.20 255);
+  --brand-glow: oklch(0.55 0.20 255);
+  --secondary-accent: oklch(0.75 0.08 280);
 }
 
 @theme inline {

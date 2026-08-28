@@ -10,6 +10,11 @@ import {
   defaultDark,
 } from '@codesandbox/sandpack-react'
 
+import {
+  getProjectRuntimeDependencies,
+  buildPreviewIndexHtml,
+} from '@/lib/preview-files'
+
 type PreviewClientProps = {
   files: Record<
     string,
@@ -21,29 +26,6 @@ type PreviewClientProps = {
     string
   >
 }
-
-const BLOCKED_DEPENDENCIES =
-  new Set([
-    'next',
-
-    'vite',
-
-    '@vitejs/plugin-react',
-
-    '@vercel/ai',
-
-    '@supabase/ssr',
-
-    '@supabase/auth-helpers-nextjs',
-
-    'typescript',
-
-    'tailwindcss',
-
-    'postcss',
-
-    'autoprefixer',
-  ])
 
 export function PreviewClient({
   files,
@@ -57,41 +39,41 @@ export function PreviewClient({
     useMemo<
       Record<string, string>
     >(() => {
-      const safe =
-        Object.fromEntries(
-          Object.entries(
-            dependencies,
-          ).filter(
-            ([name]) =>
-              !BLOCKED_DEPENDENCIES.has(
-                name,
-              ),
-          ),
+      const previewFileInputs =
+        Object.entries(files).map(
+          ([path, content]) => ({
+            path,
+            content,
+          }),
+        )
+
+      const merged =
+        getProjectRuntimeDependencies(
+          previewFileInputs,
+          dependencies,
         )
 
       return {
-        ...safe,
+        ...merged,
 
-        react: '^18.2.0',
+        react: '18.2.0',
 
-        'react-dom':
-          '^18.2.0',
+        'react-dom': '18.2.0',
 
-        'lucide-react':
-          safe[
-            'lucide-react'
-          ] ?? '^0.468.0',
-
-        clsx:
-          safe.clsx ??
-          '^2.1.1',
-
-        'tailwind-merge':
-          safe[
-            'tailwind-merge'
-          ] ?? '^2.5.4',
+        ...(merged['react-router-dom'] ||
+        Object.values(files).some(
+          content =>
+            typeof content === 'string' &&
+            content.includes('react-router-dom'),
+        )
+          ? {
+              'react-router-dom':
+                merged['react-router-dom'] ??
+                '^6.28.0',
+            }
+          : {}),
       }
-    }, [dependencies])
+    }, [files, dependencies])
 
   // ─────────────────────────────────────────────
   // SANDPACK FILE FORMAT
@@ -99,7 +81,7 @@ export function PreviewClient({
 
   const sandpackFiles =
     useMemo(() => {
-      return Object.fromEntries(
+      const result = Object.fromEntries(
         Object.entries(
           files,
         ).map(
@@ -117,6 +99,37 @@ export function PreviewClient({
           ],
         ),
       )
+
+      // Sandpack's vite-react-ts template ships its own config.
+      // Generated project config files override it and break dependency injection.
+      delete result['/package.json']
+      delete result['/package-lock.json']
+      delete result['/tsconfig.json']
+      delete result['/vite.config.ts']
+      delete result['/vite.config.js']
+      delete result['/tailwind.config.js']
+      delete result['/tailwind.config.ts']
+      delete result['/postcss.config.js']
+
+      if (!result['/index.html']) {
+        const entry =
+          result['/index.tsx']
+            ? '/index.tsx'
+            : result['/index.jsx']
+              ? '/index.jsx'
+              : null
+
+        if (entry) {
+          result['/index.html'] = {
+            code:
+              buildPreviewIndexHtml(
+                entry,
+              ),
+          }
+        }
+      }
+
+      return result
     }, [files])
 
   return (
@@ -129,6 +142,8 @@ export function PreviewClient({
             runtimeDependencies,
         }}
         options={{
+          bundlerTimeOut: 180000,
+          experimental_enableStableServiceWorkerId: true,
           externalResources: [
             'https://cdn.tailwindcss.com',
           ],

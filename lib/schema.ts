@@ -111,7 +111,11 @@ Every project should include the required files such as:
 
 And all required components, pages, hooks, utilities, services, types, and data files.
 
-If backend/database/auth/storage is required, also generate the appropriate Supabase files such as:
+DEFAULT: frontend-only with mock data in /src/data/. Every project must look premium — custom brand theme in tailwind.config.js, framer-motion animations, Unsplash images on every visual (no blanks), SafeImage fallback component, full structure (navbar, sections/pages, footer). Works smoothly with local React state.
+
+Do NOT add Supabase, auth, or login unless the user explicitly asks for backend/database/auth.
+
+If the user explicitly requests backend/database/auth/storage, then generate Supabase files such as:
 
 /.env.example
 /src/lib/supabase.ts

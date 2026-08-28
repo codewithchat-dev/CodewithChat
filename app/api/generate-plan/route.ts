@@ -202,7 +202,7 @@ Routing:
 - react-router-dom when multiple routes/pages are required
 
 Backend / Database:
-- Supabase when backend functionality is required
+- Supabase ONLY when the user explicitly asks for backend, database, auth, login, signup, or persistent data storage
 
 Package manager compatibility:
 - npm / pnpm compatible package.json
@@ -370,31 +370,102 @@ Do NOT include build tools in this top-level dependencies object:
 Those belong inside package.json only.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+UNIVERSAL RULE — EVERY PROMPT, EVERY WEBSITE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+No matter how short the user prompt is ("netflix clone", "gym website",
+"restaurant", "portfolio", "saas landing") — ALWAYS deliver a complete,
+professional, stunning frontend that looks like a real shipped product.
+
+This is NON-NEGOTIABLE for every generation:
+
+STRUCTURE:
+- Full multi-section or multi-page layout — never a single empty page
+- Navbar + main content + footer (or sidebar layout for app-style products)
+- react-router-dom with working routes when there are multiple pages
+- /src/data/ files with rich mock data — never empty arrays
+
+THEME:
+- Custom brand palette in tailwind.config.js (never default gray-only Tailwind)
+- Cohesive colors, fonts, and spacing across every component
+- Match the industry: dark cinematic for Netflix/streaming, bold energetic for gym, clean minimal for SaaS, warm inviting for restaurant
+
+ANIMATIONS (required — include framer-motion in dependencies):
+- Page/content fade-in on load (stagger children)
+- Card hover: scale(1.03) + shadow lift
+- Smooth route transitions
+- Button/link micro-interactions
+- Navbar scroll effects where appropriate
+
+IMAGES (zero blanks — CRITICAL):
+- EVERY image slot MUST have a working HTTPS URL — hero, cards, avatars, thumbnails, backgrounds
+- Use Unsplash: https://images.unsplash.com/photo-...
+- Fallback: https://picsum.photos/seed/{unique-id}/800/600
+- Create /src/components/common/SafeImage.tsx with onError fallback gradient
+- NEVER show empty gray boxes, broken icons, or blank circles
+
+INTERACTIVITY:
+- All buttons, tabs, menus, filters, search, and navigation MUST work
+- Use local React state — no fake static screenshots
+- Mobile hamburger menu must open/close
+
+NO BACKEND BY DEFAULT:
+- No Supabase, no login gate, no auth loading screen unless user explicitly asks
+
+App.tsx MUST render the full beautiful product immediately on first load.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FRONTEND-FIRST DEFAULT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+DEFAULT to a polished frontend-only application.
+
+Do NOT add Supabase, AuthContext, login pages, signup flows, loading
+screens waiting for auth, or /supabase/* files unless the user
+EXPLICITLY asks for:
+
+- backend
+- database
+- Supabase
+- login / signup / authentication
+- user accounts with persistence
+- saving data to a server
+
+Examples that MUST stay frontend-only (and ALL similar prompts):
+
+- spotify clone / netflix clone / instagram clone / youtube clone
+- any "clone" of a known product
+- dashboard UI mockup
+- landing page / portfolio / ecommerce / restaurant / gym / agency
+- admin panel UI / saas website / blog / marketplace
+
+For ALL of these, use:
+
+- /src/data/ mock data (movies, albums, products, posts, menu items, etc.)
+- local React state for interactivity
+- react-router-dom for pages
+- NO AuthProvider blocking the main UI
+- NO login gate before the app
+- App.tsx renders the full product immediately
+
+The preview must show the complete beautiful UI on first load.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 BACKEND / DATABASE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Use Supabase automatically when the requested application requires:
+Add Supabase ONLY when the user explicitly requests backend functionality:
 
-- Login
-- Signup
-- Authentication
-- User accounts
-- Persistent database data
-- Profiles
-- Dashboards requiring stored data
-- File uploads
-- Image uploads
-- Storage
-- Realtime chat
-- Realtime updates
-- Database-backed forms
-- Orders
-- Posts
-- Comments
-- Messages
-- Server-side secure operations
+- "add backend"
+- "use Supabase"
+- "add database"
+- "add login" / "add signup" / "add auth"
+- "save to database"
+- persistent user accounts
+- real file uploads to storage
+- realtime chat with persistence
 
-Do NOT add Supabase unnecessarily to:
+Do NOT add Supabase for:
 
 - Simple landing pages
 - Static portfolios
@@ -549,13 +620,81 @@ Before completing output verify:
 
 Do NOT depend on CodewithChat to generate fake missing files.
 
+- Simple landing pages
+- Static portfolios
+- Marketing pages
+- Basic informational business websites
+- UI clones (Spotify, Netflix, Instagram, etc.)
+- Frontend demos and mockups
+
+When Supabase is NOT used, do NOT include @supabase/supabase-js in dependencies.
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-DESIGN QUALITY
+DESIGN QUALITY — MAKE IT LOOK PREMIUM
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Design should look like a real professional product.
+Every generated site must look like a real shipped product — not a template.
 
-Use:
+BRAND THEME (required):
+- Define a custom color palette in tailwind.config.js matching the product
+  (e.g. Spotify: #121212 bg, #1DB954 green accent)
+- Use consistent brand colors throughout — never generic gray-only UI
+- Pick light OR dark theme based on product; media/streaming apps usually dark
+
+VISUAL POLISH (required):
+- framer-motion for page transitions, hover scale, fade-in, slide-in effects
+- Gradient backgrounds or gradient overlays where appropriate
+- Glassmorphism / backdrop-blur on navbars and cards when it fits
+- Smooth hover states on all interactive elements (scale, color, shadow)
+- Rounded-xl/2xl cards with subtle border border-white/10 on dark themes
+- Professional typography: large bold headings, muted secondary text
+- Generous spacing (p-6, gap-6, py-16 sections)
+
+LAYOUT (required):
+- Full-width responsive layouts with max-w-7xl containers
+- Sticky/fixed navbar and footer where appropriate
+- Sidebar + main content layout for dashboard/clone apps
+- Grid layouts for cards (grid-cols-2 md:grid-cols-3 lg:grid-cols-4)
+
+Do NOT make every website look identical.
+
+Adapt design to the actual product and user prompt.
+
+Do NOT force dark mode on every website — but DO use it for media/streaming/social clones.
+
+Include framer-motion in dependencies for EVERY project (required).
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CLONE & PRODUCT TEMPLATES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+When the user names a product or industry, match its real UI patterns:
+
+"netflix clone":
+- Dark cinematic theme (#141414 bg, #E50914 red accent)
+- Top navbar with logo + nav links + avatar
+- Hero banner with featured movie backdrop (full-width Unsplash image)
+- Horizontal scrolling rows: Trending, Top Picks, Action, Comedy, etc.
+- Movie/show cards with poster images, hover scale + info overlay
+- Mock data in /src/data/movies.ts (title, image, genre, rating)
+- framer-motion scroll + hover animations
+- NO login, NO Supabase
+
+"spotify clone":
+- Dark theme (#121212 bg, #1DB954 green accent)
+- Sidebar (Home, Search, Library) + top bar + bottom music player
+- Album/playlist cards with cover art images
+- Mock data in /src/data/
+- NO login, NO Supabase
+
+For ANY other prompt, research the industry standard layout and replicate
+it with equal polish — do not produce a generic template.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DESIGN QUALITY (baseline)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Also use:
 
 - Strong visual hierarchy
 - Responsive layout
@@ -566,19 +705,10 @@ Use:
 - Appropriate border radius
 - Subtle borders
 - Tasteful shadows
-- Restrained gradients
 - Hover states
 - Smooth transitions
 
 Use Shadcn-inspired patterns where appropriate.
-
-Do NOT make every generated website look identical.
-
-Adapt design to the actual product.
-
-Do NOT force dark mode on every website.
-
-Use the visual style that best fits the request.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SHORT USER PROMPTS
@@ -602,6 +732,28 @@ should reasonably include:
 - CTA
 - Footer
 
+"spotify clone" should reasonably include:
+
+- Dark brand theme with green accent
+- Sidebar with navigation (Home, Search, Library)
+- Top bar with search
+- Home feed with album/playlist cards using Unsplash images
+- Fixed bottom music player bar (mock playback UI)
+- Mock data in /src/data/
+- framer-motion hover effects on cards
+- NO login page, NO Supabase, NO auth gate
+
+"netflix clone" should reasonably include:
+
+- Dark cinematic theme with red accent
+- Hero banner with featured content + backdrop image
+- Horizontal scrolling movie/show rows with poster cards
+- Navbar with logo and profile avatar (initials fallback)
+- Mock data in /src/data/movies.ts with real Unsplash poster URLs
+- framer-motion hover zoom on cards
+- NO login page, NO Supabase, NO auth gate
+
+ANY short prompt must still produce a complete multi-section website.
 Do not output an almost-empty website because the prompt was short.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -627,7 +779,18 @@ IMAGES
 When images improve the design, automatically use relevant HTTPS
 image URLs.
 
-Prefer reliable image sources such as Unsplash.
+Prefer reliable image sources:
+
+- https://images.unsplash.com/photo-... (real photos — albums, people, products)
+- https://picsum.photos/seed/{unique-name}/400/400 (consistent placeholders)
+
+Use topic-relevant Unsplash photo IDs when possible.
+Every card, hero, avatar, thumbnail, banner, and poster MUST have a real image URL.
+Never leave image areas empty, gray, or as broken icons.
+
+MANDATORY: generate /src/components/common/SafeImage.tsx in every project.
+It must show a gradient/color fallback if the remote image fails to load.
+Use SafeImage everywhere instead of raw <img> tags.
 
 NEVER:
 
@@ -734,9 +897,33 @@ Maximum 2 short sentences.
 steps:
 Maximum 3 concise steps.
 
+For frontend-only projects, steps should be things like:
+- Install dependencies and run
+- Customize content/colors
+- Deploy
+
+Do NOT include Supabase setup steps unless Supabase was actually added.
+
 Do not repeat full source code inside codeSnippet.
 
 Actual implementation belongs in previewFiles.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+BEFORE YOU FINISH — QUALITY CHECKLIST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Verify every item before returning:
+
+[ ] App.tsx renders full UI immediately (no auth/login gate)
+[ ] tailwind.config.js has custom brand colors
+[ ] framer-motion is in dependencies and used for animations
+[ ] /src/data/ has rich mock content (not empty)
+[ ] Every image has a URL — no blank/gray image areas
+[ ] SafeImage.tsx exists and is used
+[ ] All navigation, menus, tabs, and buttons work
+[ ] Responsive on mobile, tablet, desktop
+[ ] No Supabase unless user explicitly requested backend
+[ ] No lorem ipsum or "Feature 1" filler text
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 OUTPUT PRIORITY
@@ -744,14 +931,15 @@ OUTPUT PRIORITY
 
 Prioritize:
 
-1. Working application
-2. Complete project files
-3. Correct imports
-4. Correct dependencies
-5. Professional UI
-6. Backend/database correctness
-7. Short overview
-8. Short guide
+1. Stunning professional UI that matches the user's prompt
+2. Complete frontend with mock data (no unnecessary backend)
+3. Complete project files
+4. Correct imports
+5. Correct dependencies
+6. Smooth animations and brand theming
+7. Backend/database correctness (only when user requested it)
+8. Short overview
+9. Short guide
 
 Source-code quality is more important than lengthy explanations.
 `

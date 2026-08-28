@@ -15,6 +15,7 @@ import {
   SandpackLayout,
   SandpackFileExplorer,
   useSandpack,
+  useSandpackPreviewProgress,
   defaultDark,
 } from '@codesandbox/sandpack-react'
 
@@ -23,6 +24,10 @@ import {
   Loader2,
   RefreshCw,
 } from 'lucide-react'
+
+import {
+  buildPreviewIndexHtml,
+} from '@/lib/preview-files'
 
 export type SandpackView =
   | 'preview'
@@ -145,7 +150,7 @@ const KNOWN_RUNTIME_VERSIONS:
       '^2.45.0',
 
     'framer-motion':
-      '^11.0.0',
+      '11.11.11',
 
     recharts:
       '^2.13.0',
@@ -275,17 +280,27 @@ function discoverDependenciesFromFiles(
       continue
     }
 
-    // import X from 'package'
-    // import { X } from 'package'
-    // export { X } from 'package'
-    const fromRegex =
-      /\b(?:import|export)\s+(?:type\s+)?[\s\S]*?\s+from\s+['"]([^'"]+)['"]/g
+    /**
+     * Scan for `from 'package'` / `from "package"` occurrences.
+     *
+     * This intentionally matches only the TAIL of an import statement
+     * rather than trying to match the whole line, so it works for
+     * BOTH single-line and multi-line import forms:
+     *
+     *   import { A, B } from 'pkg'          // single-line
+     *   import {\n  A,\n  B\n} from 'pkg'   // multi-line
+     *   export { A } from 'pkg'             // re-export
+     *
+     * Local imports (`./foo`, `../bar`, `/abs`, `@/alias`) are filtered
+     * out downstream by getPackageName().
+     */
+    const fromRegex = /\bfrom\s+['"]([^'"]+)['"]/g
 
-    // import 'package'
+    // Side-effect imports: import 'pkg'
     const sideEffectRegex =
       /\bimport\s+['"]([^'"]+)['"]/g
 
-    // import('package')
+    // Dynamic imports: import('pkg')
     const dynamicImportRegex =
       /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g
 
@@ -446,6 +461,9 @@ function PreviewStatusOverlay({
   const { sandpack } =
     useSandpack()
 
+  const progressMessage =
+    useSandpackPreviewProgress({})
+
   const status =
     sandpack.status
 
@@ -499,7 +517,10 @@ function PreviewStatusOverlay({
           </p>
 
           <p className="text-xs leading-relaxed text-zinc-400">
-            The browser preview runtime did not become ready in time.
+            Package install took too long. Large
+            projects can take 1–3 minutes on first
+            load — try again, or open preview in a
+            new tab.
           </p>
 
           <button
@@ -546,7 +567,8 @@ function PreviewStatusOverlay({
           <Loader2 className="size-4 animate-spin text-primary" />
 
           <span className="text-xs text-zinc-300">
-            Preparing preview…
+            {progressMessage ??
+              'Preparing preview…'}
           </span>
         </div>
       </div>
@@ -699,71 +721,59 @@ export function SandpackPreview({
 
           'react-dom':
             '18.2.0',
+        }
 
-          /**
-           * Common packages only use fallback versions
-           * when actually required / supplied.
-           */
-          'lucide-react':
+        for (
+          const optionalPackage
+          of [
+            'lucide-react',
+            'clsx',
+            'tailwind-merge',
+          ] as const
+        ) {
+          const version =
             sanitizedDependencies[
-              'lucide-react'
+              optionalPackage
             ] ??
             discoveredDependencies[
-              'lucide-react'
-            ] ??
-            '^0.468.0',
+              optionalPackage
+            ]
 
-          clsx:
-            sanitizedDependencies[
-              'clsx'
-            ] ??
-            discoveredDependencies[
-              'clsx'
-            ] ??
-            '^2.1.1',
-
-          'tailwind-merge':
-            sanitizedDependencies[
-              'tailwind-merge'
-            ] ??
-            discoveredDependencies[
-              'tailwind-merge'
-            ] ??
-            '^2.5.4',
+          if (version) {
+            merged[optionalPackage] =
+              version
+          }
         }
 
         /**
-         * Extra guarantee for the exact problem you are
-         * currently hitting.
+         * Always include react-router-dom at its known version
+         * if ANY file in the project imports it.
          *
-         * Only install react-router-dom when generated source
-         * actually imports it OR parent supplied it.
+         * This is a belt-and-suspenders guarantee on top of the
+         * discoverDependenciesFromFiles scanner — if the scanner
+         * misses it, this scan of the raw string values catches it.
          */
+        const routerVersion =
+          sanitizedDependencies[
+            'react-router-dom'
+          ] ??
+          discoveredDependencies[
+            'react-router-dom'
+          ]
+
         const needsReactRouter =
-          Object.values(
-            files,
-          ).some(
+          routerVersion != null ||
+          Object.values(files).some(
             content =>
-              typeof content ===
-                'string' &&
-              /['"]react-router-dom(?:\/[^'"]*)?['"]/.test(
-                content,
+              typeof content === 'string' &&
+              content.includes(
+                'react-router-dom',
               ),
           )
 
-        if (
-          needsReactRouter
-        ) {
-          merged[
-            'react-router-dom'
-          ] =
-            sanitizedDependencies[
-              'react-router-dom'
-            ] ??
-            discoveredDependencies[
-              'react-router-dom'
-            ] ??
-            '^6.28.0'
+        if (needsReactRouter) {
+          merged['react-router-dom'] =
+            routerVersion ?? '^6.28.0'
         }
 
         return Object.fromEntries(
@@ -835,6 +845,14 @@ export function SandpackPreview({
           normalizePath(
             rawPath,
           )
+
+        if (
+          !/\.(tsx?|jsx?|css|html)$/.test(
+            path,
+          )
+        ) {
+          continue
+        }
 
         result[path] = {
           code:
@@ -913,6 +931,32 @@ export function SandpackPreview({
       delete result['/tailwind.config.ts']
       delete result['/postcss.config.js']
 
+      if (!result['/index.html']) {
+        const entry =
+          result['/index.tsx']
+            ? '/index.tsx'
+            : result['/index.jsx']
+              ? '/index.jsx'
+              : result['/main.tsx']
+                ? '/main.tsx'
+                : result['/main.jsx']
+                  ? '/main.jsx'
+                  : result['/App.tsx']
+                    ? '/App.tsx'
+                    : result['/App.jsx']
+                      ? '/App.jsx'
+                      : null
+
+        if (entry) {
+          result['/index.html'] = {
+            code:
+              buildPreviewIndexHtml(
+                entry,
+              ),
+          }
+        }
+      }
+
       return result
     }, [
       files,
@@ -947,7 +991,7 @@ export function SandpackPreview({
     <div className="flex h-full w-full flex-col overflow-hidden bg-[#151515]">
       <SandpackProvider
         key={`${previewKey}-${localPreviewKey}`}
-        template="vite-react-ts"
+        template="react-ts"
         files={
           sandpackFiles
         }
@@ -962,7 +1006,13 @@ export function SandpackPreview({
             'delayed',
 
           recompileDelay:
-            300,
+            1000,
+
+          bundlerTimeOut:
+            180000,
+
+          experimental_enableStableServiceWorkerId:
+            true,
 
           externalResources: [
             'https://cdn.tailwindcss.com',
@@ -980,6 +1030,12 @@ export function SandpackPreview({
           flexDirection:
             'column',
 
+          height:
+            '100%',
+
+          width:
+            '100%',
+
           minHeight:
             0,
 
@@ -994,7 +1050,9 @@ export function SandpackPreview({
               .sp-layout,
               .sp-stack,
               .sp-preview-container,
-              .sp-preview-iframe {
+              .sp-preview-iframe,
+              .sp-preview,
+              .sp-preview-actions {
                 height: 100% !important;
                 min-height: 100% !important;
                 width: 100% !important;
@@ -1002,9 +1060,17 @@ export function SandpackPreview({
 
               .sp-wrapper,
               .sp-layout,
-              .sp-stack {
+              .sp-stack,
+              .sp-preview-container {
                 flex: 1 !important;
                 min-height: 0 !important;
+                display: flex !important;
+                flex-direction: column !important;
+              }
+
+              .sp-preview-iframe {
+                flex: 1 !important;
+                border: 0 !important;
               }
             `,
           }}
@@ -1100,9 +1166,9 @@ export function SandpackPreview({
                   ? 'flex'
                   : 'none',
             }}
-            className="h-full w-full flex-col bg-[#111]"
+            className="h-full min-h-0 w-full flex-1 flex-col"
           >
-            <div className="relative flex min-h-0 flex-1 items-center justify-center p-2">
+            <div className="relative h-full min-h-0 w-full flex-1">
               <PreviewStatusOverlay
                 isEmpty={
                   isEmpty
@@ -1113,34 +1179,56 @@ export function SandpackPreview({
               />
 
               <div
-                className={`h-full w-full overflow-hidden rounded-md bg-white transition-all duration-300 ease-in-out ${
+                className={`h-full min-h-0 w-full overflow-hidden rounded-md bg-white transition-all duration-300 ease-in-out ${
                   viewportSize ===
                   'mobile'
-                    ? 'max-w-[375px] border border-zinc-800 shadow-2xl'
+                    ? 'mx-auto max-w-[375px] border border-zinc-800 shadow-2xl'
                     : viewportSize ===
                         'tablet'
-                      ? 'max-w-[768px] border border-zinc-800 shadow-2xl'
+                      ? 'mx-auto max-w-[768px] border border-zinc-800 shadow-2xl'
                       : 'border border-zinc-800/50'
                 }`}
               >
-                <SandpackPreviewPane
-                  showNavigator={
-                    false
-                  }
-                  showOpenInCodeSandbox={
-                    false
-                  }
-                  showRefreshButton={
-                    false
-                  }
+                <SandpackLayout
                   style={{
                     height:
                       '100%',
 
                     width:
                       '100%',
+
+                    minHeight:
+                      '100%',
+
+                    border:
+                      'none',
+
+                    borderRadius:
+                      0,
                   }}
-                />
+                >
+                  <SandpackPreviewPane
+                    showNavigator={
+                      false
+                    }
+                    showOpenInCodeSandbox={
+                      false
+                    }
+                    showRefreshButton={
+                      false
+                    }
+                    style={{
+                      height:
+                        '100%',
+
+                      width:
+                        '100%',
+
+                      minHeight:
+                        '100%',
+                    }}
+                  />
+                </SandpackLayout>
               </div>
             </div>
           </div>

@@ -3,6 +3,7 @@ import { getProjectByIdAction } from '@/app/actions/projects'
 
 import {
   buildInstantPreviewFiles,
+  getProjectRuntimeDependencies,
 } from '@/lib/preview-files'
 
 import {
@@ -85,43 +86,11 @@ export default async function PreviewPage({
     // RUNTIME DEPENDENCIES
     // ─────────────────────────────────────────────
 
-    const blockedDependencies =
-      new Set([
-        'next',
-
-        'vite',
-
-        '@vitejs/plugin-react',
-
-        '@vercel/ai',
-
-        '@supabase/ssr',
-
-        '@supabase/auth-helpers-nextjs',
-
-        'typescript',
-
-        'tailwindcss',
-
-        'postcss',
-
-        'autoprefixer',
-      ])
-
     const dependencies =
-      Object.fromEntries(
-        Object.entries(
-          plan.dependencies ?? {},
-        ).filter(
-          ([name]) =>
-            !blockedDependencies.has(
-              name,
-            ),
-        ),
-      ) as Record<
-        string,
-        string
-      >
+      getProjectRuntimeDependencies(
+        plan.previewFiles,
+        plan.dependencies ?? {},
+      )
 
     return (
       <PreviewClient

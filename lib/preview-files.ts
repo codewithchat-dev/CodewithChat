@@ -302,14 +302,18 @@ function discoverRuntimeDependencies(
     const sources = new Set<string>()
 
     /**
-     * Handles:
+     * Handles per-line named/default/re-export imports:
      *
      * import X from 'foo'
-     * import { X } from 'foo'
+     * import { X, Y } from 'foo'
+     * import X, { Y } from 'foo'
      * export { X } from 'foo'
+     *
+     * Uses line-anchored regex (^...gm) to avoid the
+     * cross-line [\s\S]*? match that can skip imports.
      */
     const fromRegex =
-      /\b(?:import|export)\s+[\s\S]*?\s+from\s+['"]([^'"]+)['"]/g
+      /^[ \t]*(?:import|export)\s[^;'"]*?\s+from\s+['"]([^'"]+)['"]/gm
 
     /**
      * Handles:
@@ -317,7 +321,7 @@ function discoverRuntimeDependencies(
      * import 'foo'
      */
     const sideEffectRegex =
-      /\bimport\s+['"]([^'"]+)['"]/g
+      /^[ \t]*import\s+['"]([^'"]+)['"]/gm
 
     /**
      * Handles:
@@ -567,6 +571,379 @@ function rewriteSrcAliases(
 // ─────────────────────────────────────────────────────────────
 
 /**
+ * Detect whether the generated project actually uses Supabase/backend.
+ * Preview auth mocks are applied ONLY in this case.
+ */
+export function detectProjectUsesBackend(
+  projectFiles: Record<string, string>,
+): boolean {
+  for (
+    const [rawPath, content]
+    of Object.entries(
+      projectFiles,
+    )
+  ) {
+    if (
+      typeof content !==
+      'string'
+    ) {
+      continue
+    }
+
+    const path =
+      normalizePreviewPath(
+        rawPath,
+      )
+
+    if (
+      path.startsWith(
+        '/supabase/',
+      )
+    ) {
+      return true
+    }
+
+    if (
+      /\/supabase\.(tsx|ts|jsx|js)$/.test(
+        path,
+      ) ||
+      path.includes(
+        '/lib/supabase',
+      )
+    ) {
+      return true
+    }
+
+    if (
+      content.includes(
+        '@supabase/supabase-js',
+      ) ||
+      (
+        /createClient\s*\(/.test(
+          content,
+        ) &&
+        /supabase/i.test(
+          content,
+        )
+      )
+    ) {
+      return true
+    }
+  }
+
+  return false
+}
+
+type SandpackTransformOptions = {
+  usesBackend?: boolean
+}
+
+const PREVIEW_AUTH_MODULE_HELPERS = `
+// [Preview] Auto-login stubs (preview runtime only)
+const __PREVIEW_USER__ = {
+  id: 'preview-user',
+  email: 'preview@example.com',
+  user_metadata: {
+    full_name: 'Preview User',
+    avatar_url: null,
+  },
+  app_metadata: {},
+  aud: 'authenticated',
+  role: 'authenticated',
+  created_at: new Date().toISOString(),
+}
+
+const __PREVIEW_SESSION__ = {
+  access_token: 'preview-access-token',
+  refresh_token: 'preview-refresh-token',
+  expires_in: 3600,
+  expires_at: Math.floor(Date.now() / 1000) + 3600,
+  token_type: 'bearer',
+  user: __PREVIEW_USER__,
+}
+
+const __PREVIEW_AUTH_VALUE__ = {
+  user: __PREVIEW_USER__,
+  session: __PREVIEW_SESSION__,
+  loading: false,
+  signIn: async () => ({ error: null }),
+  signOut: async () => ({ error: null }),
+  signUp: async () => ({ error: null }),
+}
+`.trim()
+
+function injectAfterImports(
+  code: string,
+  snippet: string,
+): string {
+  const leadingWhitespace =
+    code.match(/^\s*/)?.[0] ?? ''
+
+  const trimmed =
+    code.slice(
+      leadingWhitespace.length,
+    )
+
+  const importMatch =
+    trimmed.match(
+      /^(?:import\s[\s\S]*?;\s*)+/,
+    )
+
+  if (importMatch) {
+    return (
+      leadingWhitespace +
+      importMatch[0] +
+      '\n' +
+      snippet +
+      '\n' +
+      trimmed.slice(
+        importMatch[0].length,
+      )
+    )
+  }
+
+  return (
+    leadingWhitespace +
+    snippet +
+    '\n' +
+    trimmed
+  )
+}
+
+function skipPreviewGate(
+  code: string,
+  condition: string,
+): string {
+  return code
+    .replace(
+      new RegExp(
+        `if\\s*\\(\\s*${condition}\\s*\\)\\s*\\{[\\s\\S]*?return\\s[\\s\\S]*?\\n\\s*\\}`,
+        'g',
+      ),
+      '{ /* [Preview] gate skipped */ }',
+    )
+    .replace(
+      new RegExp(
+        `if\\s*\\(\\s*${condition}\\s*\\)\\s*return\\s[\\s\\S]*?;?`,
+        'g',
+      ),
+      '/* [Preview] gate skipped */',
+    )
+}
+
+function applyPreviewAuthTransforms(
+  code: string,
+  filePath: string,
+  usesBackend: boolean,
+): string {
+  if (!usesBackend) {
+    return code
+  }
+
+  let next = code
+
+  if (
+    /(?:^|\/)App\.(tsx|jsx)$/.test(
+      filePath,
+    )
+  ) {
+    next = skipPreviewGate(
+      next,
+      'loading',
+    )
+    next = skipPreviewGate(
+      next,
+      'isLoading',
+    )
+    next = skipPreviewGate(
+      next,
+      '!session',
+    )
+    next = skipPreviewGate(
+      next,
+      '!user',
+    )
+  }
+
+  if (
+    /AuthContext\.(tsx|jsx|ts|js)$/.test(
+      filePath,
+    ) ||
+    filePath.includes(
+      '/context/AuthContext',
+    )
+  ) {
+    next = injectAfterImports(
+      next,
+      PREVIEW_AUTH_MODULE_HELPERS,
+    )
+
+    next = next.replace(
+      /if\s*\(\s*!context\s*\)\s*\{[\s\S]*?throw new Error\([\s\S]*?\)\s*\}/g,
+      'if (!context) { return __PREVIEW_AUTH_VALUE__ as any }',
+    )
+
+    next = next.replace(
+      /const\s*\[\s*session\s*,\s*setSession\s*\]\s*=\s*useState(?:<[^>]+>)?\(\s*null\s*\)/g,
+      'const [session, setSession] = useState(__PREVIEW_SESSION__ as any) // [Preview]',
+    )
+
+    next = next.replace(
+      /const\s*\[\s*user\s*,\s*setUser\s*\]\s*=\s*useState(?:<[^>]+>)?\(\s*null\s*\)/g,
+      'const [user, setUser] = useState(__PREVIEW_USER__ as any) // [Preview]',
+    )
+
+    next = next.replace(
+      /const\s*\[\s*(?:loading|isLoading)\s*,\s*set(?:Loading|IsLoading)\s*\]\s*=\s*useState\s*\(\s*true\s*\)/g,
+      match =>
+        match.replace(
+          'true',
+          'false',
+        ) +
+        ' // [Preview]',
+    )
+
+    next = skipPreviewGate(
+      next,
+      'loading',
+    )
+    next = skipPreviewGate(
+      next,
+      'isLoading',
+    )
+  }
+
+  if (
+    /\/context\/[^/]+\.(tsx|jsx|ts|js)$/.test(
+      filePath,
+    ) &&
+    !filePath.includes(
+      '/context/AuthContext',
+    )
+  ) {
+    next = next.replace(
+      /const\s*\[\s*(?:loading|isLoading)\s*,\s*set(?:Loading|IsLoading)\s*\]\s*=\s*useState\s*\(\s*true\s*\)/g,
+      match =>
+        match.replace(
+          'true',
+          'false',
+        ) +
+        ' // [Preview]',
+    )
+
+    next = skipPreviewGate(
+      next,
+      'loading',
+    )
+    next = skipPreviewGate(
+      next,
+      'isLoading',
+    )
+  }
+
+  if (
+    /\/supabase\.(tsx|ts|jsx|js)$/.test(
+      filePath,
+    ) ||
+    filePath.includes('/lib/supabase')
+  ) {
+    next += `
+
+// [Preview] Mock Supabase auth — preview always starts logged in.
+;(function patchPreviewSupabaseAuth() {
+  if (typeof supabase === 'undefined' || !supabase?.auth) {
+    return
+  }
+
+  const previewUser = {
+    id: 'preview-user',
+    email: 'preview@example.com',
+    user_metadata: {
+      full_name: 'Preview User',
+      avatar_url: null,
+    },
+    app_metadata: {},
+    aud: 'authenticated',
+    role: 'authenticated',
+    created_at: new Date().toISOString(),
+  }
+
+  const previewSession = {
+    access_token: 'preview-access-token',
+    refresh_token: 'preview-refresh-token',
+    expires_in: 3600,
+    expires_at: Math.floor(Date.now() / 1000) + 3600,
+    token_type: 'bearer',
+    user: previewUser,
+  }
+
+  const previewAuth = {
+    getSession: async () => ({
+      data: { session: previewSession },
+      error: null,
+    }),
+
+    getUser: async () => ({
+      data: { user: previewUser },
+      error: null,
+    }),
+
+    onAuthStateChange: (callback) => {
+      queueMicrotask(() =>
+        callback('INITIAL_SESSION', previewSession),
+      )
+
+      return {
+        data: {
+          subscription: {
+            unsubscribe: () => undefined,
+          },
+        },
+      }
+    },
+
+    signInWithPassword: async () => ({
+      data: {
+        user: previewUser,
+        session: previewSession,
+      },
+      error: null,
+    }),
+
+    signInWithOAuth: async () => ({
+      data: {
+        provider: 'github',
+        url: null,
+      },
+      error: {
+        message:
+          'OAuth is disabled in preview mode.',
+      },
+    }),
+
+    signUp: async () => ({
+      data: {
+        user: previewUser,
+        session: previewSession,
+      },
+      error: null,
+    }),
+
+    signOut: async () => ({ error: null }),
+  }
+
+  supabase.auth = {
+    ...supabase.auth,
+    ...previewAuth,
+  }
+})()
+`
+  }
+
+  return next
+}
+
+/**
  * Only changes the PREVIEW COPY.
  *
  * The source stored in the database and downloaded ZIP
@@ -575,7 +952,12 @@ function rewriteSrcAliases(
 export function transformForSandpack(
   content: string,
   filePath: string,
+  options: SandpackTransformOptions = {},
 ): string {
+  const usesBackend =
+    options.usesBackend ??
+    false
+
   let code = content
 
   // Remove framework directives not needed in Vite preview.
@@ -589,6 +971,87 @@ export function transformForSandpack(
       '',
     )
 
+  /**
+   * Strip Next.js-specific imports that the Sandpack Vite
+   * runtime cannot resolve (they cause a 500 on App.tsx).
+   *
+   * Covers patterns like:
+   *   import { useRouter, usePathname } from 'next/navigation'
+   *   import Link from 'next/link'
+   *   import Image from 'next/image'
+   *   import { useRouter } from 'next/router'
+   *   import { headers } from 'next/headers'
+   *   import dynamic from 'next/dynamic'
+   *
+   * After removing the import line, inject lightweight no-op
+   * stubs so variable references don't cause ReferenceErrors.
+   */
+  const nextImportRegex =
+    /^[ \t]*import\s+(?:type\s+)?(?:(\w+)|(\{[^}]*\}))\s+from\s+['"]next\/[^'"]+['"];?[ \t]*$/gm
+
+  const strippedNames = new Set<string>()
+
+  code = code.replace(
+    nextImportRegex,
+    (line) => {
+      // Collect default import name
+      const defaultMatch = line.match(
+        /import\s+(?:type\s+)?(\w+)\s+from\s+['"]next\//,
+      )
+
+      if (defaultMatch?.[1]) {
+        strippedNames.add(defaultMatch[1])
+      }
+
+      // Collect named imports
+      const namedMatch = line.match(
+        /import\s+(?:type\s+)?\{([^}]*)\}\s+from\s+['"]next\//,
+      )
+
+      if (namedMatch?.[1]) {
+        for (const part of namedMatch[1].split(',')) {
+          const name = part
+            .trim()
+            .split(/\s+as\s+/)
+            .pop()
+            ?.trim()
+
+          if (name && /^\w+$/.test(name)) {
+            strippedNames.add(name)
+          }
+        }
+      }
+
+      return `// [Preview] stripped next/* import: ${line.trim()}`
+    },
+  )
+
+  // Inject no-op stubs for stripped names so the rest of
+  // the file compiles without ReferenceError.
+  if (strippedNames.size > 0) {
+    const stubs = [...strippedNames]
+      .map((name) => {
+        // Hook stubs return a no-op function or empty object.
+        if (/^use[A-Z]/.test(name)) {
+          return `const ${name} = () => ({} as any)`
+        }
+
+        // Component stubs render children or nothing.
+        if (/^[A-Z]/.test(name)) {
+          return (
+            `const ${name} = ` +
+            `({ children, ...props }: any) => ` +
+            `children ?? null`
+          )
+        }
+
+        return `const ${name} = undefined`
+      })
+      .join('\n')
+
+    code = `// [Preview] next/* stubs\n${stubs}\n\n${code}`
+  }
+
   // Convert @/... imports.
   code = rewriteSrcAliases(
     code,
@@ -596,144 +1059,133 @@ export function transformForSandpack(
   )
 
   /**
-   * Preview-only Supabase values.
-   *
-   * Prevents createClient() from crashing immediately
-   * before the user connects their own Supabase project.
-   *
-   * These are NOT written to the real project.
+   * Preview-only Supabase values — only when the project
+   * actually uses Supabase (user requested backend).
    */
-  code = code
-    .replace(
-      /import\.meta\.env\.VITE_SUPABASE_URL/g,
-      JSON.stringify(
-        'https://preview.supabase.co',
-      ),
+  if (usesBackend) {
+    code = code
+      .replace(
+        /import\.meta\.env\.VITE_SUPABASE_URL/g,
+        JSON.stringify(
+          'https://preview.supabase.co',
+        ),
+      )
+      .replace(
+        /import\.meta\.env\.VITE_SUPABASE_PUBLISHABLE_KEY/g,
+        JSON.stringify(
+          'preview-public-key',
+        ),
+      )
+      .replace(
+        /import\.meta\.env\.VITE_SUPABASE_ANON_KEY/g,
+        JSON.stringify(
+          'preview-anon-key',
+        ),
+      )
+
+    code = applyPreviewAuthTransforms(
+      code,
+      filePath,
+      usesBackend,
     )
-    .replace(
-      /import\.meta\.env\.VITE_SUPABASE_PUBLISHABLE_KEY/g,
-      JSON.stringify(
-        'preview-public-key',
-      ),
-    )
-    .replace(
-      /import\.meta\.env\.VITE_SUPABASE_ANON_KEY/g,
-      JSON.stringify(
-        'preview-anon-key',
-      ),
-    )
+  }
 
   return code
 }
 
-// ─────────────────────────────────────────────────────────────
-// VITE → SANDPACK RUNTIME
-// ─────────────────────────────────────────────────────────────
+type MainEntryExt =
+  | 'tsx'
+  | 'jsx'
+  | 'ts'
+  | 'js'
 
-/**
- * Real project:
- *
- * /src/App.tsx
- * /src/components/Navbar.tsx
- *
- * Sandpack runtime:
- *
- * /App.tsx
- * /components/Navbar.tsx
- *
- * Only the preview representation is flattened.
- */
-export function extractPreviewFromVite(
+function getViteMainEntry(
   projectFiles: Record<string, string>,
-): Record<string, string> {
-  const result: Record<string, string> = {}
+): {
+  content: string
+  ext: MainEntryExt
+} | null {
+  const candidates: Array<
+    [string, MainEntryExt]
+  > = [
+    ['/src/main.tsx', 'tsx'],
+    ['/src/main.jsx', 'jsx'],
+    ['/src/main.ts', 'ts'],
+    ['/src/main.js', 'js'],
+  ]
 
   for (
-    const [rawPath, rawContent]
-    of Object.entries(projectFiles)
+    const [path, ext]
+    of candidates
   ) {
-    const path =
-      normalizePreviewPath(rawPath)
+    const content =
+      projectFiles[path] ??
+      projectFiles[path.slice(1)]
 
-    if (!path.startsWith('/src/')) {
-      continue
-    }
-
-    /**
-     * We generate a custom Sandpack entry below,
-     * so the Vite main entry isn't copied.
-     */
     if (
-      path === '/src/main.tsx' ||
-      path === '/src/main.jsx' ||
-      path === '/src/main.ts' ||
-      path === '/src/main.js'
+      typeof content === 'string' &&
+      content.trim()
     ) {
-      continue
+      return {
+        content,
+        ext,
+      }
     }
-
-    // /src/App.tsx -> /App.tsx
-    const previewPath =
-      path.slice('/src'.length)
-
-    let content = rawContent
-
-    // ─── CSS ────────────────────────────────────────────
-
-    if (path.endsWith('.css')) {
-      /**
-       * Tailwind utilities are currently supplied through
-       * the external Tailwind preview runtime.
-       *
-       * Keep custom CSS.
-       */
-      content = content
-        .replace(
-          /@tailwind\s+(base|components|utilities)\s*;?/g,
-          '',
-        )
-        .trim()
-    }
-
-    // ─── TS / JS ────────────────────────────────────────
-
-    else if (
-      /\.(tsx?|jsx?)$/.test(path)
-    ) {
-      content =
-        transformForSandpack(
-          content,
-          path,
-        )
-    }
-
-    result[previewPath] =
-      content
   }
 
-  const hasTsApp =
-    Boolean(result['/App.tsx'])
+  return null
+}
 
-  const hasJsApp =
-    Boolean(
-      result['/App.jsx'] ||
-        result['/App.js'],
+/**
+ * Reuses the real Vite bootstrap (providers, router, etc.)
+ * instead of rendering bare <App /> in preview.
+ */
+function buildPreviewEntryFromMain(
+  mainContent: string,
+  cssImportLine: string,
+  usesBackend: boolean,
+): string {
+  let code =
+    transformForSandpack(
+      mainContent,
+      '/src/main.tsx',
+      { usesBackend },
     )
 
-  const hasCss =
-    Boolean(result['/index.css'])
+  if (
+    cssImportLine &&
+    !/\.\/index\.css/.test(code)
+  ) {
+    const importBlockMatch =
+      code.match(
+        /^(?:import\s[\s\S]*?;\s*)+/,
+      )
 
-  const cssImport =
-    hasCss
-      ? `import './index.css'`
-      : ''
+    if (importBlockMatch) {
+      code =
+        importBlockMatch[0] +
+        `${cssImportLine}\n` +
+        code.slice(
+          importBlockMatch[0].length,
+        )
+    } else {
+      code = `${cssImportLine}\n\n${code}`
+    }
+  }
 
-  // ───────────────────────────────────────────────────────
-  // TYPESCRIPT ENTRY
-  // ───────────────────────────────────────────────────────
+  return code.trim()
+}
 
-  if (hasTsApp) {
-    result['/index.tsx'] = `
+function buildFallbackPreviewEntry(
+  cssImport: string,
+  appExt: 'tsx' | 'jsx',
+): string {
+  const indexExt =
+    appExt === 'tsx'
+      ? 'tsx'
+      : 'jsx'
+
+  return `
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 ${cssImport}
@@ -752,7 +1204,7 @@ async function startPreview() {
 
     if (!appModule.default) {
       throw new Error(
-        'App.tsx does not provide a default export.',
+        'App.${indexExt} does not provide a default export.',
       )
     }
 
@@ -823,92 +1275,298 @@ async function startPreview() {
 
 startPreview()
 `.trim()
-  }
-
-  // ───────────────────────────────────────────────────────
-  // JAVASCRIPT ENTRY
-  // ───────────────────────────────────────────────────────
-
-  else if (hasJsApp) {
-    result['/index.jsx'] = `
-import React from 'react'
-import { createRoot } from 'react-dom/client'
-${cssImport}
-
-const rootElement = document.getElementById('root')
-
-if (!rootElement) {
-  throw new Error('Root element was not found')
 }
 
-const root = createRoot(rootElement)
+/**
+ * Pulls the config object from generated tailwind.config.js/ts
+ * so the Play CDN can apply custom theme tokens in preview.
+ */
+function extractTailwindConfigBody(
+  projectFiles: Record<string, string>,
+): string | null {
+  const raw =
+    projectFiles['/tailwind.config.js'] ??
+    projectFiles['/tailwind.config.ts'] ??
+    projectFiles['tailwind.config.js'] ??
+    projectFiles['tailwind.config.ts']
 
-async function startPreview() {
+  if (
+    typeof raw !== 'string' ||
+    !raw.trim()
+  ) {
+    return null
+  }
+
+  // Configs that import plugins/themes cannot run in Play CDN scripts.
+  if (
+    /\b(import|require)\b/.test(
+      raw,
+    )
+  ) {
+    return null
+  }
+
+  let body = raw
+    .replace(
+      /\/\*[\s\S]*?\*\//g,
+      '',
+    )
+    .replace(
+      /^\s*\/\/.*$/gm,
+      '',
+    )
+    .replace(
+      /^\s*import\s+[\s\S]*?;\s*$/gm,
+      '',
+    )
+    .replace(
+      /^\s*export\s+default\s+/,
+      '',
+    )
+    .replace(
+      /\s*:\s*import\(['"]tailwindcss['"]\)\.Config\s*/g,
+      '',
+    )
+    .replace(
+      /\s*:\s*Config\s*/g,
+      '',
+    )
+    .trim()
+
+  if (body.endsWith(';')) {
+    body = body.slice(0, -1).trim()
+  }
+
+  if (!body.startsWith('{')) {
+    return null
+  }
+
+  // Play CDN cannot execute tailwind plugins from config files.
+  body = body.replace(
+    /plugins\s*:\s*\[[^\]]*\]\s*,?/g,
+    '',
+  )
+
+  return body
+}
+
+/**
+ * Sandpack's Vite template does not always load externalResources
+ * reliably. Inject Tailwind Play CDN directly in index.html.
+ */
+export function buildPreviewIndexHtml(
+  entryScript: string,
+  tailwindConfigBody:
+    | string
+    | null = null,
+): string {
+  const configScript =
+    tailwindConfigBody
+      ? `<script>
   try {
-    const appModule = await import('./App')
+    tailwind.config = ${tailwindConfigBody}
+  } catch (error) {
+    console.warn('[Preview] Invalid tailwind config, using defaults.', error)
+    tailwind.config = {
+      content: ['./index.html', './**/*.{js,ts,jsx,tsx}'],
+    }
+  }
+</script>`
+      : `<script>
+  tailwind.config = {
+    content: ['./index.html', './**/*.{js,ts,jsx,tsx}'],
+  }
+</script>`
 
-    if (!appModule.default) {
-      throw new Error(
-        'App.jsx does not provide a default export.',
-      )
+  return `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Preview</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    ${configScript}
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="${entryScript}"></script>
+  </body>
+</html>
+`
+}
+
+// ─────────────────────────────────────────────────────────────
+// VITE → SANDPACK RUNTIME
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Real project:
+ *
+ * /src/App.tsx
+ * /src/components/Navbar.tsx
+ *
+ * Sandpack runtime:
+ *
+ * /App.tsx
+ * /components/Navbar.tsx
+ *
+ * Only the preview representation is flattened.
+ */
+export function extractPreviewFromVite(
+  projectFiles: Record<string, string>,
+): Record<string, string> {
+  const result: Record<string, string> = {}
+
+  const usesBackend =
+    detectProjectUsesBackend(
+      projectFiles,
+    )
+
+  const mainEntry =
+    getViteMainEntry(
+      projectFiles,
+    )
+
+  for (
+    const [rawPath, rawContent]
+    of Object.entries(projectFiles)
+  ) {
+    const path =
+      normalizePreviewPath(rawPath)
+
+    if (!path.startsWith('/src/')) {
+      continue
     }
 
-    const App = appModule.default
+    /**
+     * We generate a custom Sandpack entry below,
+     * so the Vite main entry isn't copied.
+     */
+    if (
+      path === '/src/main.tsx' ||
+      path === '/src/main.jsx' ||
+      path === '/src/main.ts' ||
+      path === '/src/main.js'
+    ) {
+      continue
+    }
 
-    root.render(
-      <React.StrictMode>
-        <App />
-      </React.StrictMode>,
-    )
-  } catch (error) {
-    console.error(
-      '[Preview Runtime Error]',
-      error,
-    )
+    // /src/App.tsx -> /App.tsx
+    const previewPath =
+      path.slice('/src'.length)
 
-    const message =
-      error instanceof Error
-        ? error.message
-        : String(error)
+    let content = rawContent
 
-    root.render(
-      <div
-        style={{
-          minHeight: '100vh',
-          background: '#09090b',
-          color: '#fafafa',
-          padding: '32px',
-          fontFamily: 'system-ui, sans-serif',
-        }}
-      >
-        <h2
-          style={{
-            margin: '0 0 12px',
-            fontSize: '20px',
-            fontWeight: 700,
-          }}
-        >
-          Preview runtime error
-        </h2>
+    // ─── CSS ────────────────────────────────────────────
 
-        <pre
-          style={{
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-word',
-            color: '#fca5a5',
-            fontSize: '13px',
-            lineHeight: 1.6,
-          }}
-        >
-          {message}
-        </pre>
-      </div>,
-    )
+    if (path.endsWith('.css')) {
+      /**
+       * Tailwind utilities are currently supplied through
+       * the external Tailwind preview runtime.
+       *
+       * Keep custom CSS.
+       */
+      content = content
+        .replace(
+          /@tailwind\s+(base|components|utilities)\s*;?/g,
+          '',
+        )
+        .replace(
+          /@apply[^;]+;/g,
+          '',
+        )
+        .replace(
+          /@layer\s+(base|components|utilities)\s*\{[^}]*\}/g,
+          '',
+        )
+        .trim()
+    }
+
+    // ─── TS / JS ────────────────────────────────────────
+
+    else if (
+      /\.(tsx?|jsx?)$/.test(path)
+    ) {
+      content =
+        transformForSandpack(
+          content,
+          path,
+          { usesBackend },
+        )
+    }
+
+    result[previewPath] =
+      content
   }
-}
 
-startPreview()
-`.trim()
+  const hasTsApp =
+    Boolean(result['/App.tsx'])
+
+  const hasJsApp =
+    Boolean(
+      result['/App.jsx'] ||
+        result['/App.js'],
+    )
+
+  const hasCss =
+    Boolean(result['/index.css'])
+
+  const cssImport =
+    hasCss
+      ? `import './index.css'`
+      : ''
+
+  const tailwindConfigBody =
+    extractTailwindConfigBody(
+      projectFiles,
+    )
+
+  // ───────────────────────────────────────────────────────
+  // PREVIEW ENTRY (prefer real main.tsx bootstrap)
+  // ───────────────────────────────────────────────────────
+
+  if (hasTsApp) {
+    result['/index.tsx'] =
+      mainEntry &&
+      (mainEntry.ext === 'tsx' ||
+        mainEntry.ext === 'ts')
+        ? buildPreviewEntryFromMain(
+            mainEntry.content,
+            cssImport,
+            usesBackend,
+          )
+        : buildFallbackPreviewEntry(
+            cssImport,
+            'tsx',
+          )
+
+    result['/index.html'] =
+      buildPreviewIndexHtml(
+        '/index.tsx',
+        tailwindConfigBody,
+      )
+  }
+
+  else if (hasJsApp) {
+    result['/index.jsx'] =
+      mainEntry &&
+      (mainEntry.ext === 'jsx' ||
+        mainEntry.ext === 'js')
+        ? buildPreviewEntryFromMain(
+            mainEntry.content,
+            cssImport,
+            usesBackend,
+          )
+        : buildFallbackPreviewEntry(
+            cssImport,
+            'jsx',
+          )
+
+    result['/index.html'] =
+      buildPreviewIndexHtml(
+        '/index.jsx',
+        tailwindConfigBody,
+      )
   }
 
   return result
@@ -939,6 +1597,11 @@ export function extractPreviewFromFullStack(
 
   const result: Record<string, string> = {}
 
+  const usesBackend =
+    detectProjectUsesBackend(
+      fullStackFiles,
+    )
+
   const legacyPage =
     fullStackFiles['/app/page.tsx'] ??
     fullStackFiles['app/page.tsx'] ??
@@ -952,6 +1615,7 @@ export function extractPreviewFromFullStack(
       transformForSandpack(
         legacyPage,
         '/App.tsx',
+        { usesBackend },
       )
   }
 
@@ -986,6 +1650,7 @@ export function extractPreviewFromFullStack(
       transformForSandpack(
         content,
         path,
+        { usesBackend },
       )
   }
 
@@ -1053,6 +1718,14 @@ async function startPreview() {
 
 startPreview()
 `.trim()
+
+    result['/index.html'] =
+      buildPreviewIndexHtml(
+        '/index.tsx',
+        extractTailwindConfigBody(
+          fullStackFiles,
+        ),
+      )
   }
 
   return result
