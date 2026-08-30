@@ -5,7 +5,8 @@ import { useState } from 'react'
 import { Menu, X, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SiteLogo } from '@/components/site-logo'
-import { UserButton, SignInButton, SignUpButton, useAuth } from '@clerk/nextjs'
+import { UserButton, SignInButton, SignUpButton, useAuth, useUser } from '@clerk/nextjs'
+import { useRouter } from 'next/navigation'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,6 +29,8 @@ const resourcesLinks = [
 export function SiteHeader() {
   const [open, setOpen] = useState(false)
   const { userId } = useAuth()
+  const { user } = useUser()
+  const router = useRouter()
 
   return (
     <header className="sticky top-6 z-50 mx-auto w-full max-w-6xl px-4 sm:px-6">
@@ -72,12 +75,19 @@ export function SiteHeader() {
               </SignUpButton>
             </>
           ) : (
-            <>
-              <Button asChild size="sm" className="font-medium shadow-lg shadow-primary/20">
-                <Link href="/dashboard">Open Studio</Link>
-              </Button>
-              <UserButton />
-            </>
+            <button
+              onClick={() => router.push('/dashboard')}
+              className="relative flex size-8 items-center justify-center rounded-full overflow-hidden ring-2 ring-border/60 hover:ring-foreground/40 transition-all"
+              title="Go to Dashboard"
+            >
+              {user?.imageUrl ? (
+                <img src={user.imageUrl} alt={user.firstName ?? 'Profile'} className="size-full object-cover" />
+              ) : (
+                <span className="text-xs font-semibold bg-muted text-foreground size-full flex items-center justify-center">
+                  {user?.firstName?.[0] ?? 'U'}
+                </span>
+              )}
+            </button>
           )}
         </div>
 
@@ -129,14 +139,21 @@ export function SiteHeader() {
                   </SignUpButton>
                 </>
               ) : (
-                <>
-                  <Button asChild size="sm" className="w-full font-medium shadow-lg shadow-primary/20">
-                    <Link href="/dashboard">Open Studio</Link>
-                  </Button>
-                  <div className="mt-3 flex justify-center">
-                    <UserButton />
-                  </div>
-                </>
+                <div className="flex justify-center">
+                  <button
+                    onClick={() => { setOpen(false); router.push('/dashboard') }}
+                    className="relative flex size-10 items-center justify-center rounded-full overflow-hidden ring-2 ring-border/60 hover:ring-foreground/40 transition-all"
+                    title="Go to Dashboard"
+                  >
+                    {user?.imageUrl ? (
+                      <img src={user.imageUrl} alt={user.firstName ?? 'Profile'} className="size-full object-cover" />
+                    ) : (
+                      <span className="text-sm font-semibold bg-muted text-foreground size-full flex items-center justify-center">
+                        {user?.firstName?.[0] ?? 'U'}
+                      </span>
+                    )}
+                  </button>
+                </div>
               )}
             </div>
           </nav>

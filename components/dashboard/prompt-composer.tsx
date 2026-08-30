@@ -202,12 +202,15 @@ export function PromptComposer({
       <div
         className="
           relative flex flex-col
-          bg-card
-          border border-border/60
-          hover:border-border
+          bg-card/50
+          backdrop-blur-xl
+          border border-white/10
+          hover:border-white/20
           rounded-2xl
-          transition-all
-          focus-within:border-primary/60
+          transition-all duration-300
+          focus-within:border-white/30
+          focus-within:shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_8px_40px_rgba(0,0,0,0.4)]
+          shadow-[0_2px_20px_rgba(0,0,0,0.3)]
           overflow-hidden
         "
       >
@@ -267,6 +270,8 @@ export function PromptComposer({
                   ? 'min-h-[60px]'
                   : 'min-h-[120px]'
             }
+            max-h-[300px]
+            overflow-y-auto
             resize-none
             border-0
             bg-transparent
@@ -420,11 +425,14 @@ export function PromptComposer({
             className="
               rounded-full
               size-10
-              bg-primary/10
-              hover:bg-primary
-              text-primary
-              hover:text-primary-foreground
+              bg-foreground/10
+              hover:bg-foreground
+              text-foreground
+              hover:text-background
+              border border-foreground/20
+              hover:border-foreground
               shrink-0
+              transition-all duration-200
             "
             title={submitHint || 'Send'}
           >

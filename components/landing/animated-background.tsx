@@ -50,6 +50,7 @@ export function AnimatedBackground() {
       size: number
       baseSize: number
       color: string
+      opacity: number
 
       constructor() {
         this.x = Math.random() * window.innerWidth
@@ -59,18 +60,9 @@ export function AnimatedBackground() {
         this.baseSize = Math.random() * 3 + 2
         this.size = this.baseSize
         
-        // Randomly assign a subtle blue theme color
-        const colors = [
-          'rgba(59, 130, 246, 0.9)', // blue-500
-          'rgba(96, 165, 250, 0.8)', // blue-400
-          'rgba(147, 197, 253, 0.7)', // blue-300
-          'rgba(191, 219, 254, 0.6)', // blue-200
-          'rgba(6, 182, 212, 0.8)', // cyan-500
-          'rgba(34, 211, 238, 0.7)', // cyan-400
-          'rgba(99, 102, 241, 0.8)', // indigo-500
-          // 'rgba(255, 255, 255, 0.7)'
-        ]
-        this.color = colors[Math.floor(Math.random() * colors.length)]
+        // Assign a base opacity for the particle
+        this.opacity = Math.random() * 0.4 + 0.1
+        this.color = '' // Color is decided dynamically in draw() based on theme
       }
 
       update() {
@@ -103,7 +95,9 @@ export function AnimatedBackground() {
         if (!ctx) return
         ctx.beginPath()
         ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2)
-        ctx.fillStyle = this.color
+        
+        const isDark = document.documentElement.classList.contains('dark')
+        ctx.fillStyle = isDark ? `rgba(255, 255, 255, ${this.opacity})` : `rgba(0, 0, 0, ${this.opacity})`
         ctx.fill()
       }
     }
@@ -127,7 +121,8 @@ export function AnimatedBackground() {
           ctx.moveTo(i, 0)
           ctx.lineTo(i, canvas.height)
       }
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.02)'
+      const isDark = document.documentElement.classList.contains('dark')
+      ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)'
       ctx.stroke()
 
       // Update and draw particles
@@ -154,11 +149,13 @@ export function AnimatedBackground() {
             const midY = (particles[i].y + particles[j].y) / 2
             const mouseDist = Math.sqrt(Math.pow(mouse.x - midX, 2) + Math.pow(mouse.y - midY, 2))
             
+            const isDark = document.documentElement.classList.contains('dark')
+            
             if (mouseDist < mouseRadius) {
-                ctx.strokeStyle = `rgba(59, 130, 246, ${opacity * 0.9})` // blue glow
+                ctx.strokeStyle = isDark ? `rgba(255, 255, 255, ${opacity * 0.9})` : `rgba(0, 0, 0, ${opacity * 0.9})`
                 ctx.lineWidth = 1.5
             } else {
-                ctx.strokeStyle = `rgba(96, 165, 250, ${opacity * 0.3})` // subtle blue
+                ctx.strokeStyle = isDark ? `rgba(255, 255, 255, ${opacity * 0.2})` : `rgba(0, 0, 0, ${opacity * 0.2})`
                 ctx.lineWidth = 1
             }
             

@@ -1009,7 +1009,7 @@ export function SandpackPreview({
             1000,
 
           bundlerTimeOut:
-            180000,
+            600000,
 
           experimental_enableStableServiceWorkerId:
             true,
@@ -1059,13 +1059,19 @@ export function SandpackPreview({
               }
 
               .sp-wrapper,
-              .sp-layout,
               .sp-stack,
               .sp-preview-container {
                 flex: 1 !important;
                 min-height: 0 !important;
                 display: flex !important;
                 flex-direction: column !important;
+              }
+
+              .sp-layout {
+                flex: 1 !important;
+                min-height: 0 !important;
+                display: flex !important;
+                flex-direction: row !important;
               }
 
               .sp-preview-iframe {
@@ -1141,7 +1147,6 @@ export function SandpackPreview({
               <SandpackCodeEditor
                 showTabs
                 showLineNumbers
-                showInlineErrors
                 closableTabs
                 style={{
                   height:

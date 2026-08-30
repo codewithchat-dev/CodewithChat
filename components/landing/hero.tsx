@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { useAuth, useClerk } from '@clerk/nextjs'
 import { toast } from 'sonner'
-import { AnimatedBackground } from '@/components/landing/animated-background'
+import { AnimatedWaveBackground } from '@/components/landing/animated-wave-background'
 import { HeroPreview } from '@/components/landing/hero-preview'
 
 const PLACEHOLDER_PHRASES = [
@@ -163,25 +163,12 @@ export function Hero() {
 
   return (
     <section className="relative overflow-hidden pt-24 pb-16 md:pt-40 md:pb-24 flex flex-col items-center min-h-screen">
-      {/* Premium background effects */}
-      <div className="absolute inset-0 -z-20 bg-gradient-to-br from-blue-900/20 via-background to-cyan-900/20"></div>
+      <AnimatedWaveBackground />
+      {/* Faint radial glow at top */}
+      <div className="absolute top-0 left-1/2 -z-10 h-[600px] w-[1000px] -translate-x-1/2 -translate-y-[30%] rounded-full bg-foreground/5 blur-[200px] pointer-events-none" />
+      <div className="absolute top-0 inset-x-0 -z-10 h-[500px] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-foreground/8 via-transparent to-transparent pointer-events-none" />
       
-      {/* Large animated gradient orbs with more visibility */}
-      <div className="absolute top-0 left-0 -z-20 w-[800px] h-[800px] rounded-full bg-blue-500/20 blur-[200px] animate-pulse pointer-events-none" style={{ animationDuration: '6s' }}></div>
-      <div className="absolute top-20 right-0 -z-20 w-[700px] h-[700px] rounded-full bg-cyan-500/25 blur-[180px] animate-pulse pointer-events-none" style={{ animationDuration: '8s', animationDelay: '1s' }}></div>
-      <div className="absolute bottom-0 left-1/4 -z-20 w-[600px] h-[600px] rounded-full bg-indigo-500/20 blur-[150px] animate-pulse pointer-events-none" style={{ animationDuration: '10s', animationDelay: '2s' }}></div>
-      <div className="absolute top-1/3 right-1/4 -z-20 w-[500px] h-[500px] rounded-full bg-purple-500/15 blur-[120px] animate-pulse pointer-events-none" style={{ animationDuration: '7s', animationDelay: '3s' }}></div>
-      
-      {/* Moving gradient background */}
-      <div className="absolute inset-0 -z-20 bg-gradient-to-r from-blue-500/10 via-cyan-500/10 to-indigo-500/10 animate-gradient-mesh pointer-events-none"></div>
-      
-      {/* Main gradient glow */}
-      <div className="absolute top-0 left-1/2 -z-20 h-[1000px] w-[1200px] -translate-x-1/2 -translate-y-[30%] rounded-full bg-primary/30 blur-[300px] pointer-events-none animate-pulse" style={{ animationDuration: '4s' }}></div>
-      <div className="absolute top-0 inset-x-0 -z-20 h-[700px] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-400/30 via-cyan-400/20 to-transparent pointer-events-none"></div>
-      
-      {/* Animated background canvas */}
-      <AnimatedBackground />
-      
+
       {/* Subtle grid pattern */}
       <div className="absolute inset-0 -z-10 pattern-grid opacity-[0.05] pointer-events-none"></div>
       
@@ -200,14 +187,14 @@ export function Hero() {
             onSubmit={handleSubmit}
             className="relative w-full group"
           >
-            <div className="absolute -inset-0.5 rounded-xl bg-gradient-to-r from-primary/30 via-primary/10 to-secondary-accent/30 blur-sm transition-all duration-500 group-hover:from-primary/40 group-hover:via-primary/20 group-hover:to-secondary-accent/40 opacity-60"></div>
-            <div className="relative flex flex-col bg-card/90 backdrop-blur-lg border border-border/60 hover:border-border/80 rounded-xl shadow-xl transition-all duration-300 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/40 overflow-hidden">
+            <div className="absolute -inset-px rounded-xl bg-gradient-to-r from-white/10 via-white/5 to-white/10 blur-sm transition-all duration-500 group-hover:from-white/15 group-hover:via-white/8 group-hover:to-white/15"></div>
+            <div className="relative flex flex-col bg-card/50 backdrop-blur-xl border border-white/10 hover:border-white/20 rounded-xl shadow-[0_2px_30px_rgba(0,0,0,0.4)] transition-all duration-300 focus-within:border-white/30 focus-within:shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_12px_50px_rgba(0,0,0,0.5)] overflow-hidden">
               <Textarea
                 value={idea}
                 onChange={(e) => setIdea(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={placeholder}
-                className="min-h-[120px] resize-none border-0 bg-transparent px-5 py-4 text-base md:text-lg focus-visible:ring-0 placeholder:text-foreground/60 shadow-none"
+                className="max-h-[300px] overflow-y-auto min-h-[120px] resize-none border-0 bg-transparent px-5 py-4 text-base md:text-lg focus-visible:ring-0 placeholder:text-foreground/60 shadow-none"
               />
               
               <div className="flex items-center justify-between px-4 pb-4">

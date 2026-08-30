@@ -51,7 +51,8 @@ import { z } from 'zod'
 import { ShareProjectModal } from '@/components/dashboard/share-project-modal'
 import { PublishProjectModal } from '@/components/dashboard/publish-project-modal'
 import { ProjectGuide } from '@/components/dashboard/project-guide'
-import { BuildActivityFeed } from '@/components/dashboard/build-activity-feed'
+import { BuildActivityFeed, buildActivitiesFromPlan } from '@/components/dashboard/build-activity-feed'
+import type { FileSource } from '@/components/dashboard/build-activity-feed'
 import { PromptComposer } from '@/components/dashboard/prompt-composer'
 
 import { Button } from '@/components/ui/button'
@@ -270,6 +271,18 @@ const [rightPanel, setRightPanel] =
 const [viewportSize, setViewportSize] =
   useState<ViewportSize>('desktop')
 
+const [activeFile, setActiveFile] =
+  useState<string | null>(null)
+
+const handleOpenFile = useCallback(
+  (path: string) => {
+    setView('code')
+    setActiveFile(path)
+    setRightPanel('preview')
+  },
+  [],
+)
+
   // ───────────────────────────────────────────────────────────
   // COMPLETE STABLE PLAN
   // ───────────────────────────────────────────────────────────
@@ -287,6 +300,16 @@ const [viewportSize, setViewportSize] =
    */
   const [localPlan, setLocalPlan] =
     useState<Plan | null>(null)
+
+  // History of all past completed builds (shown stacked in chat)
+  type BuildSnapshot = {
+    idea: string
+    plan: Plan
+    durationMs: number
+    completedAt: number
+  }
+  const [activityHistory, setActivityHistory] =
+    useState<BuildSnapshot[]>([])
 
   // ───────────────────────────────────────────────────────────
   // AI GENERATION
@@ -321,50 +344,26 @@ const [viewportSize, setViewportSize] =
         setProjectUpdatedAt(
           new Date(finishedAt),
         )
+
+        // Snapshot this build into history BEFORE it gets replaced
+        setLocalPlan(prev => {
+          if (prev) {
+            setActivityHistory(h => [
+              ...h,
+              {
+                idea,
+                plan: prev,
+                durationMs: ms,
+                completedAt: finishedAt,
+              },
+            ])
+          }
+          return prev
+        })
       }
 
-      setMessages(prev => {
-        let durationLabel =
-          'Your preview is ready.'
-
-        if (buildStartedAtRef.current) {
-          const seconds = Math.max(
-            1,
-            Math.floor(
-              (finishedAt -
-                buildStartedAtRef.current) /
-                1000,
-            ),
-          )
-
-          const workedFor =
-            seconds < 60
-              ? `${seconds}s`
-              : `${Math.floor(
-                  seconds / 60,
-                )}m ${seconds % 60}s`
-
-          durationLabel =
-            `Done! Worked for ${workedFor}. ` +
-            'Preview + project files ready.'
-        }
-
-        if (
-          prev.length > 0 &&
-          prev[prev.length - 1].role ===
-            'user'
-        ) {
-          return [
-            ...prev,
-            {
-              role: 'assistant',
-              content: durationLabel,
-            },
-          ]
-        }
-
-        return prev
-      })
+      // Intentionally not adding a "Done!" chat message here.
+      // We rely on the BuildActivityFeed to show completion status and project files.
     },
 
     onError: err => {
@@ -1498,7 +1497,25 @@ const [viewportSize, setViewportSize] =
                   ),
                 )}
 
-                {/* BUILD ACTIVITY */}
+                {/* PAST BUILD ACTIVITIES */}
+
+                {activityHistory.map((hist, idx) => (
+                  <div key={idx} className="w-full self-start py-1 text-foreground/90">
+                    <BuildActivityFeed
+                      plan={hist.plan}
+                      loading={false}
+                      idea={hist.idea}
+                      startedAt={hist.completedAt - hist.durationMs}
+                      durationMs={hist.durationMs}
+                      completedAt={hist.completedAt}
+                      fallbackUpdatedAt={new Date(hist.completedAt)}
+                      compact
+                      onOpenFile={handleOpenFile}
+                    />
+                  </div>
+                ))}
+
+                {/* CURRENT BUILD ACTIVITY */}
 
                 {(loading ||
                   activePlan?.overview ||
@@ -1525,6 +1542,7 @@ const [viewportSize, setViewportSize] =
                         projectUpdatedAt
                       }
                       compact
+                      onOpenFile={handleOpenFile}
                     />
                   </div>
                 )}
@@ -1983,6 +2001,9 @@ const [viewportSize, setViewportSize] =
                       }
                       viewportSize={
                         viewportSize
+                      }
+                      activeFile={
+                        activeFile
                       }
                     />
                   ) : loading ? (

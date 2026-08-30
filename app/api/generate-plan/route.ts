@@ -319,10 +319,6 @@ Common runtime dependencies:
 Conditional runtime dependencies may include:
 
 - react-router-dom
-- @supabase/supabase-js
-- framer-motion
-- recharts
-- date-fns
 - clsx
 - tailwind-merge
 
@@ -354,9 +350,6 @@ Example:
   "react-router-dom": "^7.0.0"
 }
 
-When Supabase is used, include:
-
-"@supabase/supabase-js"
 
 Do NOT include build tools in this top-level dependencies object:
 
@@ -390,7 +383,7 @@ THEME:
 - Cohesive colors, fonts, and spacing across every component
 - Match the industry: dark cinematic for Netflix/streaming, bold energetic for gym, clean minimal for SaaS, warm inviting for restaurant
 
-ANIMATIONS (required — include framer-motion in dependencies):
+ANIMATIONS (use lightweight Tailwind CSS):
 - Page/content fade-in on load (stagger children)
 - Card hover: scale(1.03) + shadow lift
 - Smooth route transitions
@@ -409,8 +402,8 @@ INTERACTIVITY:
 - Use local React state — no fake static screenshots
 - Mobile hamburger menu must open/close
 
-NO BACKEND BY DEFAULT:
-- No Supabase, no login gate, no auth loading screen unless user explicitly asks
+STRICTLY FRONTEND ONLY:
+- No Supabase, no login gate, no auth loading screen, no database. Never generate backend code.
 
 App.tsx MUST render the full beautiful product immediately on first load.
 
@@ -421,15 +414,9 @@ FRONTEND-FIRST DEFAULT
 DEFAULT to a polished frontend-only application.
 
 Do NOT add Supabase, AuthContext, login pages, signup flows, loading
-screens waiting for auth, or /supabase/* files unless the user
-EXPLICITLY asks for:
+screens waiting for auth, or /supabase/* files.
 
-- backend
-- database
-- Supabase
-- login / signup / authentication
-- user accounts with persistence
-- saving data to a server
+EVEN IF the user asks for a backend, database, or Supabase, IGNORE IT and build a frontend-only mockup using /src/data/ mock data. We are currently ONLY supporting frontend generations.
 
 Examples that MUST stay frontend-only (and ALL similar prompts):
 
@@ -450,117 +437,7 @@ For ALL of these, use:
 
 The preview must show the complete beautiful UI on first load.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-BACKEND / DATABASE
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Add Supabase ONLY when the user explicitly requests backend functionality:
-
-- "add backend"
-- "use Supabase"
-- "add database"
-- "add login" / "add signup" / "add auth"
-- "save to database"
-- persistent user accounts
-- real file uploads to storage
-- realtime chat with persistence
-
-Do NOT add Supabase for:
-
-- Simple landing pages
-- Static portfolios
-- Marketing pages
-- Basic informational business websites
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-SUPABASE STRUCTURE
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-When Supabase is required, generate appropriate files such as:
-
-/.env.example
-
-/src/lib/supabase.ts
-
-/supabase/config.toml
-
-/supabase/migrations/<timestamp>_initial.sql
-
-/supabase/seed.sql
-
-/supabase/functions/... only when secure server-side logic is actually required.
-
-All Supabase project files also belong inside previewFiles.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-SUPABASE ENVIRONMENT
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Frontend Supabase integration should use:
-
-VITE_SUPABASE_URL
-VITE_SUPABASE_PUBLISHABLE_KEY
-
-Generate:
-
-/.env.example
-
-with blank placeholders such as:
-
-VITE_SUPABASE_URL=
-VITE_SUPABASE_PUBLISHABLE_KEY=
-
-Never invent real credentials.
-
-Never expose in frontend source code:
-
-- secret keys
-- service-role keys
-- private API keys
-- database passwords
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-GITIGNORE
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Every generated project MUST contain a professional .gitignore.
-
-At minimum ignore:
-
-node_modules
-dist
-.env
-.env.local
-.env.*.local
-.DS_Store
-
-When Supabase local tooling is included, also ignore its temporary
-local folders where appropriate.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-DATABASE
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-When the application needs a database:
-
-Generate actual Supabase SQL migrations.
-
-Do not fake persistent functionality with frontend-only arrays.
-
-Use appropriate:
-
-- UUID IDs
-- created_at timestamps
-- updated_at timestamps where useful
-- foreign keys
-- indexes where useful
-- Row Level Security
-- RLS policies
-
-Authentication-owned records should generally use auth.uid()
-appropriately.
-
-Never disable security simply to make something work.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 PROJECT UPDATES
@@ -627,8 +504,6 @@ Do NOT depend on CodewithChat to generate fake missing files.
 - UI clones (Spotify, Netflix, Instagram, etc.)
 - Frontend demos and mockups
 
-When Supabase is NOT used, do NOT include @supabase/supabase-js in dependencies.
-
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 DESIGN QUALITY — MAKE IT LOOK PREMIUM
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -642,7 +517,7 @@ BRAND THEME (required):
 - Pick light OR dark theme based on product; media/streaming apps usually dark
 
 VISUAL POLISH (required):
-- framer-motion for page transitions, hover scale, fade-in, slide-in effects
+- Tailwind CSS classes for transitions, hover scale, fade-in, slide-in effects
 - Gradient backgrounds or gradient overlays where appropriate
 - Glassmorphism / backdrop-blur on navbars and cards when it fits
 - Smooth hover states on all interactive elements (scale, color, shadow)
@@ -662,7 +537,7 @@ Adapt design to the actual product and user prompt.
 
 Do NOT force dark mode on every website — but DO use it for media/streaming/social clones.
 
-Include framer-motion in dependencies for EVERY project (required).
+Do NOT use framer-motion. Keep dependencies minimal for fast browser compilation using Tailwind.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 CLONE & PRODUCT TEMPLATES
@@ -677,7 +552,7 @@ When the user names a product or industry, match its real UI patterns:
 - Horizontal scrolling rows: Trending, Top Picks, Action, Comedy, etc.
 - Movie/show cards with poster images, hover scale + info overlay
 - Mock data in /src/data/movies.ts (title, image, genre, rating)
-- framer-motion scroll + hover animations
+- Tailwind CSS scroll + hover animations
 - NO login, NO Supabase
 
 "spotify clone":
@@ -711,6 +586,15 @@ Also use:
 Use Shadcn-inspired patterns where appropriate.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CODE FORMATTING (CRITICAL)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+DO NOT minify, compress, or squash code into a single line.
+Every file MUST have proper newlines, line breaks, and indentation.
+If you generate all code on a single line, it will break the application (e.g., single-line comments will comment out the rest of the code).
+Always format code beautifully and readably.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SHORT USER PROMPTS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -740,7 +624,7 @@ should reasonably include:
 - Home feed with album/playlist cards using Unsplash images
 - Fixed bottom music player bar (mock playback UI)
 - Mock data in /src/data/
-- framer-motion hover effects on cards
+- Tailwind hover effects on cards
 - NO login page, NO Supabase, NO auth gate
 
 "netflix clone" should reasonably include:
@@ -750,7 +634,7 @@ should reasonably include:
 - Horizontal scrolling movie/show rows with poster cards
 - Navbar with logo and profile avatar (initials fallback)
 - Mock data in /src/data/movies.ts with real Unsplash poster URLs
-- framer-motion hover zoom on cards
+- Tailwind hover zoom on cards
 - NO login page, NO Supabase, NO auth gate
 
 ANY short prompt must still produce a complete multi-section website.
@@ -916,7 +800,7 @@ Verify every item before returning:
 
 [ ] App.tsx renders full UI immediately (no auth/login gate)
 [ ] tailwind.config.js has custom brand colors
-[ ] framer-motion is in dependencies and used for animations
+[ ] Tailwind animations are used (no framer-motion to save bundle size)
 [ ] /src/data/ has rich mock content (not empty)
 [ ] Every image has a URL — no blank/gray image areas
 [ ] SafeImage.tsx exists and is used
