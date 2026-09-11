@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  serverExternalPackages: ['@prisma/client', 'prisma'],
+  serverExternalPackages: ["@prisma/client", "prisma"],
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -10,20 +10,16 @@ const nextConfig = {
   async headers() {
     return [
       {
-        source: '/dashboard/:path*',
+        source: "/dashboard/:path*",
         headers: [
           {
-            key: 'Cross-Origin-Embedder-Policy',
-            value: 'credentialless',
-          },
-          {
-            key: 'Cross-Origin-Opener-Policy',
-            value: 'same-origin',
+            key: "Cross-Origin-Opener-Policy",
+            value: "same-origin",
           },
         ],
       },
-    ]
+    ];
   },
-}
+};
 
-export default nextConfig
+export default nextConfig;

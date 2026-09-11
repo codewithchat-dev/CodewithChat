@@ -1,15 +1,15 @@
-import { google } from '@ai-sdk/google'
-import { auth, currentUser } from '@clerk/nextjs/server'
-import { streamObject, type ModelMessage } from 'ai'
+import { google } from "@ai-sdk/google";
+import { auth, currentUser } from "@clerk/nextjs/server";
+import { streamObject, type ModelMessage } from "ai";
 
-import { planSchema } from '@/lib/schema'
-import { db } from '@/lib/db'
-import { MAX_DAILY_CREDITS } from '@/lib/credits'
+import { planSchema } from "@/lib/schema";
+import { db } from "@/lib/db";
+import { MAX_DAILY_CREDITS } from "@/lib/credits";
 
-export const maxDuration = 300
+export const maxDuration = 300;
 
-type UserModelMessage = Extract<ModelMessage, { role: 'user' }>
-type UserMessageContent = UserModelMessage['content']
+type UserModelMessage = Extract<ModelMessage, { role: "user" }>;
+type UserMessageContent = UserModelMessage["content"];
 
 // ─────────────────────────────────────────────────────────────
 // DAILY CREDIT SYSTEM
@@ -19,38 +19,38 @@ function isDifferentUtcDay(
   lastReset: Date | null | undefined,
   now: Date,
 ): boolean {
-  if (!lastReset) return true
+  if (!lastReset) return true;
 
   return (
     lastReset.getUTCFullYear() !== now.getUTCFullYear() ||
     lastReset.getUTCMonth() !== now.getUTCMonth() ||
     lastReset.getUTCDate() !== now.getUTCDate()
-  )
+  );
 }
 
 async function consumeGenerationCredit() {
-  const { userId } = await auth()
+  const { userId } = await auth();
 
   if (!userId) {
     return {
       ok: false as const,
       status: 401,
-      error: 'Unauthorized',
+      error: "Unauthorized",
       credits: 0,
-    }
+    };
   }
 
-  const now = new Date()
+  const now = new Date();
 
   let dbUser = await db.user.findUnique({
     where: {
       clerkId: userId,
     },
-  })
+  });
 
   // First time user
   if (!dbUser) {
-    const clerkUser = await currentUser()
+    const clerkUser = await currentUser();
 
     dbUser = await db.user.create({
       data: {
@@ -61,7 +61,7 @@ async function consumeGenerationCredit() {
         credits: MAX_DAILY_CREDITS,
         lastCreditResetAt: now,
       },
-    })
+    });
   }
 
   // Reset credits when a new UTC calendar day starts
@@ -74,7 +74,7 @@ async function consumeGenerationCredit() {
         credits: MAX_DAILY_CREDITS,
         lastCreditResetAt: now,
       },
-    })
+    });
   }
 
   // Daily limit reached
@@ -82,9 +82,9 @@ async function consumeGenerationCredit() {
     return {
       ok: false as const,
       status: 402,
-      error: 'NO_CREDITS',
+      error: "NO_CREDITS",
       credits: 0,
-    }
+    };
   }
 
   // Consume 1 credit
@@ -97,12 +97,12 @@ async function consumeGenerationCredit() {
         decrement: 1,
       },
     },
-  })
+  });
 
   return {
     ok: true as const,
     credits: updatedUser.credits,
-  }
+  };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -110,59 +110,50 @@ async function consumeGenerationCredit() {
 // ─────────────────────────────────────────────────────────────
 
 function parseMessageContent(content: string): UserMessageContent {
-  if (
-    typeof content !== 'string' ||
-    !content.includes('[IMAGE: data:image/')
-  ) {
-    return content
+  if (typeof content !== "string" || !content.includes("[IMAGE: data:image/")) {
+    return content;
   }
 
-  const startIndex = content.indexOf('[IMAGE: ')
+  const startIndex = content.indexOf("[IMAGE: ");
 
   if (startIndex === -1) {
-    return content
+    return content;
   }
 
-  const textPart = content
-    .substring(0, startIndex)
-    .trim()
+  const textPart = content.substring(0, startIndex).trim();
 
-  const imagePartWithBracket =
-    content.substring(startIndex + 8)
+  const imagePartWithBracket = content.substring(startIndex + 8);
 
-  const endIndex =
-    imagePartWithBracket.indexOf(']')
+  const endIndex = imagePartWithBracket.indexOf("]");
 
   if (endIndex === -1) {
-    return content
+    return content;
   }
 
-  const imagePart = imagePartWithBracket
-    .substring(0, endIndex)
-    .trim()
+  const imagePart = imagePartWithBracket.substring(0, endIndex).trim();
 
-  const base64Data = imagePart.includes(',')
-    ? imagePart.split(',')[1]
-    : imagePart
+  const base64Data = imagePart.includes(",")
+    ? imagePart.split(",")[1]
+    : imagePart;
 
   if (!base64Data) {
-    return textPart
+    return textPart;
   }
 
   return [
     ...(textPart
       ? [
           {
-            type: 'text' as const,
+            type: "text" as const,
             text: textPart,
           },
         ]
       : []),
     {
-      type: 'image' as const,
+      type: "image" as const,
       image: base64Data,
     },
-  ] as UserMessageContent
+  ] as UserMessageContent;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -172,12 +163,35 @@ function parseMessageContent(content: string): UserMessageContent {
 function getSystemPrompt({
   tech,
   platform,
+  isUpdate = false,
 }: {
-  tech?: string
-  platform?: string
+  tech?: string;
+  platform?: string;
+  isUpdate?: boolean;
 }) {
   return `
 You are the project-generation engine for CodewithChat.
+
+${
+  isUpdate
+    ? `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FOLLOW-UP EDIT MODE (CRITICAL)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+This is NOT a new project. An existing app already exists.
+
+- Apply ONLY the user's latest requested change.
+- Do NOT rewrite the whole website from scratch.
+- Keep the current design, routes, components, data, and behavior
+  unless the user asked to change them.
+- previewFiles must contain ONLY files you changed or added.
+- Unchanged files MUST be omitted (the app merges them back).
+- If you delete a file, list its path in deletedFilePaths.
+- Return a complete implementation for each changed file, not a patch snippet.
+- After the edit, the app should still preview immediately.
+`
+    : ""
+}
 
 Your job is to generate complete, professional, production-quality
 web applications that can be previewed, downloaded, opened in VS Code,
@@ -218,13 +232,13 @@ Do NOT generate:
 
 The selected UI option may say:
 
-${tech || 'React + Vite'}
+${tech || "React + Vite"}
 
 But the generated project MUST still use the canonical stack above.
 
 Platform:
 
-${platform || 'Website'}
+${platform || "Website"}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 previewFiles = REAL PROJECT FILES
@@ -279,6 +293,11 @@ Create additional files only when useful:
 /src/data/
 
 Do not create useless empty files.
+Never emit a file with empty content. If a file is not needed, omit it
+entirely. Only create files inside /src/types/ when they contain real types
+used by the project; never create an empty /src/types/index.ts barrel file.
+Always put real reset, layout, and theme rules in /src/index.css; it must
+never be empty.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ENTRY POINT
@@ -333,6 +352,10 @@ Development dependencies should contain the required:
 
 Do not add random unused packages.
 
+Preview must stay fast. NEVER add @radix-ui/*, shadcn CLI packages,
+framer-motion, or extra UI kits. Stick to:
+react, react-dom, lucide-react, react-router-dom, clsx, tailwind-merge.
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 TOP-LEVEL dependencies FIELD
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -378,6 +401,48 @@ STRUCTURE:
 - react-router-dom with working routes when there are multiple pages
 - /src/data/ files with rich mock data — never empty arrays
 
+IMPLEMENTATION DEPTH — DO NOT SHIP A WIREFRAME:
+- Build the actual product experience, not only a hero, a few cards, and
+  placeholder rectangles.
+- Use at least 4 meaningful visual sections for a landing page, or at least
+  3 usable views/routes for an app, dashboard, marketplace, or clone.
+- Generate rich domain data: at least 8 realistic records for card/list
+  products, and enough copy to make the screen feel populated on first load.
+- Every visible control must have behavior: search filters records, tabs
+  switch content, menus open/close, cards navigate or open details, forms
+  validate and submit, and mobile navigation works.
+- Use loading, empty, success, and error states where the product needs them.
+- Use CSS for the visual identity: custom variables, gradients, layered
+  backgrounds, responsive breakpoints, hover/focus/active states, and subtle
+  motion. Do not rely on default browser styling.
+- Keep the first viewport visually strong: clear hero/content hierarchy,
+  realistic imagery, intentional spacing, and no unexplained blank space.
+
+FILE QUALITY BUDGET:
+- Prefer 16–32 purposeful files with REAL implementations, not stubs.
+- Navbar, Footer, Hero, and each major section/page MUST be their own
+  files with complete markup, spacing, hover states, and mobile behavior.
+- Main pages should typically be 120–250 lines. A 20-line "website" is
+  a failure. Write the full product UI.
+- Every generated file must contain real implementation. Never return an
+  empty index.ts, empty types barrel, empty CSS file, or placeholder export.
+- Keep individual source files complete and readable; never truncate a file
+  to fit the response. If a feature is not fully implementable, simplify the
+  feature instead of returning broken partial code.
+
+CUSTOMIZABLE STRUCTURE (required):
+- Brand tokens in tailwind.config.js AND CSS variables in /src/index.css
+  (--bg, --surface, --text, --muted, --accent) so colors are easy to change
+- Data lives in /src/data/, not hardcoded inside JSX
+- Reusable components in /src/components/, pages in /src/pages/
+- Footer must match the theme: dark sites get a dark footer (never a white
+  strip on a dark page). Text/links must have visible contrast.
+- Do not reuse the same Unsplash URL on every card. Each record gets a
+  unique, topic-matching image.
+- One handler per control. Never bind the same onClick twice. Buttons use
+  type="button" unless they submit a form. Clicks must navigate or setState
+  once and actually change the UI.
+
 THEME:
 - Custom brand palette in tailwind.config.js (never default gray-only Tailwind)
 - Cohesive colors, fonts, and spacing across every component
@@ -404,6 +469,20 @@ INTERACTIVITY:
 
 STRICTLY FRONTEND ONLY:
 - No Supabase, no login gate, no auth loading screen, no database. Never generate backend code.
+
+FUTURE BACKEND / DATABASE READY STRUCTURE:
+- Put reusable UI in /src/components/ and page-specific UI in /src/features/.
+- Put domain models in /src/types/ only when they are actually used.
+- Put data access behind typed interfaces in /src/services/ and provide mock
+  implementations backed by rich local data for the preview.
+- Keep pages and components dependent on service functions, not hardcoded
+  arrays or database clients.
+- Put validation, formatting, and pure helpers in /src/lib/.
+- Keep /src/App.tsx focused on routing and application composition.
+- Never create empty barrel files or speculative folders.
+
+The frontend must work immediately now, while a future REST, server-action,
+or database implementation can replace the service layer without rewriting UI.
 
 App.tsx MUST render the full beautiful product immediately on first load.
 
@@ -445,31 +524,17 @@ PROJECT UPDATES
 
 When existing project code is supplied:
 
-MODIFY the existing project.
+This is a SURGICAL EDIT, not a rebuild.
 
-Do NOT start again from scratch unless the user explicitly asks.
+- Modify only what the latest user message asks for
+- Do NOT start again from scratch unless the user explicitly asks to rebuild
+- Preserve design, components, routes, features, data, and styling
+- previewFiles = ONLY changed/added files (omit everything else)
+- deletedFilePaths = files to remove (usually [])
+- Do not "improve" unrelated files
+- Do not regenerate package.json, vite.config, or tailwind config unless required
 
-Preserve existing:
-
-- Design
-- Components
-- Routes
-- Features
-- Data models
-- Supabase integration
-- Styling
-- Functional behavior
-
-Apply the requested change cleanly.
-
-IMPORTANT:
-
-The response must still contain the COMPLETE final project in previewFiles.
-
-Do NOT return only modified files.
-
-If the project has 20 files and only Navbar changes,
-return all required current project files.
+If the user says "rebuild" or "start over", then generate the complete project.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 IMPORT INTEGRITY
@@ -494,6 +559,10 @@ Before completing output verify:
 - Runtime npm packages are listed
 - TypeScript syntax is valid
 - There are no obviously broken references
+- Every object, array, JSX element, function, string, and CSS block is closed
+- No // comments inside JSX (they render as visible text)
+- No Next.js Image props (priority, fill) on <img> or SafeImage
+- npm run build would be able to parse the generated TypeScript and CSS
 
 Do NOT depend on CodewithChat to generate fake missing files.
 
@@ -546,14 +615,32 @@ CLONE & PRODUCT TEMPLATES
 When the user names a product or industry, match its real UI patterns:
 
 "netflix clone":
-- Dark cinematic theme (#141414 bg, #E50914 red accent)
-- Top navbar with logo + nav links + avatar
-- Hero banner with featured movie backdrop (full-width Unsplash image)
-- Horizontal scrolling rows: Trending, Top Picks, Action, Comedy, etc.
-- Movie/show cards with poster images, hover scale + info overlay
-- Mock data in /src/data/movies.ts (title, image, genre, rating)
-- Tailwind CSS scroll + hover animations
-- NO login, NO Supabase
+- Dark cinematic theme (#141414 page bg, #E50914 red accent, white text)
+- Sticky top navbar: red wordmark, Home / TV Shows / Movies / My List,
+  search icon, bell, circular avatar initials — all working links/routes
+- Full-viewport hero: backdrop image covering the section, dark gradient
+  overlay from bottom, LARGE title, 2-line synopsis, Play + More Info buttons
+  that open a details route or modal. Title and copy sit ABOVE the image
+  (relative z-10), never mixed with raw code or extra text nodes
+- Horizontal rows that actually scroll: each card MUST be shrink-0 with a
+  fixed width (w-40 md:w-48), poster aspect-[2/3] object-cover rounded-md,
+  real Unsplash URL, title under the poster with truncate. Do NOT let flex
+  items shrink into 2-letter slivers
+- At least 4 rows (Trending, Top Picks, Action, Comedy) and 8+ movies
+- Hover: scale 1.08 + shadow. Clicking a card opens details
+- Mock data in /src/data/movies.ts: { id, title, image, backdrop, genre,
+  rating, synopsis }
+- Use these working poster URLs (append ?w=400&h=600&fit=crop):
+  https://images.unsplash.com/photo-1536440136628-849c177e76a1
+  https://images.unsplash.com/photo-1489599849927-2ee91cede3ba
+  https://images.unsplash.com/photo-1478720568477-152d9b164e26
+  https://images.unsplash.com/photo-1440404653325-ab127d49abc1
+  https://images.unsplash.com/photo-1574267432553-4b4628081c31
+  https://images.unsplash.com/photo-1594908900066-3f47337549d8
+  https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c
+  https://images.unsplash.com/photo-1485846234645-a62644f84728
+- Hero backdrop: same Unsplash photos with ?w=1920&h=1080&fit=crop
+- NO login, NO Supabase, NO next/image, NO priority prop on img
 
 "spotify clone":
 - Dark theme (#121212 bg, #1DB954 green accent)
@@ -582,6 +669,8 @@ Also use:
 - Tasteful shadows
 - Hover states
 - Smooth transitions
+- Footer contrast: never white-on-white or a blank white footer on a dark app
+- Unique relevant images per card/hero; no duplicate placeholder photos
 
 Use Shadcn-inspired patterns where appropriate.
 
@@ -591,8 +680,18 @@ CODE FORMATTING (CRITICAL)
 
 DO NOT minify, compress, or squash code into a single line.
 Every file MUST have proper newlines, line breaks, and indentation.
-If you generate all code on a single line, it will break the application (e.g., single-line comments will comment out the rest of the code).
+Use real line breaks between every import, statement, JSX block, and comment.
+Never flatten a file onto one line.
+If you generate all code on a single line, it will break the application
+(single-line // comments will comment out the rest of the file, and source
+will leak onto the page as visible text).
 Always format code beautifully and readably.
+
+NEVER RENDER SOURCE CODE IN THE UI:
+- Inside JSX, NEVER use // comments. They become visible text on the page.
+- If you need a comment in JSX, use {/* comment */} only.
+- Never dump scripts, JSON, stack traces, or file contents into the layout.
+- The user must see a designed product, not programming source.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SHORT USER PROMPTS
@@ -672,9 +771,52 @@ Use topic-relevant Unsplash photo IDs when possible.
 Every card, hero, avatar, thumbnail, banner, and poster MUST have a real image URL.
 Never leave image areas empty, gray, or as broken icons.
 
-MANDATORY: generate /src/components/common/SafeImage.tsx in every project.
-It must show a gradient/color fallback if the remote image fails to load.
-Use SafeImage everywhere instead of raw <img> tags.
+MANDATORY: generate /src/components/common/SafeImage.tsx in every project
+using this exact component (do not invent Next.js Image props):
+
+import { useState } from "react";
+
+type SafeImageProps = {
+  src?: string;
+  alt?: string;
+  className?: string;
+};
+
+export default function SafeImage({
+  src = "",
+  alt = "",
+  className = "",
+}: SafeImageProps) {
+  const [failed, setFailed] = useState(!src);
+
+  if (failed) {
+    return (
+      <div
+        className={"bg-gradient-to-br from-zinc-700 to-zinc-950 " + className}
+        role="img"
+        aria-label={alt}
+      />
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={className}
+      loading="lazy"
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
+Rules:
+- Use SafeImage everywhere instead of raw <img> tags
+- Pass ONLY src, alt, className
+- NEVER pass priority, fill, unoptimized, sizes, or spread ...props onto <img>
+- NEVER import from next/image — this is Vite + React, not Next.js
+- Every poster/hero/avatar className must include width + height or aspect-ratio
+  plus object-cover so images actually fill the slot
 
 NEVER:
 
@@ -803,7 +945,9 @@ Verify every item before returning:
 [ ] Tailwind animations are used (no framer-motion to save bundle size)
 [ ] /src/data/ has rich mock content (not empty)
 [ ] Every image has a URL — no blank/gray image areas
-[ ] SafeImage.tsx exists and is used
+[ ] SafeImage.tsx exists, is used, and does NOT use priority/fill/next/image
+[ ] Media rows use shrink-0 + fixed card width + aspect-[2/3] posters
+[ ] No // comments inside JSX (they show up as text on the page)
 [ ] All navigation, menus, tabs, and buttons work
 [ ] Responsive on mobile, tablet, desktop
 [ ] No Supabase unless user explicitly requested backend
@@ -826,7 +970,7 @@ Prioritize:
 9. Short guide
 
 Source-code quality is more important than lengthy explanations.
-`
+`;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -841,28 +985,24 @@ export async function POST(req: Request) {
       platform,
       messages = [],
       existingPlan,
-    } = await req.json()
+    } = await req.json();
 
-    if (
-      typeof idea !== 'string' ||
-      !idea.trim()
-    ) {
+    if (typeof idea !== "string" || !idea.trim()) {
       return Response.json(
         {
-          error: 'Missing idea',
+          error: "Missing idea",
         },
         {
           status: 400,
         },
-      )
+      );
     }
 
     // ─────────────────────────────────────────────────────────
     // CREDIT
     // ─────────────────────────────────────────────────────────
 
-    const creditResult =
-      await consumeGenerationCredit()
+    const creditResult = await consumeGenerationCredit();
 
     if (!creditResult.ok) {
       return Response.json(
@@ -873,7 +1013,7 @@ export async function POST(req: Request) {
         {
           status: creditResult.status,
         },
-      )
+      );
     }
 
     // ─────────────────────────────────────────────────────────
@@ -882,86 +1022,91 @@ export async function POST(req: Request) {
 
     const existingProject = existingPlan
       ? {
-          overview:
-            existingPlan.overview ?? '',
-
-          previewFiles:
-            existingPlan.previewFiles ?? [],
-
-          dependencies:
-            existingPlan.dependencies ?? {},
+          overview: existingPlan.overview ?? "",
+          previewFiles: existingPlan.previewFiles ?? [],
+          dependencies: existingPlan.dependencies ?? {},
         }
-      : null
+      : null;
+
+    const isUpdate = Boolean(
+      existingProject &&
+        Array.isArray(existingProject.previewFiles) &&
+        existingProject.previewFiles.length > 0 &&
+        Array.isArray(messages) &&
+        messages.length > 0,
+    );
 
     // Only keep recent chat context
-    const recentMessages = Array.isArray(messages)
-      ? messages.slice(-8)
-      : []
+    const recentMessages = Array.isArray(messages) ? messages.slice(-8) : [];
 
-    // ─────────────────────────────────────────────────────────
-    // MODEL MESSAGES
-    // IMPORTANT:
-    // Build messages manually instead of .map() union typing.
-    // ─────────────────────────────────────────────────────────
+    const modelMessages: ModelMessage[] = [];
 
-    const modelMessages: ModelMessage[] = []
+    if (isUpdate) {
+      modelMessages.push({
+        role: "user",
+        content: parseMessageContent(
+          `You are editing an existing CodewithChat project.
 
-    // Initial project context
-    modelMessages.push({
-      role: 'user',
-      content: parseMessageContent(
-        `Build this project:
+Original idea: ${idea.trim()}
+Platform: ${platform || "Website"}
+
+Apply ONLY the latest user request from the chat history.
+Do not rebuild the app. Return only changed/added files in previewFiles.`,
+        ),
+      });
+
+      modelMessages.push({
+        role: "user",
+        content: `CURRENT PROJECT FILES (copy unchanged files by omitting them)
+
+${JSON.stringify(existingProject)}`,
+      });
+    } else {
+      modelMessages.push({
+        role: "user",
+        content: parseMessageContent(
+          `Build this project:
 
 ${idea.trim()}
 
-Platform: ${platform || 'Website'}
+Platform: ${platform || "Website"}
 
 Generate the COMPLETE project using the canonical CodewithChat stack.`,
-      ),
-    })
+        ),
+      });
 
-    // Existing source code when editing a project
-    if (existingProject) {
-      modelMessages.push({
-        role: 'user',
-        content: `EXISTING PROJECT CODE
+      if (existingProject) {
+        modelMessages.push({
+          role: "user",
+          content: `EXISTING PROJECT CODE
 
 Modify this existing project instead of discarding it.
-
-Preserve everything that still works.
-
-Apply the requested changes.
-
 Return the COMPLETE final project after modifications.
 
 ${JSON.stringify(existingProject)}`,
-      })
+        });
+      }
     }
 
     // Chat history
     for (const message of recentMessages) {
-      if (
-        !message ||
-        typeof message.content !== 'string'
-      ) {
-        continue
+      if (!message || typeof message.content !== "string") {
+        continue;
       }
 
-      if (message.role === 'assistant') {
+      if (message.role === "assistant") {
         modelMessages.push({
-          role: 'assistant',
+          role: "assistant",
           content: message.content,
-        })
+        });
 
-        continue
+        continue;
       }
 
       modelMessages.push({
-        role: 'user',
-        content: parseMessageContent(
-          message.content,
-        ),
-      })
+        role: "user",
+        content: parseMessageContent(message.content),
+      });
     }
 
     // ─────────────────────────────────────────────────────────
@@ -969,38 +1114,34 @@ ${JSON.stringify(existingProject)}`,
     // ─────────────────────────────────────────────────────────
 
     const result = await streamObject({
-      model: google('gemini-2.5-flash'),
+      model: google("gemini-2.5-flash"),
 
       schema: planSchema,
 
       system: getSystemPrompt({
         tech,
         platform,
+        isUpdate,
       }),
 
       messages: modelMessages,
-    })
+    });
 
-    return result.toTextStreamResponse()
+    return result.toTextStreamResponse();
   } catch (error: unknown) {
-    console.error(
-      '[Generate Project] Error:',
-      error,
-    )
+    console.error("[Generate Project] Error:", error);
 
     const errorMessage =
-      error instanceof Error
-        ? error.message
-        : 'Unknown error occurred'
+      error instanceof Error ? error.message : "Unknown error occurred";
 
     return Response.json(
       {
-        error: 'Failed to generate project',
+        error: "Failed to generate project",
         details: errorMessage,
       },
       {
         status: 500,
       },
-    )
+    );
   }
 }

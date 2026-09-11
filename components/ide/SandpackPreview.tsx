@@ -1,12 +1,6 @@
-'use client'
+"use client";
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   SandpackProvider,
@@ -17,168 +11,126 @@ import {
   useSandpack,
   useSandpackPreviewProgress,
   defaultDark,
-} from '@codesandbox/sandpack-react'
+} from "@codesandbox/sandpack-react";
 
-import {
-  AlertCircle,
-  Loader2,
-  RefreshCw,
-} from 'lucide-react'
+import { AlertCircle, Loader2, RefreshCw } from "lucide-react";
 
-import {
-  buildPreviewIndexHtml,
-} from '@/lib/preview-files'
+import { buildPreviewIndexHtml } from "@/lib/preview-files";
 
-export type SandpackView =
-  | 'preview'
-  | 'code'
+export type SandpackView = "preview" | "code";
 
-export type ViewportSize =
-  | 'desktop'
-  | 'tablet'
-  | 'mobile'
+export type ViewportSize = "desktop" | "tablet" | "mobile";
 
 interface SandpackPreviewProps {
-  files: Record<string, string>
+  files: Record<string, string>;
 
-  dependencies?: Record<
-    string,
-    string
-  >
+  dependencies?: Record<string, string>;
 
-  view?: SandpackView
+  view?: SandpackView;
 
-  isTerminalOpen?: boolean
+  isTerminalOpen?: boolean;
 
-  onCloseTerminal?: () => void
+  onCloseTerminal?: () => void;
 
-  onPreviewError?: (
-    message: string,
-  ) => void
+  onPreviewError?: (message: string) => void;
 
-  previewKey?: number
+  onAutoFix?: () => void;
 
-  fileMode?: 'preview' | 'project'
+  previewKey?: number;
 
-  activeFile?: string | null
+  fileMode?: "preview" | "project";
 
-  tech?: string
+  activeFile?: string | null;
 
-  openPreviewUrl?: string
+  tech?: string;
 
-  isLoading?: boolean
+  openPreviewUrl?: string;
 
-  viewportSize?: ViewportSize
+  isLoading?: boolean;
+
+  viewportSize?: ViewportSize;
 }
 
 // ─────────────────────────────────────────────────────────────
 // PATH HELPERS
 // ─────────────────────────────────────────────────────────────
 
-function normalizePath(
-  path: string,
-): string {
-  const normalized = path
-    .trim()
-    .replace(/\\/g, '/')
-    .replace(/\/+/g, '/')
+function normalizePath(path: string): string {
+  const normalized = path.trim().replace(/\\/g, "/").replace(/\/+/g, "/");
 
   if (!normalized) {
-    return '/'
+    return "/";
   }
 
-  return normalized.startsWith('/')
-    ? normalized
-    : `/${normalized}`
+  return normalized.startsWith("/") ? normalized : `/${normalized}`;
 }
 
-function toRuntimePath(
-  path: string,
-): string {
-  const normalized =
-    normalizePath(path)
+function toRuntimePath(path: string): string {
+  const normalized = normalizePath(path);
 
-  if (
-    normalized.startsWith('/src/')
-  ) {
-    return normalized.slice(
-      '/src'.length,
-    )
+  if (normalized.startsWith("/src/")) {
+    return normalized.slice("/src".length);
   }
 
-  return normalized
+  return normalized;
 }
 
 // ─────────────────────────────────────────────────────────────
 // DEPENDENCIES
 // ─────────────────────────────────────────────────────────────
 
-const BLOCKED_DEPENDENCIES =
-  new Set([
-    'next',
-    'vite',
-    '@vitejs/plugin-react',
-    '@vercel/ai',
-    '@supabase/ssr',
-    '@supabase/auth-helpers-nextjs',
-    'typescript',
-    'tailwindcss',
-    'postcss',
-    'autoprefixer',
-  ])
+const BLOCKED_DEPENDENCIES = new Set([
+  "next",
+  "vite",
+  "@vitejs/plugin-react",
+  "@vercel/ai",
+  "@supabase/ssr",
+  "@supabase/auth-helpers-nextjs",
+  "typescript",
+  "tailwindcss",
+  "postcss",
+  "autoprefixer",
+]);
 
-const KNOWN_RUNTIME_VERSIONS:
-  Record<string, string> = {
-    react: '18.2.0',
+const KNOWN_RUNTIME_VERSIONS: Record<string, string> = {
+  react: "18.2.0",
 
-    'react-dom':
-      '18.2.0',
+  "react-dom": "18.2.0",
 
-    'react-router-dom':
-      '^6.28.0',
+  "react-router-dom": "^6.28.0",
 
-    'lucide-react':
-      '^0.468.0',
+  "lucide-react": "^0.468.0",
 
-    clsx:
-      '^2.1.1',
+  clsx: "^2.1.1",
 
-    'tailwind-merge':
-      '^2.5.4',
+  "tailwind-merge": "^2.5.4",
 
-    '@supabase/supabase-js':
-      '^2.45.0',
+  "@supabase/supabase-js": "^2.45.0",
 
-    'framer-motion':
-      '11.11.11',
+  "framer-motion": "11.11.11",
 
-    recharts:
-      '^2.13.0',
+  recharts: "^2.13.0",
 
-    'date-fns':
-      '^4.0.0',
-  }
+  "date-fns": "^4.0.0",
+};
 
-function shouldBlockDependency(
-  name: string,
-): boolean {
-  if (
-    BLOCKED_DEPENDENCIES.has(
-      name,
-    )
-  ) {
-    return true
+function shouldBlockDependency(name: string): boolean {
+  if (BLOCKED_DEPENDENCIES.has(name)) {
+    return true;
   }
 
   if (
-    name.startsWith(
-      '@supabase/ssr',
-    )
+    name.startsWith("@supabase/ssr") ||
+    name.startsWith("@radix-ui/") ||
+    name.startsWith("@types/") ||
+    name.startsWith("eslint") ||
+    name.startsWith("@eslint") ||
+    name.startsWith("prettier")
   ) {
-    return true
+    return true;
   }
 
-  return false
+  return false;
 }
 
 /**
@@ -190,42 +142,33 @@ function shouldBlockDependency(
  * @supabase/supabase-js
  * -> @supabase/supabase-js
  */
-function getPackageName(
-  importSource: string,
-): string | null {
-  const source =
-    importSource.trim()
+function getPackageName(importSource: string): string | null {
+  const source = importSource.trim();
 
   if (
     !source ||
-    source.startsWith('.') ||
-    source.startsWith('/') ||
-    source.startsWith('@/') ||
-    source.startsWith('http://') ||
-    source.startsWith('https://') ||
-    source.startsWith('data:') ||
-    source.startsWith('node:')
+    source.startsWith(".") ||
+    source.startsWith("/") ||
+    source.startsWith("@/") ||
+    source.startsWith("http://") ||
+    source.startsWith("https://") ||
+    source.startsWith("data:") ||
+    source.startsWith("node:")
   ) {
-    return null
+    return null;
   }
 
-  if (source.startsWith('@')) {
-    const parts =
-      source.split('/')
+  if (source.startsWith("@")) {
+    const parts = source.split("/");
 
-    if (
-      parts.length >= 2
-    ) {
-      return `${parts[0]}/${parts[1]}`
+    if (parts.length >= 2) {
+      return `${parts[0]}/${parts[1]}`;
     }
 
-    return source
+    return source;
   }
 
-  return (
-    source.split('/')[0] ??
-    null
-  )
+  return source.split("/")[0] ?? null;
 }
 
 /**
@@ -241,43 +184,25 @@ function getPackageName(
 function discoverDependenciesFromFiles(
   files: Record<string, string>,
 ): Record<string, string> {
-  const discovered:
-    Record<string, string> = {}
+  const discovered: Record<string, string> = {};
 
-  const addDependency = (
-    source: string,
-  ) => {
-    const packageName =
-      getPackageName(source)
+  const addDependency = (source: string) => {
+    const packageName = getPackageName(source);
 
     if (!packageName) {
-      return
+      return;
     }
 
-    if (
-      shouldBlockDependency(
-        packageName,
-      )
-    ) {
-      return
+    if (shouldBlockDependency(packageName)) {
+      return;
     }
 
-    discovered[packageName] =
-      KNOWN_RUNTIME_VERSIONS[
-        packageName
-      ] ?? 'latest'
-  }
+    discovered[packageName] = KNOWN_RUNTIME_VERSIONS[packageName] ?? "latest";
+  };
 
-  for (
-    const [path, content]
-    of Object.entries(files)
-  ) {
-    if (
-      !/\.(tsx?|jsx?)$/.test(
-        path,
-      )
-    ) {
-      continue
+  for (const [path, content] of Object.entries(files)) {
+    if (!/\.(tsx?|jsx?)$/.test(path)) {
+      continue;
     }
 
     /**
@@ -294,105 +219,58 @@ function discoverDependenciesFromFiles(
      * Local imports (`./foo`, `../bar`, `/abs`, `@/alias`) are filtered
      * out downstream by getPackageName().
      */
-    const fromRegex = /\bfrom\s+['"]([^'"]+)['"]/g
+    const fromRegex = /\bfrom\s+['"]([^'"]+)['"]/g;
 
     // Side-effect imports: import 'pkg'
-    const sideEffectRegex =
-      /\bimport\s+['"]([^'"]+)['"]/g
+    const sideEffectRegex = /\bimport\s+['"]([^'"]+)['"]/g;
 
     // Dynamic imports: import('pkg')
-    const dynamicImportRegex =
-      /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g
+    const dynamicImportRegex = /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
 
-    let match:
-      RegExpExecArray | null
+    let match: RegExpExecArray | null;
 
-    while (
-      (
-        match =
-          fromRegex.exec(
-            content,
-          )
-      ) !== null
-    ) {
+    while ((match = fromRegex.exec(content)) !== null) {
       if (match[1]) {
-        addDependency(
-          match[1],
-        )
+        addDependency(match[1]);
       }
     }
 
-    while (
-      (
-        match =
-          sideEffectRegex.exec(
-            content,
-          )
-      ) !== null
-    ) {
+    while ((match = sideEffectRegex.exec(content)) !== null) {
       if (match[1]) {
-        addDependency(
-          match[1],
-        )
+        addDependency(match[1]);
       }
     }
 
-    while (
-      (
-        match =
-          dynamicImportRegex.exec(
-            content,
-          )
-      ) !== null
-    ) {
+    while ((match = dynamicImportRegex.exec(content)) !== null) {
       if (match[1]) {
-        addDependency(
-          match[1],
-        )
+        addDependency(match[1]);
       }
     }
   }
 
-  return discovered
+  return discovered;
 }
 
 // ─────────────────────────────────────────────────────────────
 // ACTIVE FILE
 // ─────────────────────────────────────────────────────────────
 
-function ActiveFileOpener({
-  filePath,
-}: {
-  filePath?: string | null
-}) {
-  const { sandpack } =
-    useSandpack()
+function ActiveFileOpener({ filePath }: { filePath?: string | null }) {
+  const { sandpack } = useSandpack();
 
   useEffect(() => {
     if (!filePath) {
-      return
+      return;
     }
 
-    const runtimePath =
-      toRuntimePath(
-        filePath,
-      )
+    const runtimePath = toRuntimePath(filePath);
 
-    if (
-      sandpack.files[
-        runtimePath
-      ]
-    ) {
-      sandpack.openFile(
-        runtimePath,
-      )
+    if (sandpack.files[runtimePath]) {
+      sandpack.openFile(runtimePath);
     }
-  }, [
-    filePath,
-    sandpack,
-  ])
+  }, [filePath, sandpack]);
 
-  return null
+  return null;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -402,49 +280,31 @@ function ActiveFileOpener({
 function SandpackErrorReporter({
   onError,
 }: {
-  onError?: (
-    message: string,
-  ) => void
+  onError?: (message: string) => void;
 }) {
-  const { sandpack } =
-    useSandpack()
+  const { sandpack } = useSandpack();
 
-  const lastReportedError =
-    useRef<string | null>(
-      null,
-    )
+  const lastReportedError = useRef<string | null>(null);
 
-  const errorMessage =
-    sandpack.error?.message ??
-    null
+  const errorMessage = sandpack.error?.message ?? null;
 
   useEffect(() => {
     if (!errorMessage) {
-      lastReportedError.current =
-        null
+      lastReportedError.current = null;
 
-      return
+      return;
     }
 
-    if (
-      errorMessage ===
-      lastReportedError.current
-    ) {
-      return
+    if (errorMessage === lastReportedError.current) {
+      return;
     }
 
-    lastReportedError.current =
-      errorMessage
+    lastReportedError.current = errorMessage;
 
-    onError?.(
-      errorMessage,
-    )
-  }, [
-    errorMessage,
-    onError,
-  ])
+    onError?.(errorMessage);
+  }, [errorMessage, onError]);
 
-  return null
+  return null;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -454,21 +314,19 @@ function SandpackErrorReporter({
 function PreviewStatusOverlay({
   isEmpty,
   onRefresh,
+  onAutoFix,
 }: {
-  isEmpty: boolean
-  onRefresh: () => void
+  isEmpty: boolean;
+  onRefresh: () => void;
+  onAutoFix?: () => void;
 }) {
-  const { sandpack } =
-    useSandpack()
+  const { sandpack } = useSandpack();
 
-  const progressMessage =
-    useSandpackPreviewProgress({})
+  const progressMessage = useSandpackPreviewProgress({});
 
-  const status =
-    sandpack.status
+  const status = sandpack.status;
 
-  const errorMessage =
-    sandpack.error?.message
+  const errorMessage = sandpack.error?.message;
 
   // ─── COMPILE ERROR ────────────────────────────────────
 
@@ -488,25 +346,30 @@ function PreviewStatusOverlay({
 
           <button
             type="button"
-            onClick={
-              onRefresh
-            }
+            onClick={onRefresh}
             className="mx-auto mt-3 flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
             <RefreshCw className="size-3.5" />
-
             Refresh Preview
           </button>
+
+          {onAutoFix && (
+            <button
+              type="button"
+              onClick={onAutoFix}
+              className="mx-auto flex items-center gap-2 rounded-lg border border-primary/40 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/10"
+            >
+              Fix with AI
+            </button>
+          )}
         </div>
       </div>
-    )
+    );
   }
 
   // ─── TIMEOUT ──────────────────────────────────────────
 
-  if (
-    status === 'timeout'
-  ) {
+  if (status === "timeout") {
     return (
       <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#0a0a0a]/95 p-6 backdrop-blur-sm">
         <div className="max-w-md space-y-3 text-center">
@@ -517,26 +380,21 @@ function PreviewStatusOverlay({
           </p>
 
           <p className="text-xs leading-relaxed text-zinc-400">
-            Package install took too long. Large
-            projects can take 1–3 minutes on first
-            load — try again, or open preview in a
-            new tab.
+            Package install took too long. Large projects can take 1–3 minutes
+            on first load — try again, or open preview in a new tab.
           </p>
 
           <button
             type="button"
-            onClick={
-              onRefresh
-            }
+            onClick={onRefresh}
             className="mx-auto flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
           >
             <RefreshCw className="size-3.5" />
-
             Try Again
           </button>
         </div>
       </div>
-    )
+    );
   }
 
   // ─── EMPTY ────────────────────────────────────────────
@@ -547,52 +405,47 @@ function PreviewStatusOverlay({
         <div className="flex flex-col items-center gap-3 text-zinc-400">
           <Loader2 className="size-8 animate-spin text-primary" />
 
-          <p className="text-sm">
-            Waiting for project files...
-          </p>
+          <p className="text-sm">Waiting for project files...</p>
         </div>
       </div>
-    )
+    );
   }
 
   // ─── INITIAL / COMPILING ──────────────────────────────
 
-  if (
-    status === 'initial' ||
-    status === 'running'
-  ) {
+  // Sandpack keeps `running` after the iframe is live. Treating it as a
+  // loading state leaves a permanent overlay on top of an already-rendered
+  // website, so only show the loader during the initial boot phase.
+  if (status === "initial") {
     return (
       <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-[#0a0a0a]/70 backdrop-blur-[1px]">
         <div className="flex items-center gap-2 rounded-full border border-zinc-800 bg-[#151515] px-4 py-2 shadow-xl">
           <Loader2 className="size-4 animate-spin text-primary" />
 
           <span className="text-xs text-zinc-300">
-            {progressMessage ??
-              'Preparing preview…'}
+            {progressMessage ?? "Preparing preview…"}
           </span>
         </div>
       </div>
-    )
+    );
   }
 
-  return null
+  return null;
 }
 
 // ─────────────────────────────────────────────────────────────
 // FILE SAFETY
 // ─────────────────────────────────────────────────────────────
 
-function stripHugeBase64(
-  content: string,
-): string {
+function stripHugeBase64(content: string): string {
   if (!content) {
-    return content
+    return content;
   }
 
   return content.replace(
     /data:image\/[^;]+;base64,[A-Za-z0-9+/=]{1000,}/g,
-    'https://placehold.co/1200x800?text=Preview+Image',
-  )
+    "https://placehold.co/1200x800?text=Preview+Image",
+  );
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -604,384 +457,233 @@ export function SandpackPreview({
 
   dependencies = {},
 
-  view = 'preview',
+  view = "preview",
 
   onPreviewError,
 
+  onAutoFix,
+
   previewKey = 0,
 
-  fileMode = 'preview',
+  fileMode = "preview",
 
   activeFile = null,
 
-  viewportSize = 'desktop',
+  viewportSize = "desktop",
+
+  isLoading = false,
 }: SandpackPreviewProps) {
-  const [
-    localPreviewKey,
-    setLocalPreviewKey,
-  ] = useState(0)
+  const [localPreviewKey, setLocalPreviewKey] = useState(0);
 
   // ───────────────────────────────────────────────────────────
   // ERROR CALLBACK
   // ───────────────────────────────────────────────────────────
 
-  const handlePreviewError =
-    useCallback(
-      (
-        message: string,
-      ) => {
-        console.error(
-          '[Sandpack] Preview error:',
-          message,
-        )
+  const handlePreviewError = useCallback(
+    (message: string) => {
+      console.error("[Sandpack] Preview error:", message);
 
-        onPreviewError?.(
-          message,
-        )
-      },
-      [
-        onPreviewError,
-      ],
-    )
+      onPreviewError?.(message);
+    },
+    [onPreviewError],
+  );
 
   // ───────────────────────────────────────────────────────────
   // DISCOVER DEPENDENCIES FROM FILES
   // ───────────────────────────────────────────────────────────
 
-  const discoveredDependencies =
-    useMemo(
-      () =>
-        discoverDependenciesFromFiles(
-          files,
-        ),
-      [
-        files,
-      ],
-    )
+  const discoveredDependencies = useMemo(
+    () => discoverDependenciesFromFiles(files),
+    [files],
+  );
 
   // ───────────────────────────────────────────────────────────
   // SANITIZE PROVIDED DEPENDENCIES
   // ───────────────────────────────────────────────────────────
 
-  const sanitizedDependencies =
-    useMemo<
-      Record<string, string>
-    >(() => {
-      return Object.fromEntries(
-        Object.entries(
-          dependencies,
-        ).filter(
-          (
-            [name, version],
-          ) =>
-            Boolean(
-              name,
-            ) &&
-            typeof version ===
-              'string' &&
-            Boolean(
-              version,
-            ) &&
-            !shouldBlockDependency(
-              name,
-            ),
-        ),
-      )
-    }, [
-      dependencies,
-    ])
+  const sanitizedDependencies = useMemo<Record<string, string>>(() => {
+    return Object.fromEntries(
+      Object.entries(dependencies).filter(
+        ([name, version]) =>
+          Boolean(name) &&
+          typeof version === "string" &&
+          Boolean(version) &&
+          !shouldBlockDependency(name),
+      ),
+    );
+  }, [dependencies]);
 
   // ───────────────────────────────────────────────────────────
   // FINAL RUNTIME DEPENDENCIES
   // ───────────────────────────────────────────────────────────
 
-  const runtimeDependencies =
-    useMemo<
-      Record<string, string>
-    >(
-      () => {
-        const merged: Record<string, string> = {
-          /**
-           * Lowest priority:
-           * automatically discovered imports.
-           */
-          ...discoveredDependencies,
+  const runtimeDependencies = useMemo<Record<string, string>>(() => {
+    const merged: Record<string, string> = {
+      ...discoveredDependencies,
+      react: "18.2.0",
+      "react-dom": "18.2.0",
+    };
 
-          /**
-           * Higher priority:
-           * package.json / plan dependencies received from parent.
-           */
-          ...sanitizedDependencies,
+    for (const [name, version] of Object.entries(sanitizedDependencies)) {
+      if (merged[name]) {
+        merged[name] = version;
+      }
+    }
 
-          /**
-           * Keep React runtime stable.
-           */
-          react:
-            '18.2.0',
+    for (const optionalPackage of [
+      "lucide-react",
+      "clsx",
+      "tailwind-merge",
+    ] as const) {
+      const version =
+        sanitizedDependencies[optionalPackage] ??
+        discoveredDependencies[optionalPackage];
 
-          'react-dom':
-            '18.2.0',
-        }
+      if (version) {
+        merged[optionalPackage] = version;
+      }
+    }
 
-        for (
-          const optionalPackage
-          of [
-            'lucide-react',
-            'clsx',
-            'tailwind-merge',
-          ] as const
-        ) {
-          const version =
-            sanitizedDependencies[
-              optionalPackage
-            ] ??
-            discoveredDependencies[
-              optionalPackage
-            ]
+    /**
+     * Always include react-router-dom at its known version
+     * if ANY file in the project imports it.
+     *
+     * This is a belt-and-suspenders guarantee on top of the
+     * discoverDependenciesFromFiles scanner — if the scanner
+     * misses it, this scan of the raw string values catches it.
+     */
+    const routerVersion =
+      sanitizedDependencies["react-router-dom"] ??
+      discoveredDependencies["react-router-dom"];
 
-          if (version) {
-            merged[optionalPackage] =
-              version
-          }
-        }
+    const needsReactRouter =
+      routerVersion != null ||
+      Object.values(files).some(
+        (content) =>
+          typeof content === "string" && content.includes("react-router-dom"),
+      );
 
-        /**
-         * Always include react-router-dom at its known version
-         * if ANY file in the project imports it.
-         *
-         * This is a belt-and-suspenders guarantee on top of the
-         * discoverDependenciesFromFiles scanner — if the scanner
-         * misses it, this scan of the raw string values catches it.
-         */
-        const routerVersion =
-          sanitizedDependencies[
-            'react-router-dom'
-          ] ??
-          discoveredDependencies[
-            'react-router-dom'
-          ]
+    if (needsReactRouter) {
+      merged["react-router-dom"] = routerVersion ?? "^6.28.0";
+    }
 
-        const needsReactRouter =
-          routerVersion != null ||
-          Object.values(files).some(
-            content =>
-              typeof content === 'string' &&
-              content.includes(
-                'react-router-dom',
-              ),
-          )
-
-        if (needsReactRouter) {
-          merged['react-router-dom'] =
-            routerVersion ?? '^6.28.0'
-        }
-
-        return Object.fromEntries(
-          Object.entries(
-            merged,
-          ).filter(
-            ([name]) =>
-              !shouldBlockDependency(
-                name,
-              ),
-          ),
-        )
-      },
-      [
-        discoveredDependencies,
-        sanitizedDependencies,
-        files,
-      ],
-    )
+    return Object.fromEntries(
+      Object.entries(merged).filter(([name]) => !shouldBlockDependency(name)),
+    );
+  }, [discoveredDependencies, sanitizedDependencies, files]);
 
   // Debug while developing
   useEffect(() => {
-    if (
-      process.env.NODE_ENV ===
-      'production'
-    ) {
-      return
+    if (process.env.NODE_ENV === "production") {
+      return;
     }
 
-    console.log(
-      '[Sandpack] Runtime dependencies:',
-      runtimeDependencies,
-    )
-  }, [
-    runtimeDependencies,
-  ])
+    console.log("[Sandpack] Runtime dependencies:", runtimeDependencies);
+  }, [runtimeDependencies]);
 
   // ───────────────────────────────────────────────────────────
   // FILES
   // ───────────────────────────────────────────────────────────
 
-  const sandpackFiles =
-    useMemo(() => {
-      const result:
-        Record<
-          string,
-          {
-            code: string
-            active?: boolean
-          }
-        > = {}
+  const sandpackFiles = useMemo(() => {
+    const result: Record<
+      string,
+      {
+        code: string;
+        active?: boolean;
+      }
+    > = {};
 
-      for (
-        const [
-          rawPath,
-          rawContent,
-        ] of Object.entries(
-          files,
-        )
-      ) {
-        if (
-          typeof rawContent !==
-          'string'
-        ) {
-          continue
-        }
-
-        const path =
-          normalizePath(
-            rawPath,
-          )
-
-        if (
-          !/\.(tsx?|jsx?|css|html)$/.test(
-            path,
-          )
-        ) {
-          continue
-        }
-
-        result[path] = {
-          code:
-            stripHugeBase64(
-              rawContent,
-            ),
-        }
+    for (const [rawPath, rawContent] of Object.entries(files)) {
+      if (typeof rawContent !== "string") {
+        continue;
       }
 
-      // ─── ACTIVE FILE ──────────────────────────────────
+      const path = normalizePath(rawPath);
 
-      if (activeFile) {
-        const runtimePath =
-          toRuntimePath(
-            activeFile,
-          )
-
-        if (
-          result[
-            runtimePath
-          ]
-        ) {
-          result[
-            runtimePath
-          ] = {
-            ...result[
-              runtimePath
-            ],
-
-            active: true,
-          }
-        }
+      if (!/\.(tsx?|jsx?|css|html)$/.test(path)) {
+        continue;
       }
 
-      else if (
-        result[
-          '/App.tsx'
-        ]
-      ) {
-        result[
-          '/App.tsx'
-        ] = {
-          ...result[
-            '/App.tsx'
-          ],
+      result[path] = {
+        code: stripHugeBase64(rawContent),
+      };
+    }
+
+    // ─── ACTIVE FILE ──────────────────────────────────
+
+    if (activeFile) {
+      const runtimePath = toRuntimePath(activeFile);
+
+      if (result[runtimePath]) {
+        result[runtimePath] = {
+          ...result[runtimePath],
 
           active: true,
-        }
+        };
       }
+    } else if (result["/App.tsx"]) {
+      result["/App.tsx"] = {
+        ...result["/App.tsx"],
 
-      else if (
-        result[
-          '/App.jsx'
-        ]
-      ) {
-        result[
-          '/App.jsx'
-        ] = {
-          ...result[
-            '/App.jsx'
-          ],
+        active: true,
+      };
+    } else if (result["/App.jsx"]) {
+      result["/App.jsx"] = {
+        ...result["/App.jsx"],
 
-          active: true,
-        }
+        active: true,
+      };
+    }
+
+    // Sandpack template already has its own package.json & tsconfig.
+    // If we pass the generated ones, they override Sandpack's internal config
+    // and break the Vite dev server or miss dependencies we injected.
+    delete result["/package.json"];
+    delete result["/package-lock.json"];
+    delete result["/tsconfig.json"];
+    delete result["/vite.config.ts"];
+    delete result["/vite.config.js"];
+    delete result["/tailwind.config.js"];
+    delete result["/tailwind.config.ts"];
+    delete result["/postcss.config.js"];
+
+    if (!result["/index.html"]) {
+      const entry = result["/index.tsx"]
+        ? "/index.tsx"
+        : result["/index.jsx"]
+          ? "/index.jsx"
+          : result["/main.tsx"]
+            ? "/main.tsx"
+            : result["/main.jsx"]
+              ? "/main.jsx"
+              : result["/App.tsx"]
+                ? "/App.tsx"
+                : result["/App.jsx"]
+                  ? "/App.jsx"
+                  : null;
+
+      if (entry) {
+        result["/index.html"] = {
+          code: buildPreviewIndexHtml(entry),
+        };
       }
+    }
 
-      // Sandpack template already has its own package.json & tsconfig.
-      // If we pass the generated ones, they override Sandpack's internal config 
-      // and break the Vite dev server or miss dependencies we injected.
-      delete result['/package.json']
-      delete result['/package-lock.json']
-      delete result['/tsconfig.json']
-      delete result['/vite.config.ts']
-      delete result['/vite.config.js']
-      delete result['/tailwind.config.js']
-      delete result['/tailwind.config.ts']
-      delete result['/postcss.config.js']
+    return result;
+  }, [files, activeFile]);
 
-      if (!result['/index.html']) {
-        const entry =
-          result['/index.tsx']
-            ? '/index.tsx'
-            : result['/index.jsx']
-              ? '/index.jsx'
-              : result['/main.tsx']
-                ? '/main.tsx'
-                : result['/main.jsx']
-                  ? '/main.jsx'
-                  : result['/App.tsx']
-                    ? '/App.tsx'
-                    : result['/App.jsx']
-                      ? '/App.jsx'
-                      : null
+  const isProjectFiles = fileMode === "project";
 
-        if (entry) {
-          result['/index.html'] = {
-            code:
-              buildPreviewIndexHtml(
-                entry,
-              ),
-          }
-        }
-      }
-
-      return result
-    }, [
-      files,
-      activeFile,
-    ])
-
-  const isProjectFiles =
-    fileMode === 'project'
-
-  const isEmpty =
-    Object.keys(
-      sandpackFiles,
-    ).length === 0
+  const isEmpty = Object.keys(sandpackFiles).length === 0;
 
   // ───────────────────────────────────────────────────────────
   // REFRESH
   // ───────────────────────────────────────────────────────────
 
-  const refreshPreview =
-    useCallback(() => {
-      setLocalPreviewKey(
-        current =>
-          current + 1,
-      )
-    }, [])
+  const refreshPreview = useCallback(() => {
+    setLocalPreviewKey((current) => current + 1);
+  }, []);
 
   // ───────────────────────────────────────────────────────────
   // RENDER
@@ -990,57 +692,39 @@ export function SandpackPreview({
   return (
     <div className="flex h-full w-full flex-col overflow-hidden bg-[#151515]">
       <SandpackProvider
-        key={`${previewKey}-${localPreviewKey}`}
-        template="react-ts"
-        files={
-          sandpackFiles
-        }
+        key={localPreviewKey}
+        // Generated projects are real Vite projects. Using the Vite
+        // template keeps the embedded preview identical to the
+        // standalone /preview route and makes /index.tsx the entrypoint.
+        template="vite-react-ts"
+        files={sandpackFiles}
         customSetup={{
-          dependencies:
-            runtimeDependencies,
+          dependencies: runtimeDependencies,
         }}
         options={{
           autorun: true,
 
-          recompileMode:
-            'delayed',
+          recompileMode: "delayed",
 
-          recompileDelay:
-            1000,
+          recompileDelay: 250,
 
-          bundlerTimeOut:
-            600000,
-
-          experimental_enableStableServiceWorkerId:
-            true,
-
-          externalResources: [
-            'https://cdn.tailwindcss.com',
-          ],
+          bundlerTimeOut: 600000,
         }}
-        theme={
-          defaultDark
-        }
+        theme={defaultDark}
         style={{
           flex: 1,
 
-          display:
-            'flex',
+          display: "flex",
 
-          flexDirection:
-            'column',
+          flexDirection: "column",
 
-          height:
-            '100%',
+          height: "100%",
 
-          width:
-            '100%',
+          width: "100%",
 
-          minHeight:
-            0,
+          minHeight: 0,
 
-          overflow:
-            'hidden',
+          overflow: "hidden",
         }}
       >
         <style
@@ -1082,65 +766,45 @@ export function SandpackPreview({
           }}
         />
 
-        <ActiveFileOpener
-          filePath={
-            activeFile
-          }
-        />
+        <ActiveFileOpener filePath={activeFile} />
 
         {!isProjectFiles && (
-          <SandpackErrorReporter
-            onError={
-              handlePreviewError
-            }
-          />
+          <SandpackErrorReporter onError={handlePreviewError} />
         )}
 
-        <div className="relative min-h-0 flex-1 overflow-hidden">
+        <div className="relative min-h-0 flex-1 overflow-visible">
           {/* ─────────────────────────────────────────────
               CODE
           ───────────────────────────────────────────── */}
 
           <div
             style={{
-              display:
-                view ===
-                  'code' ||
-                isProjectFiles
-                  ? 'flex'
-                  : 'none',
+              display: view === "code" || isProjectFiles ? "flex" : "none",
             }}
             className="h-full w-full"
           >
             <SandpackLayout
               style={{
-                height:
-                  '100%',
+                height: "100%",
 
                 flex: 1,
 
-                border:
-                  'none',
+                border: "none",
 
-                borderRadius:
-                  0,
+                borderRadius: 0,
 
                 gap: 0,
               }}
             >
               <SandpackFileExplorer
                 style={{
-                  height:
-                    '100%',
+                  height: "100%",
 
-                  minWidth:
-                    '160px',
+                  minWidth: "160px",
 
-                  maxWidth:
-                    '220px',
+                  maxWidth: "220px",
 
-                  fontSize:
-                    '12px',
+                  fontSize: "12px",
                 }}
               />
 
@@ -1149,8 +813,7 @@ export function SandpackPreview({
                 showLineNumbers
                 closableTabs
                 style={{
-                  height:
-                    '100%',
+                  height: "100%",
 
                   flex: 1,
                 }}
@@ -1164,73 +827,60 @@ export function SandpackPreview({
 
           <div
             style={{
-              display:
-                view ===
-                  'preview' &&
-                !isProjectFiles
-                  ? 'flex'
-                  : 'none',
+              display: view === "preview" && !isProjectFiles ? "flex" : "none",
             }}
             className="h-full min-h-0 w-full flex-1 flex-col"
           >
-            <div className="relative h-full min-h-0 w-full flex-1">
+            <div className="relative h-full min-h-0 w-full flex-1 overflow-auto">
               <PreviewStatusOverlay
-                isEmpty={
-                  isEmpty
-                }
-                onRefresh={
-                  refreshPreview
-                }
+                isEmpty={isEmpty}
+                onRefresh={refreshPreview}
+                onAutoFix={onAutoFix}
               />
 
+              {isLoading && !isEmpty ? (
+                <div className="pointer-events-none absolute inset-x-0 top-3 z-30 flex justify-center">
+                  <div className="flex items-center gap-2 rounded-full border border-zinc-800 bg-[#151515]/90 px-3 py-1.5 shadow-lg backdrop-blur-sm">
+                    <Loader2 className="size-3.5 animate-spin text-primary" />
+                    <span className="text-xs text-zinc-300">
+                      Updating preview…
+                    </span>
+                  </div>
+                </div>
+              ) : null}
+
               <div
-                className={`h-full min-h-0 w-full overflow-hidden rounded-md bg-white transition-all duration-300 ease-in-out ${
-                  viewportSize ===
-                  'mobile'
-                    ? 'mx-auto max-w-[375px] border border-zinc-800 shadow-2xl'
-                    : viewportSize ===
-                        'tablet'
-                      ? 'mx-auto max-w-[768px] border border-zinc-800 shadow-2xl'
-                      : 'border border-zinc-800/50'
+                className={`h-full min-h-0 w-full overflow-auto rounded-md bg-white transition-all duration-300 ease-in-out ${
+                  viewportSize === "mobile"
+                    ? "mx-auto max-w-[375px] border border-zinc-800 shadow-2xl"
+                    : viewportSize === "tablet"
+                      ? "mx-auto max-w-[768px] border border-zinc-800 shadow-2xl"
+                      : "border border-zinc-800/50"
                 }`}
               >
                 <SandpackLayout
                   style={{
-                    height:
-                      '100%',
+                    height: "100%",
 
-                    width:
-                      '100%',
+                    width: "100%",
 
-                    minHeight:
-                      '100%',
+                    minHeight: "100%",
 
-                    border:
-                      'none',
+                    border: "none",
 
-                    borderRadius:
-                      0,
+                    borderRadius: 0,
                   }}
                 >
                   <SandpackPreviewPane
-                    showNavigator={
-                      false
-                    }
-                    showOpenInCodeSandbox={
-                      false
-                    }
-                    showRefreshButton={
-                      false
-                    }
+                    showNavigator={false}
+                    showOpenInCodeSandbox={false}
+                    showRefreshButton={false}
                     style={{
-                      height:
-                        '100%',
+                      height: "100%",
 
-                      width:
-                        '100%',
+                      width: "100%",
 
-                      minHeight:
-                        '100%',
+                      minHeight: "100%",
                     }}
                   />
                 </SandpackLayout>
@@ -1240,5 +890,5 @@ export function SandpackPreview({
         </div>
       </SandpackProvider>
     </div>
-  )
+  );
 }

@@ -1,5 +1,5 @@
-@import 'tailwindcss';
-@import 'tw-animate-css';
+@import "tailwindcss";
+@import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -25,12 +25,12 @@
   --input: oklch(0.85 0 0);
   --ring: oklch(0.1 0 0);
   --chart-1: oklch(0.45 0.15 250);
-  --chart-2: oklch(0.60 0.18 180);
+  --chart-2: oklch(0.6 0.18 180);
   --chart-3: oklch(0.55 0.14 240);
-  --chart-4: oklch(0.70 0.16 290);
-  --chart-5: oklch(0.60 0.20 160);
+  --chart-4: oklch(0.7 0.16 290);
+  --chart-5: oklch(0.6 0.2 160);
   --radius: 1.5rem; /* More rounded for MD3 */
-  
+
   --sidebar: oklch(0.96 0.01 250);
   --sidebar-foreground: oklch(0.2 0 0);
   --sidebar-primary: oklch(0.1 0 0);
@@ -39,7 +39,7 @@
   --sidebar-accent-foreground: oklch(0.2 0 0);
   --sidebar-border: oklch(0.85 0 0);
   --sidebar-ring: oklch(0.1 0 0);
-  
+
   /* CodeWithChat Extended Design Tokens */
   --surface-elevated: oklch(0.98 0 0);
   --surface-hover: oklch(0.94 0.01 250);
@@ -59,11 +59,11 @@
   --card-foreground: oklch(0.99 0 0);
   --popover: oklch(0.22 0.01 265);
   --popover-foreground: oklch(0.99 0 0);
-  
+
   /* UPDATED: White for Dark Mode to make text readable against dark backgrounds */
-  --primary: oklch(0.99 0 0); 
+  --primary: oklch(0.99 0 0);
   --primary-foreground: oklch(0.1 0 0); /* Dark Black text on primary buttons */
-  
+
   --secondary: oklch(0.2 0 0); /* Grayscale */
   --secondary-foreground: oklch(0.95 0 0);
   --muted: oklch(0.26 0 0); /* #444746 */
@@ -74,14 +74,14 @@
   --destructive-foreground: oklch(0.3 0.15 25); /* #601410 */
   --border: oklch(0.35 0 0); /* #444746 */
   --input: oklch(0.35 0 0);
-  
+
   --ring: oklch(0.99 0 0);
-  --chart-1: oklch(0.60 0.18 255);
+  --chart-1: oklch(0.6 0.18 255);
   --chart-2: oklch(0.58 0.16 180);
   --chart-3: oklch(0.54 0.12 240);
   --chart-4: oklch(0.68 0.14 290);
   --chart-5: oklch(0.58 0.18 160);
-  
+
   --sidebar: oklch(0.22 0.01 265);
   --sidebar-foreground: oklch(0.99 0 0);
   --sidebar-primary: oklch(0.99 0 0);
@@ -90,12 +90,12 @@
   --sidebar-accent-foreground: oklch(0.95 0 0);
   --sidebar-border: oklch(0.35 0 0);
   --sidebar-ring: oklch(0.99 0 0);
-  
+
   /* CodeWithChat Extended Design Tokens - Dark Mode */
   --surface-elevated: oklch(0.25 0.01 265);
   --surface-hover: oklch(0.28 0.01 265);
   --border-hover: oklch(0.45 0 0);
-  --text-secondary: oklch(0.90 0 0); /* Brightened secondary text */
+  --text-secondary: oklch(0.9 0 0); /* Brightened secondary text */
   --text-muted: oklch(0.75 0 0); /* Brightened muted text */
   --brand-hover: oklch(0.85 0 0); /* Light gray for dark mode hover */
   --brand-glow: oklch(0.9 0 0);
@@ -141,7 +141,7 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-  
+
   /* CodeWithChat Extended Design Tokens */
   --color-surface-elevated: var(--surface-elevated);
   --color-surface-hover: var(--surface-hover);
@@ -160,47 +160,52 @@
   body {
     @apply bg-background text-foreground;
   }
-  
+
   /* Ensure headings have good visibility in all modes */
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     @apply text-foreground;
   }
-  
+
   /* Ensure p elements have better visibility in dark mode */
   p {
     @apply text-foreground/90;
   }
-  
+
   /* CodeWithChat Premium Base Styles */
   html {
     scroll-behavior: smooth;
   }
-  
+
   /* Custom scrollbar for premium feel */
   ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
   }
-  
+
   ::-webkit-scrollbar-track {
     background: var(--background);
   }
-  
+
   ::-webkit-scrollbar-thumb {
     background: var(--border);
     border-radius: 4px;
   }
-  
+
   ::-webkit-scrollbar-thumb:hover {
     background: var(--border-hover);
   }
-  
+
   /* Premium selection styling */
   ::selection {
     background: var(--primary);
     color: var(--primary-foreground);
   }
-  
+
   /* Focus states for accessibility */
   :focus-visible {
     outline: 2px solid var(--ring);
@@ -215,23 +220,27 @@
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+    box-shadow:
+      0 1px 3px rgba(0, 0, 0, 0.1),
+      0 1px 2px rgba(0, 0, 0, 0.06);
   }
-  
+
   .surface-elevated {
     background: var(--surface-elevated);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06);
+    box-shadow:
+      0 4px 6px rgba(0, 0, 0, 0.1),
+      0 2px 4px rgba(0, 0, 0, 0.06);
   }
-  
+
   .surface-glass {
     background: rgba(var(--card), 0.8);
     backdrop-filter: blur(12px);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
   }
-  
+
   /* Premium button styles */
   .btn-premium {
     background: var(--primary);
@@ -241,53 +250,64 @@
     transition: all 0.2s ease;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
-  
+
   .btn-premium:hover {
     background: var(--brand-hover);
     transform: translateY(-1px);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
   }
-  
+
   /* Text gradients */
   .text-gradient {
-    background: linear-gradient(135deg, var(--foreground) 0%, var(--text-secondary) 100%);
+    background: linear-gradient(
+      135deg,
+      var(--foreground) 0%,
+      var(--text-secondary) 100%
+    );
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
-  
+
   .text-gradient-brand {
-    background: linear-gradient(135deg, var(--primary) 0%, var(--secondary-accent) 100%);
+    background: linear-gradient(
+      135deg,
+      var(--primary) 0%,
+      var(--secondary-accent) 100%
+    );
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
-  
+
   /* Glow effects */
   .glow-subtle {
     box-shadow: 0 0 20px rgba(var(--primary), 0.15);
   }
-  
+
   .glow-medium {
     box-shadow: 0 0 30px rgba(var(--primary), 0.25);
   }
-  
+
   /* Border animations */
   .border-glow:hover {
     border-color: var(--primary);
     box-shadow: 0 0 15px rgba(var(--primary), 0.2);
   }
-  
+
   /* Developer-inspired patterns */
   .pattern-grid {
-    background-image: 
+    background-image:
       linear-gradient(rgba(var(--border), 0.1) 1px, transparent 1px),
       linear-gradient(90deg, rgba(var(--border), 0.1) 1px, transparent 1px);
     background-size: 20px 20px;
   }
-  
+
   .pattern-dots {
-    background-image: radial-gradient(rgba(var(--border), 0.3) 1px, transparent 1px);
+    background-image: radial-gradient(
+      rgba(var(--border), 0.3) 1px,
+      transparent 1px
+    );
     background-size: 16px 16px;
   }
 }
@@ -323,10 +343,13 @@
   min-height: 100% !important;
   max-height: 100% !important;
   flex: 1 !important;
+  overflow: visible !important;
 }
 
 .sp-preview-iframe {
   background: #0a0a0a !important;
+  overflow: auto !important;
+  touch-action: pan-y pan-x !important;
 }
 
 /* ── Guide tab scroll fix ─────────────────────────────── */
@@ -341,14 +364,18 @@
 }
 /* Hide scrollbar for IE, Edge and Firefox */
 .no-scrollbar {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
 }
 
 /* ── Animations ─────────────────────────────── */
 @keyframes marquee {
-  0% { transform: translateX(0%); }
-  100% { transform: translateX(-50%); }
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
 }
 
 .animate-marquee {
@@ -357,10 +384,19 @@
 
 /* Hero background floating animation */
 @keyframes float {
-  0%, 100% { transform: translateY(0px) translateX(0px); }
-  25% { transform: translateY(-20px) translateX(10px); }
-  50% { transform: translateY(-10px) translateX(-10px); }
-  75% { transform: translateY(-30px) translateX(5px); }
+  0%,
+  100% {
+    transform: translateY(0px) translateX(0px);
+  }
+  25% {
+    transform: translateY(-20px) translateX(10px);
+  }
+  50% {
+    transform: translateY(-10px) translateX(-10px);
+  }
+  75% {
+    transform: translateY(-30px) translateX(5px);
+  }
 }
 
 .animate-float {
@@ -369,9 +405,15 @@
 
 /* Gradient mesh animation */
 @keyframes gradient-mesh {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
 }
 
 .animate-gradient-mesh {
@@ -395,4 +437,4 @@ div[class*="cl-modal"] {
   background: rgba(0, 0, 0, 0.5) !important;
 }
 
-@import '@clerk/ui/themes/shadcn.css';
+@import "@clerk/ui/themes/shadcn.css";

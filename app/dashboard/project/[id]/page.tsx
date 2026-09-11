@@ -1,16 +1,10 @@
-'use client'
+"use client";
 
-import {
-  useState,
-  useEffect,
-  useRef,
-  useMemo,
-  useCallback,
-} from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 
-import dynamic from 'next/dynamic'
-import { useParams } from 'next/navigation'
-import Link from 'next/link'
+import dynamic from "next/dynamic";
+import { useParams } from "next/navigation";
+import Link from "next/link";
 
 import {
   Eye,
@@ -40,30 +34,33 @@ import {
   ChevronDown,
   Coins,
   LogOut,
-} from 'lucide-react'
+} from "lucide-react";
 
-import { toast } from 'sonner'
-import JSZip from 'jszip'
-import { saveAs } from 'file-saver'
-import { experimental_useObject } from '@ai-sdk/react'
-import { z } from 'zod'
+import { toast } from "sonner";
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
+import { experimental_useObject } from "@ai-sdk/react";
+import { z } from "zod";
 
-import { ShareProjectModal } from '@/components/dashboard/share-project-modal'
-import { PublishProjectModal } from '@/components/dashboard/publish-project-modal'
-import { ProjectGuide } from '@/components/dashboard/project-guide'
-import { BuildActivityFeed, buildActivitiesFromPlan } from '@/components/dashboard/build-activity-feed'
-import type { FileSource } from '@/components/dashboard/build-activity-feed'
-import { PromptComposer } from '@/components/dashboard/prompt-composer'
+import { ShareProjectModal } from "@/components/dashboard/share-project-modal";
+import { PublishProjectModal } from "@/components/dashboard/publish-project-modal";
+import { ProjectGuide } from "@/components/dashboard/project-guide";
+import {
+  BuildActivityFeed,
+  buildActivitiesFromPlan,
+} from "@/components/dashboard/build-activity-feed";
+import type { FileSource } from "@/components/dashboard/build-activity-feed";
+import { PromptComposer } from "@/components/dashboard/prompt-composer";
 
-import { Button } from '@/components/ui/button'
-import { Spinner } from '@/components/ui/spinner'
+import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/components/ui/tooltip'
+} from "@/components/ui/tooltip";
 
 import {
   DropdownMenu,
@@ -71,49 +68,45 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+} from "@/components/ui/dropdown-menu";
 
-import { planSchema } from '@/lib/schema'
+import { planSchema } from "@/lib/schema";
 
 import {
   buildInstantPreviewFiles,
   hasPreviewEntry,
   getProjectRuntimeDependencies,
-} from '@/lib/preview-files'
+  sanitizeGeneratedProjectFiles,
+  mergeGeneratedProjectFiles,
+} from "@/lib/preview-files";
 
-import { buildFullStackFiles } from '@/lib/fullstack-files'
+import { buildFullStackFiles } from "@/lib/fullstack-files";
 
-import {
-  isTrivialMessage,
-  shouldRegenerateCode,
-} from '@/lib/chat-intent'
+import { isTrivialMessage, shouldRegenerateCode } from "@/lib/chat-intent";
 
-import {
-  DEFAULT_TECH_STACK,
-  DEFAULT_PLATFORM,
-} from '@/lib/project-structure'
+import { DEFAULT_TECH_STACK, DEFAULT_PLATFORM } from "@/lib/project-structure";
 
 import {
   getProjectByIdAction,
   updateProjectAction,
   togglePinProjectAction,
   renameProjectAction,
-} from '@/app/actions/projects'
+} from "@/app/actions/projects";
 
-import { getCreditsAction } from '@/app/actions/credits'
-import { MAX_DAILY_CREDITS } from '@/lib/credits'
+import { getCreditsAction } from "@/app/actions/credits";
+import { MAX_DAILY_CREDITS } from "@/lib/credits";
 
 import type {
   SandpackView,
   ViewportSize,
-} from '@/components/ide/SandpackPreview'
+} from "@/components/ide/SandpackPreview";
 
-type Plan = z.infer<typeof planSchema>
+type Plan = z.infer<typeof planSchema>;
 
 type ChatMessage = {
-  role: string
-  content: string
-}
+  role: string;
+  content: string;
+};
 
 // ─────────────────────────────────────────────────────────────
 // SANDPACK
@@ -121,8 +114,8 @@ type ChatMessage = {
 
 const SandpackPreview = dynamic(
   () =>
-    import('@/components/ide/SandpackPreview').then(
-      mod => mod.SandpackPreview,
+    import("@/components/ide/SandpackPreview").then(
+      (mod) => mod.SandpackPreview,
     ),
   {
     ssr: false,
@@ -133,155 +126,128 @@ const SandpackPreview = dynamic(
       </div>
     ),
   },
-)
+);
 
 // ─────────────────────────────────────────────────────────────
 // MAIN PAGE
 // ─────────────────────────────────────────────────────────────
 
 export default function ProjectPage() {
-  const params = useParams()
+  const params = useParams();
 
-  const projectId = params.id as string
+  const projectId = params.id as string;
 
   // Canonical generated stack
-  const tech = DEFAULT_TECH_STACK
-  const platform = DEFAULT_PLATFORM
+  const tech = DEFAULT_TECH_STACK;
+  const platform = DEFAULT_PLATFORM;
 
   // ───────────────────────────────────────────────────────────
   // PROJECT DATA
   // ───────────────────────────────────────────────────────────
 
-  const [idea, setIdea] = useState('')
+  const [idea, setIdea] = useState("");
 
-  const [projectTitle, setProjectTitle] =
-    useState('')
+  const [projectTitle, setProjectTitle] = useState("");
 
-  const [isPinned, setIsPinned] =
-    useState(false)
+  const [isPinned, setIsPinned] = useState(false);
 
-  const [credits, setCredits] =
-    useState(MAX_DAILY_CREDITS)
+  const [credits, setCredits] = useState(MAX_DAILY_CREDITS);
 
-  const [projectNotFound, setProjectNotFound] =
-    useState(false)
+  const [projectNotFound, setProjectNotFound] = useState(false);
 
-  const [projectLoading, setProjectLoading] =
-    useState(true)
+  const [projectLoading, setProjectLoading] = useState(true);
 
   // ───────────────────────────────────────────────────────────
   // RENAME
   // ───────────────────────────────────────────────────────────
 
-  const [isRenaming, setIsRenaming] =
-    useState(false)
+  const [isRenaming, setIsRenaming] = useState(false);
 
-  const [renameValue, setRenameValue] =
-    useState('')
+  const [renameValue, setRenameValue] = useState("");
 
-  const renameRef =
-    useRef<HTMLInputElement>(null)
+  const renameRef = useRef<HTMLInputElement>(null);
 
   // ───────────────────────────────────────────────────────────
   // CHAT
   // ───────────────────────────────────────────────────────────
 
-  const [chatInput, setChatInput] =
-    useState('')
+  const [chatInput, setChatInput] = useState("");
 
-  const [messages, setMessages] =
-    useState<ChatMessage[]>([])
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
 
-  const [chatPanelOpen, setChatPanelOpen] =
-    useState(true)
+  const [chatPanelOpen, setChatPanelOpen] = useState(true);
 
-  const [chatLoading, setChatLoading] =
-    useState(false)
+  const [chatLoading, setChatLoading] = useState(false);
 
   // ───────────────────────────────────────────────────────────
   // GENERATION
   // ───────────────────────────────────────────────────────────
 
-  const [genError, setGenError] =
-    useState<string | null>(null)
+  const [genError, setGenError] = useState<string | null>(null);
 
-  const [buildStartedAt, setBuildStartedAt] =
-    useState<number | null>(null)
+  const [buildStartedAt, setBuildStartedAt] = useState<number | null>(null);
 
-  const [buildDurationMs, setBuildDurationMs] =
-    useState<number | null>(null)
+  const [buildDurationMs, setBuildDurationMs] = useState<number | null>(null);
 
-  const [
-    buildCompletedAt,
-    setBuildCompletedAt,
-  ] = useState<number | null>(null)
+  const [buildCompletedAt, setBuildCompletedAt] = useState<number | null>(null);
 
-  const [
-    projectUpdatedAt,
-    setProjectUpdatedAt,
-  ] = useState<Date | null>(null)
+  const [projectUpdatedAt, setProjectUpdatedAt] = useState<Date | null>(null);
 
-  const buildStartedAtRef =
-    useRef<number | null>(null)
+  const buildStartedAtRef = useRef<number | null>(null);
 
   /**
    * Used to make sure a completed generated plan
    * is committed only once.
    */
-  const generationInFlightRef =
-    useRef(false)
+  const generationInFlightRef = useRef(false);
+  const incrementalUpdateRef = useRef(false);
 
   /**
    * Prevent duplicate project loading/generation
    * during React development Strict Mode.
    */
-  const loadedProjectRef =
-    useRef<string | null>(null)
+  const loadedProjectRef = useRef<string | null>(null);
 
   // ───────────────────────────────────────────────────────────
   // PREVIEW UI
   // ───────────────────────────────────────────────────────────
 
-  const [view, setView] =
-  useState<SandpackView>('preview')
+  const [view, setView] = useState<SandpackView>("preview");
 
-const [previewKey, setPreviewKey] =
-  useState(0)
+  const [previewKey, setPreviewKey] = useState(0);
 
-const [
-  isRefreshingPreview,
-  setIsRefreshingPreview,
-] = useState(false)
+  const [isRefreshingPreview, setIsRefreshingPreview] = useState(false);
 
-const handleRefreshPreview = useCallback(() => {
-  if (isRefreshingPreview) return
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
-  setIsRefreshingPreview(true)
+  const handleRefreshPreview = useCallback(() => {
+    if (isRefreshingPreview) return;
 
-  setPreviewKey(current => current + 1)
+    setIsRefreshingPreview(true);
+    setPreviewError(null);
 
-  window.setTimeout(() => {
-    setIsRefreshingPreview(false)
-  }, 800)
-}, [isRefreshingPreview])
+    setPreviewKey((current) => current + 1);
 
-const [rightPanel, setRightPanel] =
-  useState<'preview' | 'guide'>('preview')
+    window.setTimeout(() => {
+      setIsRefreshingPreview(false);
+    }, 800);
+  }, [isRefreshingPreview]);
 
-const [viewportSize, setViewportSize] =
-  useState<ViewportSize>('desktop')
+  const handlePreviewError = useCallback((message: string) => {
+    setPreviewError(message);
+  }, []);
 
-const [activeFile, setActiveFile] =
-  useState<string | null>(null)
+  const [rightPanel, setRightPanel] = useState<"preview" | "guide">("preview");
 
-const handleOpenFile = useCallback(
-  (path: string) => {
-    setView('code')
-    setActiveFile(path)
-    setRightPanel('preview')
-  },
-  [],
-)
+  const [viewportSize, setViewportSize] = useState<ViewportSize>("desktop");
+
+  const [activeFile, setActiveFile] = useState<string | null>(null);
+
+  const handleOpenFile = useCallback((path: string) => {
+    setView("code");
+    setActiveFile(path);
+    setRightPanel("preview");
+  }, []);
 
   // ───────────────────────────────────────────────────────────
   // COMPLETE STABLE PLAN
@@ -298,18 +264,16 @@ const handleOpenFile = useCallback(
    * This prevents Sandpack from recompiling for every partial
    * streamed file/token.
    */
-  const [localPlan, setLocalPlan] =
-    useState<Plan | null>(null)
+  const [localPlan, setLocalPlan] = useState<Plan | null>(null);
 
   // History of all past completed builds (shown stacked in chat)
   type BuildSnapshot = {
-    idea: string
-    plan: Plan
-    durationMs: number
-    completedAt: number
-  }
-  const [activityHistory, setActivityHistory] =
-    useState<BuildSnapshot[]>([])
+    idea: string;
+    plan: Plan;
+    durationMs: number;
+    completedAt: number;
+  };
+  const [activityHistory, setActivityHistory] = useState<BuildSnapshot[]>([]);
 
   // ───────────────────────────────────────────────────────────
   // AI GENERATION
@@ -320,35 +284,30 @@ const handleOpenFile = useCallback(
     submit,
     isLoading: loading,
   } = experimental_useObject({
-    api: '/api/generate-plan',
+    api: "/api/generate-plan",
 
     schema: planSchema,
 
     onFinish: () => {
-      console.log(
-        '[CodewithChat] Generation finished successfully',
-      )
+      console.log("[CodewithChat] Generation finished successfully");
 
-      setGenError(null)
+      setGenError(null);
+      setPreviewError(null);
 
-      const finishedAt = Date.now()
+      const finishedAt = Date.now();
 
       if (buildStartedAtRef.current) {
-        const ms =
-          finishedAt -
-          buildStartedAtRef.current
+        const ms = finishedAt - buildStartedAtRef.current;
 
-        setBuildDurationMs(ms)
-        setBuildCompletedAt(finishedAt)
+        setBuildDurationMs(ms);
+        setBuildCompletedAt(finishedAt);
 
-        setProjectUpdatedAt(
-          new Date(finishedAt),
-        )
+        setProjectUpdatedAt(new Date(finishedAt));
 
         // Snapshot this build into history BEFORE it gets replaced
-        setLocalPlan(prev => {
+        setLocalPlan((prev) => {
           if (prev) {
-            setActivityHistory(h => [
+            setActivityHistory((h) => [
               ...h,
               {
                 idea,
@@ -356,58 +315,42 @@ const handleOpenFile = useCallback(
                 durationMs: ms,
                 completedAt: finishedAt,
               },
-            ])
+            ]);
           }
-          return prev
-        })
+          return prev;
+        });
       }
 
       // Intentionally not adding a "Done!" chat message here.
       // We rely on the BuildActivityFeed to show completion status and project files.
     },
 
-    onError: err => {
-      console.error(
-        '[CodewithChat] Generation error:',
-        err,
-      )
+    onError: (err) => {
+      console.error("[CodewithChat] Generation error:", err);
 
-      generationInFlightRef.current =
-        false
+      generationInFlightRef.current = false;
 
-      const errMsg =
-        err?.message || 'Unknown error'
+      const errMsg = err?.message || "Unknown error";
 
-      setGenError(errMsg)
+      setGenError(errMsg);
 
-      if (
-        errMsg.includes('NO_CREDITS') ||
-        errMsg.includes('402')
-      ) {
-        setCredits(0)
+      if (errMsg.includes("NO_CREDITS") || errMsg.includes("402")) {
+        setCredits(0);
 
-        toast.error(
-          'Daily credits used up. Upgrade to continue building.',
-        )
+        toast.error("Daily credits used up. Upgrade to continue building.");
       } else {
-        toast.error(
-          'Failed to generate project. Please try again.',
-        )
+        toast.error("Failed to generate project. Please try again.");
       }
 
-      setMessages(prev => {
-        if (
-          prev.length > 0 &&
-          prev[prev.length - 1].role ===
-            'user'
-        ) {
-          return prev.slice(0, -1)
+      setMessages((prev) => {
+        if (prev.length > 0 && prev[prev.length - 1].role === "user") {
+          return prev.slice(0, -1);
         }
 
-        return prev
-      })
+        return prev;
+      });
     },
-  })
+  });
 
   // ───────────────────────────────────────────────────────────
   // ACTIVE PLAN
@@ -424,49 +367,45 @@ const handleOpenFile = useCallback(
    *
    * Sandpack should only receive a complete stable project.
    */
-  const activePlan = localPlan
+  const activePlan = localPlan;
 
   // ───────────────────────────────────────────────────────────
   // DEPENDENCIES
   // ───────────────────────────────────────────────────────────
 
-  const activeDependencies =
-  useMemo<Record<string, string>>(() => {
+  const activeDependencies = useMemo<Record<string, string>>(() => {
     if (!activePlan) {
-      return {}
+      return {};
     }
 
     return getProjectRuntimeDependencies(
       activePlan.previewFiles,
       activePlan.dependencies ?? {},
-    )
-  }, [activePlan])
+    );
+  }, [activePlan]);
   // ───────────────────────────────────────────────────────────
   // CREDITS
   // ───────────────────────────────────────────────────────────
 
-  const refreshCredits =
-    useCallback(() => {
-      getCreditsAction().then(res => {
-        if (!res.success) return
+  const refreshCredits = useCallback(() => {
+    getCreditsAction().then((res) => {
+      if (!res.success) return;
 
-        setCredits(res.credits)
+      setCredits(res.credits);
 
-        window.dispatchEvent(
-          new Event('credits-updated'),
-        )
-      })
-    }, [])
+      window.dispatchEvent(new Event("credits-updated"));
+    });
+  }, []);
 
   useEffect(() => {
-    refreshCredits()
-  }, [refreshCredits])
+    refreshCredits();
+  }, [refreshCredits]);
 
   useEffect(() => {
     if (!loading) {
-      refreshCredits()
+      refreshCredits();
     }
-  }, [loading, refreshCredits])
+  }, [loading, refreshCredits]);
 
   // ───────────────────────────────────────────────────────────
   // BUILD TIMER
@@ -474,31 +413,25 @@ const handleOpenFile = useCallback(
 
   useEffect(() => {
     if (loading) {
-      const now = Date.now()
+      const now = Date.now();
 
-      buildStartedAtRef.current = now
+      buildStartedAtRef.current = now;
 
-      setBuildStartedAt(now)
-      setBuildDurationMs(null)
-      setBuildCompletedAt(null)
+      setBuildStartedAt(now);
+      setBuildDurationMs(null);
+      setBuildCompletedAt(null);
 
-      return
+      return;
     }
 
-    if (
-      buildStartedAtRef.current &&
-      !buildCompletedAt
-    ) {
-      const finishedAt = Date.now()
+    if (buildStartedAtRef.current && !buildCompletedAt) {
+      const finishedAt = Date.now();
 
-      setBuildDurationMs(
-        finishedAt -
-          buildStartedAtRef.current,
-      )
+      setBuildDurationMs(finishedAt - buildStartedAtRef.current);
 
-      setBuildCompletedAt(finishedAt)
+      setBuildCompletedAt(finishedAt);
     }
-  }, [loading, buildCompletedAt])
+  }, [loading, buildCompletedAt]);
 
   // ───────────────────────────────────────────────────────────
   // COMMIT FINISHED STREAM
@@ -525,149 +458,127 @@ const handleOpenFile = useCallback(
    */
   useEffect(() => {
     if (loading) {
-      generationInFlightRef.current =
-        true
+      generationInFlightRef.current = true;
 
-      return
+      return;
     }
 
-    if (
-      !generationInFlightRef.current ||
-      !plan ||
-      !projectId
-    ) {
-      return
+    if (!generationInFlightRef.current || !plan || !projectId) {
+      return;
     }
 
-    const parsed =
-      planSchema.safeParse(plan)
+    const parsed = planSchema.safeParse(plan);
 
     if (!parsed.success) {
       console.error(
-        '[Project] Generated plan is incomplete or invalid:',
+        "[Project] Generated plan is incomplete or invalid:",
         parsed.error,
-      )
+      );
 
-      generationInFlightRef.current =
-        false
+      generationInFlightRef.current = false;
 
-      setGenError(
-        'Generated project was incomplete. Please regenerate.',
-      )
+      setGenError("Generated project was incomplete. Please regenerate.");
 
-      return
+      return;
     }
 
-    generationInFlightRef.current =
-      false
+    generationInFlightRef.current = false;
 
-    const completedPlan = parsed.data
+    const incomingFiles = parsed.data.previewFiles ?? [];
+    const previewFiles = incrementalUpdateRef.current
+      ? mergeGeneratedProjectFiles(
+          localPlan?.previewFiles,
+          incomingFiles,
+          parsed.data.deletedFilePaths,
+        )
+      : sanitizeGeneratedProjectFiles(incomingFiles);
+
+    incrementalUpdateRef.current = false;
+
+    const completedPlan = {
+      ...parsed.data,
+      previewFiles,
+    };
 
     /**
      * This is the ONLY point where the live preview
      * swaps to the newly generated code.
      */
-    setLocalPlan(completedPlan)
+    setLocalPlan(completedPlan);
 
-    const now = new Date()
+    const now = new Date();
 
-    setProjectUpdatedAt(now)
+    setProjectUpdatedAt(now);
 
-    updateProjectAction(
-      projectId,
-      JSON.stringify(completedPlan),
-    )
-      .then(res => {
+    updateProjectAction(projectId, JSON.stringify(completedPlan))
+      .then((res) => {
         if (!res.success) {
-          console.error(
-            '[Project] Failed to save project:',
-            res.error,
-          )
+          console.error("[Project] Failed to save project:", res.error);
         }
       })
-      .catch(error => {
-        console.error(
-          '[Project] Error saving project:',
-          error,
-        )
-      })
-  }, [
-    loading,
-    plan,
-    projectId,
-  ])
+      .catch((error) => {
+        console.error("[Project] Error saving project:", error);
+      });
+  }, [loading, plan, projectId]);
 
   // ───────────────────────────────────────────────────────────
   // LOAD PROJECT
   // ───────────────────────────────────────────────────────────
 
   useEffect(() => {
-    if (!projectId) return
+    if (!projectId) return;
 
     /**
      * Prevent duplicate load / duplicate first generation
      * in React Strict Mode.
      */
-    if (
-      loadedProjectRef.current === projectId
-    ) {
-      return
+    if (loadedProjectRef.current === projectId) {
+      return;
     }
 
-    loadedProjectRef.current = projectId
+    loadedProjectRef.current = projectId;
 
-    console.log(
-      '[CodewithChat] Loading project:',
-      projectId,
-    )
+    console.log("[CodewithChat] Loading project:", projectId);
 
-    setProjectLoading(true)
+    setProjectLoading(true);
 
     getProjectByIdAction(projectId)
-      .then(res => {
-        setProjectLoading(false)
+      .then((res) => {
+        setProjectLoading(false);
 
         if (!res.success || !res.data) {
-          console.log(
-            '[CodewithChat] Project not found or unauthorized',
-          )
+          console.log("[CodewithChat] Project not found or unauthorized");
 
-          setProjectNotFound(true)
+          setProjectNotFound(true);
 
-          return
+          return;
         }
 
         console.log(
-          '[CodewithChat] Project loaded. Has code:',
+          "[CodewithChat] Project loaded. Has code:",
           Boolean(res.data.code),
-        )
+        );
 
-        setIdea(res.data.prompt)
+        setIdea(res.data.prompt);
 
-        setProjectTitle(res.data.title)
+        setProjectTitle(res.data.title);
 
-        setIsPinned(
-          res.data.isPinned || false,
-        )
+        setIsPinned(res.data.isPinned || false);
 
         if (res.data.updatedAt) {
-          setProjectUpdatedAt(
-            new Date(res.data.updatedAt),
-          )
+          setProjectUpdatedAt(new Date(res.data.updatedAt));
         }
 
         // ─── EXISTING PROJECT ────────────────────────────
 
         if (res.data.code) {
           try {
-            const parsed =
-              JSON.parse(res.data.code)
+            const parsed = JSON.parse(res.data.code);
 
             console.log(
-              '[CodewithChat] Parsed saved plan. previewFiles:',
-              parsed?.previewFiles?.length ||
-                0,
-            )
+              "[CodewithChat] Parsed saved plan. previewFiles:",
+              parsed?.previewFiles?.length || 0,
+            );
 
             /**
              * Keep backward compatibility with old saved
@@ -675,161 +586,126 @@ const handleOpenFile = useCallback(
              *
              * New generations are validated before save.
              */
-            setLocalPlan(parsed as Plan)
+            setLocalPlan({
+              ...(parsed as Plan),
+              previewFiles: sanitizeGeneratedProjectFiles(parsed.previewFiles),
+            });
 
-            return
+            return;
           } catch (error) {
             console.error(
-              '[CodewithChat] Failed to parse project code:',
+              "[CodewithChat] Failed to parse project code:",
               error,
-            )
+            );
 
             console.log(
-              '[CodewithChat] Triggering regeneration due to corrupted saved code',
-            )
+              "[CodewithChat] Triggering regeneration due to corrupted saved code",
+            );
 
             submit({
               idea: res.data.prompt,
               tech,
               platform,
               messages: [],
-            })
+            });
 
-            return
+            return;
           }
         }
 
         // ─── FIRST GENERATION ────────────────────────────
 
-        console.log(
-          '[CodewithChat] No code saved, checking credits...',
-        )
+        console.log("[CodewithChat] No code saved, checking credits...");
 
-        getCreditsAction().then(
-          creditResult => {
-            if (!creditResult.success) {
-              return
-            }
+        getCreditsAction().then((creditResult) => {
+          if (!creditResult.success) {
+            return;
+          }
 
-            setCredits(
-              creditResult.credits,
-            )
+          setCredits(creditResult.credits);
 
-            if (
-              creditResult.credits <= 0
-            ) {
-              toast.error(
-                'Daily credits used up. Upgrade to generate this project.',
-              )
+          if (creditResult.credits <= 0) {
+            toast.error(
+              "Daily credits used up. Upgrade to generate this project.",
+            );
 
-              return
-            }
+            return;
+          }
 
-            submit({
-              idea: res.data.prompt,
-              tech,
-              platform,
-              messages: [],
-            })
-          },
-        )
+          submit({
+            idea: res.data.prompt,
+            tech,
+            platform,
+            messages: [],
+          });
+        });
       })
-      .catch(error => {
-        console.error(
-          '[CodewithChat] Failed to load project:',
-          error,
-        )
+      .catch((error) => {
+        console.error("[CodewithChat] Failed to load project:", error);
 
-        setProjectLoading(false)
-        setProjectNotFound(true)
-      })
-  }, [
-    projectId,
-    submit,
-    tech,
-    platform,
-  ])
+        setProjectLoading(false);
+        setProjectNotFound(true);
+      });
+  }, [projectId, submit, tech, platform]);
 
   // ───────────────────────────────────────────────────────────
   // FOCUS RENAME INPUT
   // ───────────────────────────────────────────────────────────
 
   useEffect(() => {
-    if (
-      isRenaming &&
-      renameRef.current
-    ) {
-      renameRef.current.focus()
-      renameRef.current.select()
+    if (isRenaming && renameRef.current) {
+      renameRef.current.focus();
+      renameRef.current.select();
     }
-  }, [isRenaming])
+  }, [isRenaming]);
 
   // ───────────────────────────────────────────────────────────
   // CHAT ONLY
   // ───────────────────────────────────────────────────────────
 
-  async function handleChatOnly(
-    userMessage: string,
-    history: ChatMessage[],
-  ) {
-    setChatLoading(true)
+  async function handleChatOnly(userMessage: string, history: ChatMessage[]) {
+    setChatLoading(true);
 
     try {
-      const response = await fetch(
-        '/api/project-chat',
-        {
-          method: 'POST',
+      const response = await fetch("/api/project-chat", {
+        method: "POST",
 
-          headers: {
-            'Content-Type':
-              'application/json',
-          },
-
-          body: JSON.stringify({
-            message: userMessage,
-            idea,
-            tech,
-            platform,
-            messages: history,
-          }),
+        headers: {
+          "Content-Type": "application/json",
         },
-      )
 
-      const data =
-        await response.json()
+        body: JSON.stringify({
+          message: userMessage,
+          idea,
+          tech,
+          platform,
+          messages: history,
+        }),
+      });
+
+      const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(
-          data.error || 'Chat failed',
-        )
+        throw new Error(data.error || "Chat failed");
       }
 
-      setMessages(prev => [
+      setMessages((prev) => [
         ...prev,
         {
-          role: 'assistant',
+          role: "assistant",
           content: data.reply,
         },
-      ])
+      ]);
     } catch (error) {
-      console.error(
-        '[Project Chat] Error:',
-        error,
-      )
+      console.error("[Project Chat] Error:", error);
 
-      toast.error(
-        'Could not get a reply. Try again.',
-      )
+      toast.error("Could not get a reply. Try again.");
 
-      setMessages(prev =>
-        prev[
-          prev.length - 1
-        ]?.role === 'user'
-          ? prev.slice(0, -1)
-          : prev,
-      )
+      setMessages((prev) =>
+        prev[prev.length - 1]?.role === "user" ? prev.slice(0, -1) : prev,
+      );
     } finally {
-      setChatLoading(false)
+      setChatLoading(false);
     }
   }
 
@@ -837,77 +713,59 @@ const handleOpenFile = useCallback(
   // SEND CHAT / CODE CHANGE
   // ───────────────────────────────────────────────────────────
 
-  async function handleSendChat(
-    attachedImage?: string | null,
-  ) {
-    if (!idea.trim()) return
+  async function handleSendChat(attachedImage?: string | null) {
+    if (!idea.trim()) return;
 
-    const trimmed =
-      chatInput.trim()
+    const trimmed = chatInput.trim();
 
-    if (
-      isTrivialMessage(trimmed) &&
-      !attachedImage
-    ) {
-      toast.error(
-        'Please ask a question or describe a real change.',
-      )
+    if (isTrivialMessage(trimmed) && !attachedImage) {
+      toast.error("Please ask a question or describe a real change.");
 
-      return
+      return;
     }
 
-    const finalMessage =
-      attachedImage
-        ? trimmed
-          ? `${trimmed}\n\n[IMAGE: ${attachedImage}]`
-          : `[IMAGE: ${attachedImage}]`
-        : trimmed
+    const finalMessage = attachedImage
+      ? trimmed
+        ? `${trimmed}\n\n[IMAGE: ${attachedImage}]`
+        : `[IMAGE: ${attachedImage}]`
+      : trimmed;
 
     const userMessage: ChatMessage = {
-      role: 'user',
+      role: "user",
       content: finalMessage,
-    }
+    };
 
-    const nextMessages = [
-      ...messages,
-      userMessage,
-    ]
+    const nextMessages = [...messages, userMessage];
 
-    setMessages(nextMessages)
-    setChatInput('')
+    setMessages(nextMessages);
+    setChatInput("");
 
     const requiresGeneration =
-      Boolean(attachedImage) ||
-      shouldRegenerateCode(trimmed)
+      Boolean(attachedImage) || shouldRegenerateCode(trimmed);
 
     // ─── NORMAL CHAT ─────────────────────────────────────
 
     if (!requiresGeneration) {
-      await handleChatOnly(
-        finalMessage,
-        nextMessages,
-      )
+      await handleChatOnly(finalMessage, nextMessages);
 
-      return
+      return;
     }
 
     // ─── CODE CHANGE ─────────────────────────────────────
 
     if (credits <= 0) {
-      toast.error(
-        'Daily credits used up. Upgrade to continue building.',
-      )
+      toast.error("Daily credits used up. Upgrade to continue building.");
 
-      setMessages(prev => [
+      setMessages((prev) => [
         ...prev,
         {
-          role: 'assistant',
+          role: "assistant",
           content:
-            'Your daily generation credits are used up. Normal questions are still available.',
+            "Your daily generation credits are used up. Normal questions are still available.",
         },
-      ])
+      ]);
 
-      return
+      return;
     }
 
     /**
@@ -916,7 +774,9 @@ const handleOpenFile = useCallback(
      * Never send the partially streaming plan as
      * existingPlan.
      */
-    const existingPlan = localPlan
+    const existingPlan = localPlan;
+
+    incrementalUpdateRef.current = Boolean(existingPlan?.previewFiles?.length);
 
     submit({
       idea,
@@ -924,7 +784,7 @@ const handleOpenFile = useCallback(
       platform,
       messages: nextMessages,
       existingPlan,
-    })
+    });
   }
 
   // ───────────────────────────────────────────────────────────
@@ -932,18 +792,18 @@ const handleOpenFile = useCallback(
   // ───────────────────────────────────────────────────────────
 
   function handleRegenerateProject() {
-    if (!idea.trim()) return
+    if (!idea.trim()) return;
 
     if (credits <= 0) {
-      toast.error(
-        'Daily credits used up. Upgrade to continue building.',
-      )
+      toast.error("Daily credits used up. Upgrade to continue building.");
 
-      return
+      return;
     }
 
-    setGenError(null)
-    setMessages([])
+    setGenError(null);
+    setMessages([]);
+
+    incrementalUpdateRef.current = false;
 
     submit({
       idea,
@@ -951,60 +811,84 @@ const handleOpenFile = useCallback(
       platform,
       messages: [],
       existingPlan: localPlan,
-    })
+    });
+  }
+
+  function handleAutoFixPreview() {
+    if (!idea.trim() || !localPlan || loading) return;
+
+    if (credits <= 0) {
+      toast.error("Daily credits used up. Upgrade to continue building.");
+      return;
+    }
+
+    const fixRequest: ChatMessage = {
+      role: "user",
+      content: `Fix the generated project preview.
+
+The preview compiler reported this error:
+${previewError || "The generated project failed to compile."}
+
+Repair the root cause in the existing project. Return the COMPLETE project
+in previewFiles, preserve the existing design and features, and verify every
+local import, bracket, CSS block, and dependency before finishing. Do not
+return explanations instead of files.`,
+    };
+
+    const nextMessages = [...messages, fixRequest];
+
+    setMessages(nextMessages);
+    setPreviewError(null);
+    setGenError(null);
+
+    incrementalUpdateRef.current = Boolean(localPlan?.previewFiles?.length);
+
+    submit({
+      idea,
+      tech,
+      platform,
+      messages: nextMessages,
+      existingPlan: localPlan,
+    });
   }
 
   // ───────────────────────────────────────────────────────────
   // DOWNLOAD REAL PROJECT ZIP
   // ───────────────────────────────────────────────────────────
 
-  const handleDownloadZip =
-    async () => {
-      const projectFiles =
-        activePlan?.previewFiles
+  const handleDownloadZip = async () => {
+    const projectFiles = activePlan?.previewFiles;
 
-      if (!projectFiles?.length) {
-        toast.error(
-          'No project files available to download.',
-        )
+    if (!projectFiles?.length) {
+      toast.error("No project files available to download.");
 
-        return
-      }
+      return;
+    }
 
-      try {
-        const zip = new JSZip()
-        let hasTsConfigNode = false
-        let hasTsConfig = false
+    try {
+      const zip = new JSZip();
+      let hasTsConfigNode = false;
+      let hasTsConfig = false;
 
-        for (const file of projectFiles) {
-          if (
-            !file?.path ||
-            typeof file.content !==
-              'string'
-          ) {
-            continue
-          }
-
-          const filePath =
-            file.path
-              .replace(/\\/g, '/')
-              .replace(/^\/+/, '')
-
-          if (!filePath) continue
-
-          if (filePath === 'tsconfig.node.json') hasTsConfigNode = true
-          if (filePath === 'tsconfig.json') hasTsConfig = true
-
-          zip.file(
-            filePath,
-            file.content,
-          )
+      for (const file of projectFiles) {
+        if (!file?.path || typeof file.content !== "string") {
+          continue;
         }
 
-        if (hasTsConfig && !hasTsConfigNode) {
-          zip.file(
-            'tsconfig.node.json',
-            `{
+        const filePath = file.path.replace(/\\/g, "/").replace(/^\/+/, "");
+
+        if (!filePath) continue;
+
+        if (filePath === "tsconfig.node.json") hasTsConfigNode = true;
+        if (filePath === "tsconfig.json") hasTsConfig = true;
+
+        zip.file(filePath, file.content);
+      }
+
+      if (hasTsConfig && !hasTsConfigNode) {
+        zip.file(
+          "tsconfig.node.json",
+          `{
   "compilerOptions": {
     "composite": true,
     "skipLibCheck": true,
@@ -1014,113 +898,75 @@ const handleOpenFile = useCallback(
     "strict": true
   },
   "include": ["vite.config.ts"]
-}`
-          )
-        }
-
-        const content =
-          await zip.generateAsync({
-            type: 'blob',
-          })
-
-        saveAs(
-          content,
-          `${
-            projectTitle ||
-            'codewithchat-project'
-          }.zip`,
-        )
-
-        toast.success(
-          'Downloaded complete project ZIP!',
-        )
-      } catch (error) {
-        console.error(
-          '[Project] ZIP error:',
-          error,
-        )
-
-        toast.error(
-          'Failed to generate ZIP file.',
-        )
+}`,
+        );
       }
+
+      const content = await zip.generateAsync({
+        type: "blob",
+      });
+
+      saveAs(content, `${projectTitle || "codewithchat-project"}.zip`);
+
+      toast.success("Downloaded complete project ZIP!");
+    } catch (error) {
+      console.error("[Project] ZIP error:", error);
+
+      toast.error("Failed to generate ZIP file.");
     }
+  };
 
   // ───────────────────────────────────────────────────────────
   // PIN PROJECT
   // ───────────────────────────────────────────────────────────
 
-  const handleTogglePin =
-    async () => {
-      const newValue = !isPinned
+  const handleTogglePin = async () => {
+    const newValue = !isPinned;
 
-      setIsPinned(newValue)
+    setIsPinned(newValue);
 
-      const result =
-        await togglePinProjectAction(
-          projectId,
-          newValue,
-        )
+    const result = await togglePinProjectAction(projectId, newValue);
 
-      if (!result.success) {
-        setIsPinned(!newValue)
+    if (!result.success) {
+      setIsPinned(!newValue);
 
-        toast.error(
-          'Failed to update pin.',
-        )
-      }
+      toast.error("Failed to update pin.");
     }
+  };
 
   // ───────────────────────────────────────────────────────────
   // RENAME PROJECT
   // ───────────────────────────────────────────────────────────
 
-  const handleRename =
-    async () => {
-      const value =
-        renameValue.trim()
+  const handleRename = async () => {
+    const value = renameValue.trim();
 
-      if (
-        !value ||
-        value === projectTitle
-      ) {
-        setIsRenaming(false)
-        return
-      }
-
-      const result =
-        await renameProjectAction(
-          projectId,
-          value,
-        )
-
-      if (result.success) {
-        setProjectTitle(value)
-
-        toast.success(
-          'Project renamed.',
-        )
-      } else {
-        toast.error(
-          'Failed to rename.',
-        )
-      }
-
-      setIsRenaming(false)
+    if (!value || value === projectTitle) {
+      setIsRenaming(false);
+      return;
     }
+
+    const result = await renameProjectAction(projectId, value);
+
+    if (result.success) {
+      setProjectTitle(value);
+
+      toast.success("Project renamed.");
+    } else {
+      toast.error("Failed to rename.");
+    }
+
+    setIsRenaming(false);
+  };
 
   // ───────────────────────────────────────────────────────────
   // LEGACY FULLSTACK FILES
   // ───────────────────────────────────────────────────────────
 
-  const legacyFullStackFiles =
-    useMemo(
-      () =>
-        buildFullStackFiles(
-          activePlan?.fullStackFiles,
-        ),
-      [activePlan?.fullStackFiles],
-    )
+  const legacyFullStackFiles = useMemo(
+    () => buildFullStackFiles(activePlan?.fullStackFiles),
+    [activePlan?.fullStackFiles],
+  );
 
   // ───────────────────────────────────────────────────────────
   // BUILD PREVIEW
@@ -1140,49 +986,33 @@ const handleOpenFile = useCallback(
    * Old projects can temporarily fall back to
    * fullStackFiles.
    */
-  const previewFileMap =
-    useMemo(() => {
-      if (!activePlan) {
-        return {}
-      }
+  const previewFileMap = useMemo(() => {
+    if (!activePlan) {
+      return {};
+    }
 
-      return buildInstantPreviewFiles(
-        activePlan.previewFiles,
-        legacyFullStackFiles,
-        true,
-      )
-    }, [
-      activePlan,
+    return buildInstantPreviewFiles(
+      activePlan.previewFiles,
       legacyFullStackFiles,
-    ])
+      true,
+    );
+  }, [activePlan, legacyFullStackFiles]);
 
-  const previewReady =
-    useMemo(
-      () =>
-        hasPreviewEntry(
-          previewFileMap,
-        ),
-      [previewFileMap],
-    )
+  const previewReady = useMemo(
+    () => hasPreviewEntry(previewFileMap),
+    [previewFileMap],
+  );
 
   // ───────────────────────────────────────────────────────────
   // AUTO SWITCH TO PREVIEW
   // ───────────────────────────────────────────────────────────
 
   useEffect(() => {
-    if (
-      !loading &&
-      !genError &&
-      previewReady
-    ) {
-      setView('preview')
-      setRightPanel('preview')
+    if (!loading && !genError && previewReady) {
+      setView("preview");
+      setRightPanel("preview");
     }
-  }, [
-    loading,
-    genError,
-    previewReady,
-  ])
+  }, [loading, genError, previewReady]);
 
   // ───────────────────────────────────────────────────────────
   // NOT FOUND
@@ -1201,9 +1031,8 @@ const handleOpenFile = useCallback(
           </h1>
 
           <p className="max-w-sm text-sm text-muted-foreground">
-            This project doesn&apos;t
-            exist or you don&apos;t have
-            permission to view it.
+            This project doesn&apos;t exist or you don&apos;t have permission to
+            view it.
           </p>
         </div>
 
@@ -1214,7 +1043,7 @@ const handleOpenFile = useCallback(
           ← Back to Dashboard
         </Link>
       </div>
-    )
+    );
   }
 
   // ───────────────────────────────────────────────────────────
@@ -1247,16 +1076,10 @@ const handleOpenFile = useCallback(
                 </button>
               </DropdownMenuTrigger>
 
-              <DropdownMenuContent
-                align="start"
-                className="w-56"
-              >
+              <DropdownMenuContent align="start" className="w-56">
                 {/* HOME */}
                 <DropdownMenuItem asChild>
-                  <Link
-                    href="/dashboard"
-                    className="flex items-center gap-2"
-                  >
+                  <Link href="/dashboard" className="flex items-center gap-2">
                     <Home className="size-3.5" />
                     <span>Home</span>
                   </Link>
@@ -1284,10 +1107,10 @@ const handleOpenFile = useCallback(
                     <span
                       className={`text-xs font-semibold ${
                         credits <= 0
-                          ? 'text-destructive'
+                          ? "text-destructive"
                           : credits <= 2
-                            ? 'text-orange-500'
-                            : 'text-green-500'
+                            ? "text-orange-500"
+                            : "text-green-500"
                       }`}
                     >
                       {credits}/{MAX_DAILY_CREDITS}
@@ -1299,10 +1122,10 @@ const handleOpenFile = useCallback(
                     <div
                       className={`h-full rounded-full transition-all duration-500 ${
                         credits <= 0
-                          ? 'bg-destructive'
+                          ? "bg-destructive"
                           : credits <= 2
-                            ? 'bg-orange-500'
-                            : 'bg-green-500'
+                            ? "bg-orange-500"
+                            : "bg-green-500"
                       }`}
                       style={{
                         width: `${(credits / MAX_DAILY_CREDITS) * 100}%`,
@@ -1320,7 +1143,7 @@ const handleOpenFile = useCallback(
                 <DropdownMenuSeparator />
 
                 {/* UPGRADE */}
-                <DropdownMenuItem >
+                <DropdownMenuItem>
                   <Gift className="mr-2 size-3.5" />
                   Upgrade Plan
                 </DropdownMenuItem>
@@ -1336,24 +1159,14 @@ const handleOpenFile = useCallback(
                 <input
                   ref={renameRef}
                   value={renameValue}
-                  onChange={event =>
-                    setRenameValue(
-                      event.target.value,
-                    )
-                  }
-                  onKeyDown={event => {
-                    if (
-                      event.key ===
-                      'Enter'
-                    ) {
-                      handleRename()
+                  onChange={(event) => setRenameValue(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      handleRename();
                     }
 
-                    if (
-                      event.key ===
-                      'Escape'
-                    ) {
-                      setIsRenaming(false)
+                    if (event.key === "Escape") {
+                      setIsRenaming(false);
                     }
                   }}
                   className="h-7 w-40 rounded-md border border-border bg-muted/50 px-2 text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-primary"
@@ -1369,9 +1182,7 @@ const handleOpenFile = useCallback(
 
                 <button
                   type="button"
-                  onClick={() =>
-                    setIsRenaming(false)
-                  }
+                  onClick={() => setIsRenaming(false)}
                   className="rounded p-1 text-muted-foreground hover:bg-muted"
                 >
                   <X className="size-3.5" />
@@ -1382,8 +1193,7 @@ const handleOpenFile = useCallback(
                 className="max-w-[200px] truncate text-sm font-semibold"
                 title={projectTitle}
               >
-                {projectTitle ||
-                  'Untitled Project'}
+                {projectTitle || "Untitled Project"}
               </span>
             )}
 
@@ -1393,9 +1203,7 @@ const handleOpenFile = useCallback(
               <TooltipTrigger asChild>
                 <button
                   type="button"
-                  onClick={
-                    handleTogglePin
-                  }
+                  onClick={handleTogglePin}
                   className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                   {isPinned ? (
@@ -1406,23 +1214,15 @@ const handleOpenFile = useCallback(
                 </button>
               </TooltipTrigger>
 
-              <TooltipContent
-                side="bottom"
-                className="text-xs"
-              >
-                {isPinned
-                  ? 'Unpin'
-                  : 'Pin'}{' '}
-                project
+              <TooltipContent side="bottom" className="text-xs">
+                {isPinned ? "Unpin" : "Pin"} project
               </TooltipContent>
             </Tooltip>
 
             {/* SETTINGS */}
 
             <DropdownMenu>
-              <DropdownMenuTrigger
-                asChild
-              >
+              <DropdownMenuTrigger asChild>
                 <button
                   type="button"
                   className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
@@ -1431,27 +1231,20 @@ const handleOpenFile = useCallback(
                 </button>
               </DropdownMenuTrigger>
 
-              <DropdownMenuContent
-                align="start"
-                className="w-44 text-sm"
-              >
+              <DropdownMenuContent align="start" className="w-44 text-sm">
                 <DropdownMenuItem
                   onClick={() => {
-                    setRenameValue(
-                      projectTitle,
-                    )
+                    setRenameValue(projectTitle);
 
-                    setIsRenaming(true)
+                    setIsRenaming(true);
                   }}
                 >
                   <Pencil className="mr-2 size-3.5" />
-
                   Rename
                 </DropdownMenuItem>
 
                 <DropdownMenuItem>
                   <Settings className="mr-2 size-3.5" />
-
                   Project Settings
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -1473,34 +1266,34 @@ const handleOpenFile = useCallback(
           <div
             className={`flex h-full shrink-0 flex-col overflow-hidden border-r border-border transition-all duration-300 ease-in-out ${
               chatPanelOpen
-                ? 'w-[360px] min-w-[300px] max-w-[420px] opacity-100'
-                : 'w-0 min-w-0 border-r-0 opacity-0'
+                ? "w-[360px] min-w-[300px] max-w-[420px] opacity-100"
+                : "w-0 min-w-0 border-r-0 opacity-0"
             }`}
           >
             {/* CHAT CONTENT */}
 
             <div className="min-h-0 flex-1 overflow-y-auto p-4">
               <div className="flex flex-col gap-4">
-                {messages.map(
-                  (message, index) => (
-                    <div
-                      key={index}
-                      className={`max-w-[92%] whitespace-pre-wrap text-[13px] leading-relaxed ${
-                        message.role ===
-                        'user'
-                          ? 'ml-auto self-end rounded-[20px] rounded-br-sm border border-border/40 bg-muted/40 px-3.5 py-2.5 text-foreground'
-                          : 'w-full self-start py-1 text-foreground/90'
-                      }`}
-                    >
-                      {message.content}
-                    </div>
-                  ),
-                )}
+                {messages.map((message, index) => (
+                  <div
+                    key={index}
+                    className={`max-w-[92%] whitespace-pre-wrap text-[13px] leading-relaxed ${
+                      message.role === "user"
+                        ? "ml-auto self-end rounded-[20px] rounded-br-sm border border-border/40 bg-muted/40 px-3.5 py-2.5 text-foreground"
+                        : "w-full self-start py-1 text-foreground/90"
+                    }`}
+                  >
+                    {message.content}
+                  </div>
+                ))}
 
                 {/* PAST BUILD ACTIVITIES */}
 
                 {activityHistory.map((hist, idx) => (
-                  <div key={idx} className="w-full self-start py-1 text-foreground/90">
+                  <div
+                    key={idx}
+                    className="w-full self-start py-1 text-foreground/90"
+                  >
                     <BuildActivityFeed
                       plan={hist.plan}
                       loading={false}
@@ -1519,28 +1312,16 @@ const handleOpenFile = useCallback(
 
                 {(loading ||
                   activePlan?.overview ||
-                  activePlan?.steps
-                    ?.length) && (
+                  activePlan?.steps?.length) && (
                   <div className="w-full self-start py-1 text-foreground/90">
                     <BuildActivityFeed
-                      plan={
-                        activePlan ??
-                        undefined
-                      }
+                      plan={activePlan ?? undefined}
                       loading={loading}
                       idea={idea}
-                      startedAt={
-                        buildStartedAt
-                      }
-                      durationMs={
-                        buildDurationMs
-                      }
-                      completedAt={
-                        buildCompletedAt
-                      }
-                      fallbackUpdatedAt={
-                        projectUpdatedAt
-                      }
+                      startedAt={buildStartedAt}
+                      durationMs={buildDurationMs}
+                      completedAt={buildCompletedAt}
+                      fallbackUpdatedAt={projectUpdatedAt}
                       compact
                       onOpenFile={handleOpenFile}
                     />
@@ -1555,21 +1336,13 @@ const handleOpenFile = useCallback(
               <PromptComposer
                 value={chatInput}
                 onChange={setChatInput}
-                onSubmit={
-                  handleSendChat
-                }
-                loading={
-                  loading ||
-                  chatLoading
-                }
+                onSubmit={handleSendChat}
+                loading={loading || chatLoading}
                 compact
                 submitHint={
-                  shouldRegenerateCode(
-                    chatInput,
-                  ) &&
-                  chatInput.trim()
-                    ? 'Send code update'
-                    : 'Ask AI'
+                  shouldRegenerateCode(chatInput) && chatInput.trim()
+                    ? "Send code update"
+                    : "Ask AI"
                 }
                 placeholder="Ask a question with CodewithChat"
               />
@@ -1583,103 +1356,84 @@ const handleOpenFile = useCallback(
           <div className="flex h-full min-w-0 flex-1 flex-col">
             {/* PROJECT LOADING */}
 
-            {!activePlan &&
-              projectLoading && (
-                <div className="flex h-full items-center justify-center">
-                  <Spinner className="size-8 text-primary" />
-                </div>
-              )}
+            {!activePlan && projectLoading && (
+              <div className="flex h-full items-center justify-center">
+                <Spinner className="size-8 text-primary" />
+              </div>
+            )}
 
             {/* FIRST GENERATION */}
 
-            {!activePlan &&
-              loading &&
-              !projectLoading && (
-                <div className="flex h-full animate-in flex-col items-center justify-center px-4 text-center fade-in zoom-in-95 duration-500">
-                  <div className="relative mb-6 flex items-center justify-center">
-                    <div className="absolute size-24 rounded-full bg-primary/20 blur-2xl" />
+            {!activePlan && loading && !projectLoading && (
+              <div className="flex h-full animate-in flex-col items-center justify-center px-4 text-center fade-in zoom-in-95 duration-500">
+                <div className="relative mb-6 flex items-center justify-center">
+                  <div className="absolute size-24 rounded-full bg-primary/20 blur-2xl" />
 
-                    <div className="relative flex items-center justify-center rounded-2xl border border-primary/20 bg-gradient-to-b from-primary/20 to-transparent p-5 shadow-2xl backdrop-blur-md">
-                      <Gift className="size-12 text-primary" />
-                    </div>
+                  <div className="relative flex items-center justify-center rounded-2xl border border-primary/20 bg-gradient-to-b from-primary/20 to-transparent p-5 shadow-2xl backdrop-blur-md">
+                    <Gift className="size-12 text-primary" />
                   </div>
-
-                  <h3 className="mb-2 text-xl font-semibold text-foreground">
-                    Refer & earn
-                  </h3>
-
-                  <p className="mb-8 max-w-xs text-sm leading-relaxed text-muted-foreground">
-                    Share CodewithChat
-                    with friends and get
-                    rewarded when they
-                    subscribe
-                  </p>
-
-                  <Button
-                    variant="outline"
-                    className="mb-12 h-10 gap-2 rounded-lg border-border bg-transparent px-6 text-sm shadow-sm transition-all hover:bg-muted/50 hover:text-foreground"
-                  >
-                    <Gift className="size-4" />
-
-                    Earn $50
-                  </Button>
-
-                  <p className="flex items-center gap-2 text-[13px] text-muted-foreground">
-                    <Spinner className="size-3.5" />
-
-                    <span className="text-foreground/80">
-                      Your
-                    </span>
-
-                    preview will appear
-                    here
-                  </p>
                 </div>
-              )}
+
+                <h3 className="mb-2 text-xl font-semibold text-foreground">
+                  Refer & earn
+                </h3>
+
+                <p className="mb-8 max-w-xs text-sm leading-relaxed text-muted-foreground">
+                  Share CodewithChat with friends and get rewarded when they
+                  subscribe
+                </p>
+
+                <Button
+                  variant="outline"
+                  className="mb-12 h-10 gap-2 rounded-lg border-border bg-transparent px-6 text-sm shadow-sm transition-all hover:bg-muted/50 hover:text-foreground"
+                >
+                  <Gift className="size-4" />
+                  Earn $50
+                </Button>
+
+                <p className="flex items-center gap-2 text-[13px] text-muted-foreground">
+                  <Spinner className="size-3.5" />
+                  <span className="text-foreground/80">Your</span>
+                  preview will appear here
+                </p>
+              </div>
+            )}
 
             {/* NO PLAN / FAILED */}
 
-            {!activePlan &&
-              !loading &&
-              !projectLoading && (
-                <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-muted">
-                    <Zap className="size-6 text-muted-foreground" />
-                  </div>
-
-                  <div>
-                    <h3 className="mb-1 text-base font-semibold">
-                      {genError
-                        ? 'Generation Failed'
-                        : 'No preview yet'}
-                    </h3>
-
-                    <p className="max-w-xs text-sm text-muted-foreground">
-                      {genError
-                        ? genError
-                        : 'Generate your project to build the live preview.'}
-                    </p>
-                  </div>
-
-                  <Button
-                    onClick={() => {
-                      setGenError(null)
-
-                      handleRegenerateProject()
-                    }}
-                    disabled={
-                      !idea.trim()
-                    }
-                    className="gap-2"
-                  >
-                    <Zap className="size-4" />
-
-                    {genError
-                      ? 'Retry Generation'
-                      : 'Generate Project'}
-                  </Button>
+            {!activePlan && !loading && !projectLoading && (
+              <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-muted">
+                  <Zap className="size-6 text-muted-foreground" />
                 </div>
-              )}
+
+                <div>
+                  <h3 className="mb-1 text-base font-semibold">
+                    {genError ? "Generation Failed" : "No preview yet"}
+                  </h3>
+
+                  <p className="max-w-xs text-sm text-muted-foreground">
+                    {genError
+                      ? genError
+                      : "Generate your project to build the live preview."}
+                  </p>
+                </div>
+
+                <Button
+                  onClick={() => {
+                    setGenError(null);
+
+                    handleRegenerateProject();
+                  }}
+                  disabled={!idea.trim()}
+                  className="gap-2"
+                >
+                  <Zap className="size-4" />
+
+                  {genError ? "Retry Generation" : "Generate Project"}
+                </Button>
+              </div>
+            )}
 
             {/* ───────────────────────────────────────────
                 ACTIVE PROJECT
@@ -1693,26 +1447,17 @@ const handleOpenFile = useCallback(
                   {/* CHAT PANEL TOGGLE */}
 
                   <Tooltip>
-                    <TooltipTrigger
-                      asChild
-                    >
+                    <TooltipTrigger asChild>
                       <button
                         type="button"
-                        onClick={() =>
-                          setChatPanelOpen(
-                            open =>
-                              !open,
-                          )
-                        }
+                        onClick={() => setChatPanelOpen((open) => !open)}
                         className={`shrink-0 rounded-md p-1.5 transition-colors ${
                           chatPanelOpen
-                            ? 'bg-muted text-foreground'
-                            : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                            ? "bg-muted text-foreground"
+                            : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                         }`}
                         aria-label={
-                          chatPanelOpen
-                            ? 'Hide chat panel'
-                            : 'Show chat panel'
+                          chatPanelOpen ? "Hide chat panel" : "Show chat panel"
                         }
                       >
                         {chatPanelOpen ? (
@@ -1723,13 +1468,10 @@ const handleOpenFile = useCallback(
                       </button>
                     </TooltipTrigger>
 
-                    <TooltipContent
-                      side="bottom"
-                      className="text-xs"
-                    >
+                    <TooltipContent side="bottom" className="text-xs">
                       {chatPanelOpen
-                        ? 'Hide chat & activity'
-                        : 'Show chat & activity'}
+                        ? "Hide chat & activity"
+                        : "Show chat & activity"}
                     </TooltipContent>
                   </Tooltip>
 
@@ -1741,67 +1483,47 @@ const handleOpenFile = useCallback(
                     <button
                       type="button"
                       onClick={() => {
-                        setView(
-                          'preview',
-                        )
+                        setView("preview");
 
-                        setRightPanel(
-                          'preview',
-                        )
+                        setRightPanel("preview");
                       }}
                       className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all ${
-                        view ===
-                          'preview' &&
-                        rightPanel ===
-                          'preview'
-                          ? 'bg-card text-foreground shadow-sm'
-                          : 'text-muted-foreground hover:text-foreground'
+                        view === "preview" && rightPanel === "preview"
+                          ? "bg-card text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
                       <Eye className="size-3.5" />
-
                       Preview
                     </button>
 
                     <button
                       type="button"
                       onClick={() => {
-                        setView('code')
+                        setView("code");
 
-                        setRightPanel(
-                          'preview',
-                        )
+                        setRightPanel("preview");
                       }}
                       className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all ${
-                        view ===
-                          'code' &&
-                        rightPanel ===
-                          'preview'
-                          ? 'bg-card text-foreground shadow-sm'
-                          : 'text-muted-foreground hover:text-foreground'
+                        view === "code" && rightPanel === "preview"
+                          ? "bg-card text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
                       <Code2 className="size-3.5" />
-
                       Code
                     </button>
 
                     <button
                       type="button"
-                      onClick={() =>
-                        setRightPanel(
-                          'guide',
-                        )
-                      }
+                      onClick={() => setRightPanel("guide")}
                       className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all ${
-                        rightPanel ===
-                        'guide'
-                          ? 'bg-card text-foreground shadow-sm'
-                          : 'text-muted-foreground hover:text-foreground'
+                        rightPanel === "guide"
+                          ? "bg-card text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
                       <BookOpen className="size-3.5" />
-
                       Guide
                     </button>
                   </div>
@@ -1809,69 +1531,67 @@ const handleOpenFile = useCallback(
                   {/* CENTER URL */}
 
                   <div className="flex flex-1 justify-center items-center gap-2">
-                    {rightPanel ===
-                      'preview' &&
-                      view ===
-                        'preview' && (
-                        <>
+                    {rightPanel === "preview" && view === "preview" && (
+                      <>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setViewportSize((prev) =>
+                                  prev === "desktop"
+                                    ? "tablet"
+                                    : prev === "tablet"
+                                      ? "mobile"
+                                      : "desktop",
+                                )
+                              }
+                              className="flex items-center justify-center rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+                            >
+                              {viewportSize === "desktop" ? (
+                                <Monitor className="size-4" />
+                              ) : viewportSize === "tablet" ? (
+                                <Tablet className="size-4" />
+                              ) : (
+                                <Smartphone className="size-4" />
+                              )}
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="text-xs">
+                            Toggle Viewport ({viewportSize})
+                          </TooltipContent>
+                        </Tooltip>
+
+                        <div className="flex min-w-[300px] max-w-[400px] items-center gap-2 rounded-full border border-border/60 bg-muted/30 px-3 py-1.5">
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <button
                                 type="button"
-                                onClick={() => setViewportSize(prev => prev === 'desktop' ? 'tablet' : prev === 'tablet' ? 'mobile' : 'desktop')}
-                                className="flex items-center justify-center rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+                                onClick={handleRefreshPreview}
+                                disabled={isRefreshingPreview}
+                                className="text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
                               >
-                                {viewportSize === 'desktop' ? <Monitor className="size-4" /> : viewportSize === 'tablet' ? <Tablet className="size-4" /> : <Smartphone className="size-4" />}
+                                <RotateCw
+                                  className={`size-3.5 ${
+                                    isRefreshingPreview ? "animate-spin" : ""
+                                  }`}
+                                />
                               </button>
                             </TooltipTrigger>
+
                             <TooltipContent side="bottom" className="text-xs">
-                              Toggle Viewport ({viewportSize})
-                            </TooltipContent>
-                          </Tooltip>
-
-                          <div className="flex min-w-[300px] max-w-[400px] items-center gap-2 rounded-full border border-border/60 bg-muted/30 px-3 py-1.5">
-                            <Tooltip>
-                              <TooltipTrigger
-                                asChild
-                              >
-                               <button
-                        type="button"
-                        onClick={handleRefreshPreview}
-                        disabled={isRefreshingPreview}
-                        className="text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        <RotateCw
-                          className={`size-3.5 ${
-                            isRefreshingPreview
-                              ? 'animate-spin'
-                              : ''
-                          }`}
-                        />
-                      </button>
-                            </TooltipTrigger>
-
-                            <TooltipContent
-                              side="bottom"
-                              className="text-xs"
-                            >
-                              Refresh
-                              preview
+                              Refresh preview
                             </TooltipContent>
                           </Tooltip>
 
                           <div className="flex-1 truncate text-center font-mono text-xs text-muted-foreground">
                             codewithchat.dev/preview/
-                            {projectId.slice(
-                              0,
-                              8,
-                            )}
+                            {projectId.slice(0, 8)}
                             ...
                           </div>
 
                           <Tooltip>
-                            <TooltipTrigger
-                              asChild
-                            >
+                            <TooltipTrigger asChild>
                               <a
                                 href={`/preview/${projectId}`}
                                 target="_blank"
@@ -1882,17 +1602,13 @@ const handleOpenFile = useCallback(
                               </a>
                             </TooltipTrigger>
 
-                            <TooltipContent
-                              side="bottom"
-                              className="text-xs"
-                            >
-                              Open in new
-                              tab
+                            <TooltipContent side="bottom" className="text-xs">
+                              Open in new tab
                             </TooltipContent>
                           </Tooltip>
                         </div>
-                        </>
-                      )}
+                      </>
+                    )}
                   </div>
 
                   {/* ACTIONS */}
@@ -1905,23 +1621,15 @@ const handleOpenFile = useCallback(
                           variant="secondary"
                           className="hidden h-8 rounded-md bg-muted/40 px-3 text-xs font-medium hover:bg-muted sm:flex"
                         >
-                          <Link href="/pricing">
-                            Upgrade
-                          </Link>
+                          <Link href="/pricing">Upgrade</Link>
                         </Button>
 
-                        <ShareProjectModal
-                          projectId={projectId}
-                        />
+                        <ShareProjectModal projectId={projectId} />
 
-                        <PublishProjectModal
-                          projectId={projectId}
-                        />
+                        <PublishProjectModal projectId={projectId} />
 
                         <DropdownMenu>
-                          <DropdownMenuTrigger
-                            asChild
-                          >
+                          <DropdownMenuTrigger asChild>
                             <Button
                               variant="ghost"
                               size="icon"
@@ -1937,25 +1645,18 @@ const handleOpenFile = useCallback(
                           >
                             <DropdownMenuItem>
                               <Github className="mr-2 size-4" />
-
                               Connect GitHub
                             </DropdownMenuItem>
 
                             <DropdownMenuItem>
                               <FileCode2 className="mr-2 size-4" />
-
                               Open in VS Code
                             </DropdownMenuItem>
 
                             <DropdownMenuSeparator />
 
-                            <DropdownMenuItem
-                              onClick={
-                                handleDownloadZip
-                              }
-                            >
+                            <DropdownMenuItem onClick={handleDownloadZip}>
                               <Download className="mr-2 size-4" />
-
                               Download ZIP
                             </DropdownMenuItem>
                           </DropdownMenuContent>
@@ -1968,58 +1669,37 @@ const handleOpenFile = useCallback(
                 {/* CONTENT */}
 
                 <div className="relative min-h-0 flex-1">
-                  {rightPanel ===
-                  'guide' ? (
+                  {rightPanel === "guide" ? (
                     <ProjectGuide
                       plan={activePlan}
-                      projectId={
-                        projectId
-                      }
+                      projectId={projectId}
                       idea={idea}
                       tech={tech}
                     />
                   ) : previewReady ? (
                     <SandpackPreview
                       key={previewKey}
-                      files={
-                        previewFileMap
-                      }
-                      dependencies={
-                        activeDependencies
-                      }
+                      files={previewFileMap}
+                      dependencies={activeDependencies}
                       view={view}
-                      isTerminalOpen={
-                        false
-                      }
+                      isTerminalOpen={false}
                       onCloseTerminal={() => {}}
-                      previewKey={
-                        previewKey
-                      }
+                      previewKey={previewKey}
                       tech={tech}
-                      isLoading={
-                        loading
-                      }
-                      viewportSize={
-                        viewportSize
-                      }
-                      activeFile={
-                        activeFile
-                      }
+                      isLoading={loading}
+                      viewportSize={viewportSize}
+                      activeFile={activeFile}
+                      onPreviewError={handlePreviewError}
+                      onAutoFix={handleAutoFixPreview}
                     />
                   ) : loading ? (
                     <div className="flex h-full flex-col items-center justify-center gap-3 bg-[#151515] text-muted-foreground">
                       <Spinner className="size-6" />
 
-                      <p className="text-sm">
-                        Building
-                        preview…
-                      </p>
+                      <p className="text-sm">Building preview…</p>
 
                       <p className="text-xs text-muted-foreground/70">
-                        Preview will
-                        update when the
-                        complete project
-                        is ready
+                        Preview will update when the complete project is ready
                       </p>
                     </div>
                   ) : (
@@ -2030,33 +1710,24 @@ const handleOpenFile = useCallback(
 
                       <div>
                         <h3 className="mb-1 text-base font-semibold">
-                          Preview not
-                          ready
+                          Preview not ready
                         </h3>
 
                         <p className="max-w-sm text-sm text-muted-foreground">
-                          Regenerate the
-                          project to build
-                          the live preview.
+                          Regenerate the project to build the live preview.
                         </p>
                       </div>
 
                       <Button
                         onClick={() => {
-                          setGenError(
-                            null,
-                          )
+                          setGenError(null);
 
-                          handleRegenerateProject()
+                          handleRegenerateProject();
                         }}
-                        disabled={
-                          loading ||
-                          !idea.trim()
-                        }
+                        disabled={loading || !idea.trim()}
                         className="gap-2"
                       >
                         <Zap className="size-4" />
-
                         Regenerate Project
                       </Button>
                     </div>
@@ -2068,5 +1739,5 @@ const handleOpenFile = useCallback(
         </div>
       </div>
     </TooltipProvider>
-  )
+  );
 }
