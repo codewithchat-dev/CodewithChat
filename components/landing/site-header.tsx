@@ -1,36 +1,42 @@
-'use client'
+"use client";
 
-import Link from 'next/link'
-import { useState } from 'react'
-import { Menu, X, ChevronDown } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { SiteLogo } from '@/components/site-logo'
-import { UserButton, SignInButton, SignUpButton, useAuth, useUser } from '@clerk/nextjs'
-import { useRouter } from 'next/navigation'
+import Link from "next/link";
+import { useState } from "react";
+import { Menu, X, ChevronDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { SiteLogo } from "@/components/site-logo";
+import {
+  UserButton,
+  SignInButton,
+  SignUpButton,
+  useAuth,
+  useUser,
+} from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+} from "@/components/ui/dropdown-menu";
 
 const navLinks = [
-  { label: 'Pricing', href: '/pricing' },
-  { label: 'Enterprise', href: '/enterprise' },
-  { label: 'Community', href: 'https://discord.gg/x9UNvGyXzf', external: true },
-]
+  { label: "Pricing", href: "/pricing" },
+  { label: "Enterprise", href: "/enterprise" },
+  { label: "Community", href: "https://discord.gg/x9UNvGyXzf", external: true },
+];
 
 const resourcesLinks = [
-  { label: 'Templates', href: '/templates' },
-  { label: 'Blog', href: '/blog' },
-  { label: 'Docs', href: '/docs' },
-]
+  { label: "Templates", href: "/templates" },
+  { label: "Blog", href: "/blog" },
+  { label: "Docs", href: "/docs" },
+];
 
 export function SiteHeader() {
-  const [open, setOpen] = useState(false)
-  const { userId } = useAuth()
-  const { user } = useUser()
-  const router = useRouter()
+  const [open, setOpen] = useState(false);
+  const { userId } = useAuth();
+  const { user } = useUser();
+  const router = useRouter();
 
   return (
     <header className="sticky top-6 z-50 mx-auto w-full max-w-6xl px-4 sm:px-6">
@@ -44,7 +50,6 @@ export function SiteHeader() {
             <Link
               key={link.href}
               href={link.href}
-              target="_blank"
               className="text-sm font-medium text-foreground/90 transition-colors hover:text-foreground hover:text-primary"
             >
               {link.label}
@@ -54,9 +59,16 @@ export function SiteHeader() {
             <DropdownMenuTrigger className="flex items-center gap-1 text-sm font-medium text-foreground/90 transition-colors hover:text-foreground hover:text-primary outline-none">
               Resources <ChevronDown className="size-4" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="border-border/50 bg-card/95 backdrop-blur-xl">
+            <DropdownMenuContent
+              align="end"
+              className="border-border/50 bg-card/95 backdrop-blur-xl"
+            >
               {resourcesLinks.map((link) => (
-                <DropdownMenuItem key={link.href} asChild className="cursor-pointer">
+                <DropdownMenuItem
+                  key={link.href}
+                  asChild
+                  className="cursor-pointer"
+                >
                   <Link href={link.href}>{link.label}</Link>
                 </DropdownMenuItem>
               ))}
@@ -68,23 +80,34 @@ export function SiteHeader() {
           {!userId ? (
             <>
               <SignInButton mode="modal" forceRedirectUrl="/dashboard">
-                <Button variant="outline" size="sm" className="font-medium">Sign In</Button>
+                <Button variant="outline" size="sm" className="font-medium">
+                  Sign In
+                </Button>
               </SignInButton>
               <SignUpButton mode="modal" forceRedirectUrl="/dashboard">
-                <Button size="sm" className="font-medium shadow-lg shadow-primary/20">Sign Up</Button>
+                <Button
+                  size="sm"
+                  className="font-medium shadow-lg shadow-primary/20"
+                >
+                  Sign Up
+                </Button>
               </SignUpButton>
             </>
           ) : (
             <button
-              onClick={() => router.push('/dashboard')}
+              onClick={() => router.push("/dashboard")}
               className="relative flex size-8 items-center justify-center rounded-full overflow-hidden ring-2 ring-border/60 hover:ring-foreground/40 transition-all"
               title="Go to Dashboard"
             >
               {user?.imageUrl ? (
-                <img src={user.imageUrl} alt={user.firstName ?? 'Profile'} className="size-full object-cover" />
+                <img
+                  src={user.imageUrl}
+                  alt={user.firstName ?? "Profile"}
+                  className="size-full object-cover"
+                />
               ) : (
                 <span className="text-xs font-semibold bg-muted text-foreground size-full flex items-center justify-center">
-                  {user?.firstName?.[0] ?? 'U'}
+                  {user?.firstName?.[0] ?? "U"}
                 </span>
               )}
             </button>
@@ -117,7 +140,9 @@ export function SiteHeader() {
                 {link.label}
               </Link>
             ))}
-            <div className="px-3 py-2 text-sm font-semibold text-foreground">Resources</div>
+            <div className="px-3 py-2 text-sm font-semibold text-foreground">
+              Resources
+            </div>
             {resourcesLinks.map((link) => (
               <Link
                 key={link.href}
@@ -132,24 +157,42 @@ export function SiteHeader() {
               {!userId ? (
                 <>
                   <SignInButton mode="modal" forceRedirectUrl="/dashboard">
-                    <Button variant="outline" size="sm" className="w-full font-medium">Sign In</Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full font-medium"
+                    >
+                      Sign In
+                    </Button>
                   </SignInButton>
                   <SignUpButton mode="modal" forceRedirectUrl="/dashboard">
-                    <Button size="sm" className="w-full font-medium shadow-lg shadow-primary/20">Sign Up</Button>
+                    <Button
+                      size="sm"
+                      className="w-full font-medium shadow-lg shadow-primary/20"
+                    >
+                      Sign Up
+                    </Button>
                   </SignUpButton>
                 </>
               ) : (
                 <div className="flex justify-center">
                   <button
-                    onClick={() => { setOpen(false); router.push('/dashboard') }}
+                    onClick={() => {
+                      setOpen(false);
+                      router.push("/dashboard");
+                    }}
                     className="relative flex size-10 items-center justify-center rounded-full overflow-hidden ring-2 ring-border/60 hover:ring-foreground/40 transition-all"
                     title="Go to Dashboard"
                   >
                     {user?.imageUrl ? (
-                      <img src={user.imageUrl} alt={user.firstName ?? 'Profile'} className="size-full object-cover" />
+                      <img
+                        src={user.imageUrl}
+                        alt={user.firstName ?? "Profile"}
+                        className="size-full object-cover"
+                      />
                     ) : (
                       <span className="text-sm font-semibold bg-muted text-foreground size-full flex items-center justify-center">
-                        {user?.firstName?.[0] ?? 'U'}
+                        {user?.firstName?.[0] ?? "U"}
                       </span>
                     )}
                   </button>
@@ -160,5 +203,5 @@ export function SiteHeader() {
         </div>
       )}
     </header>
-  )
+  );
 }

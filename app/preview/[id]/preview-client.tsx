@@ -1,12 +1,16 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import {
   SandpackProvider,
-  SandpackPreview,
   defaultDark,
 } from "@codesandbox/sandpack-react";
+
+import {
+  READY_SCRIPT,
+  PreviewLoadingSurface,
+} from "@/components/ide/preview-loading-surface";
 
 import {
   getProjectRuntimeDependencies,
@@ -15,79 +19,84 @@ import {
 
 type PreviewClientProps = {
   files: Record<string, string>;
-
   dependencies?: Record<string, string>;
 };
 
+const EMPTY_DEPENDENCIES: Record<string, string> = {};
+
 export function PreviewClient({
   files,
-  dependencies = {},
+  dependencies = EMPTY_DEPENDENCIES,
 }: PreviewClientProps) {
-  // DEPENDENCIES
-  // ─────────────────────────────────────────────
+  const [attempt, setAttempt] = useState(0);
 
   const runtimeDependencies = useMemo<Record<string, string>>(() => {
-    const previewFileInputs = Object.entries(files).map(([path, content]) => ({
-      path,
-      content,
-    }));
+    const previewFileInputs = Object.entries(files).map(
+      ([path, content]) => ({
+        path,
+        content,
+      }),
+    );
 
     const merged = getProjectRuntimeDependencies(
       previewFileInputs,
       dependencies,
     );
 
+    const needsRouter =
+      Boolean(merged["react-router-dom"]) ||
+      Object.values(files).some((content) =>
+        content.includes("react-router-dom"),
+      );
+
     return {
       ...merged,
-
       react: "18.2.0",
-
       "react-dom": "18.2.0",
-
-      ...(merged["react-router-dom"] ||
-      Object.values(files).some(
-        (content) =>
-          typeof content === "string" && content.includes("react-router-dom"),
-      )
+      ...(needsRouter
         ? {
-            "react-router-dom": merged["react-router-dom"] ?? "^6.28.0",
+            "react-router-dom":
+              merged["react-router-dom"] ?? "^6.28.0",
           }
         : {}),
     };
   }, [files, dependencies]);
 
-  // ─────────────────────────────────────────────
-  // SANDPACK FILE FORMAT
-  // ─────────────────────────────────────────────
-
   const sandpackFiles = useMemo(() => {
-    const result = Object.fromEntries(
-      Object.entries(files).map(([path, content]) => [
-        path.startsWith("/") ? path : `/${path}`,
+    const result: Record<string, { code: string }> = {};
 
-        {
-          code: content,
-        },
-      ]),
-    );
+    for (const [rawPath, content] of Object.entries(files)) {
+      const normalized = rawPath.trim().replace(/\\/g, "/");
+      const path = normalized.startsWith("/")
+        ? normalized
+        : `/${normalized}`;
 
-    // Sandpack's vite-react-ts template ships its own config.
-    // Generated project config files override it and break dependency injection.
-    delete result["/package.json"];
-    delete result["/package-lock.json"];
-    delete result["/tsconfig.json"];
-    delete result["/vite.config.ts"];
-    delete result["/vite.config.js"];
-    delete result["/tailwind.config.js"];
-    delete result["/tailwind.config.ts"];
-    delete result["/postcss.config.js"];
+      result[path] = { code: content };
+    }
+
+    // Retain the existing preview configuration strategy.
+    for (const path of [
+      "/package.json",
+      "/package-lock.json",
+      "/tsconfig.json",
+      "/vite.config.ts",
+      "/vite.config.js",
+      "/tailwind.config.js",
+      "/tailwind.config.ts",
+      "/postcss.config.js",
+    ]) {
+      delete result[path];
+    }
 
     if (!result["/index.html"]) {
-      const entry = result["/index.tsx"]
-        ? "/index.tsx"
-        : result["/index.jsx"]
-          ? "/index.jsx"
-          : null;
+      const entry = [
+        "/index.tsx",
+        "/index.jsx",
+        "/main.tsx",
+        "/main.jsx",
+        "/src/main.tsx",
+        "/src/main.jsx",
+      ].find((path) => Boolean(result[path]));
 
       if (entry) {
         result["/index.html"] = {
@@ -96,12 +105,27 @@ export function PreviewClient({
       }
     }
 
+    const html = result["/index.html"];
+
+    // Add the readiness reporter once to the preview HTML.
+    if (html && !html.code.includes(READY_SCRIPT)) {
+      result["/index.html"] = {
+        code: /<\/body>/i.test(html.code)
+          ? html.code.replace(
+              /<\/body>/i,
+              () => `${READY_SCRIPT}\n</body>`,
+            )
+          : `${html.code}\n${READY_SCRIPT}`,
+      };
+    }
+
     return result;
   }, [files]);
 
   return (
-    <main className="h-dvh w-screen overflow-hidden bg-white">
+    <main className="cwc-browser-preview h-dvh w-full overflow-hidden bg-[#101114]">
       <SandpackProvider
+        key={attempt}
         template="vite-react-ts"
         files={sandpackFiles}
         customSetup={{
@@ -117,56 +141,63 @@ export function PreviewClient({
         style={{
           height: "100%",
           width: "100%",
+          minHeight: 0,
+          display: "flex",
+          flexDirection: "column",
         }}
       >
-        <style
-          dangerouslySetInnerHTML={{
-            __html: `
-              html,
-              body {
-                margin: 0;
-                width: 100%;
-                height: 100%;
-                overflow: auto !important;
-              }
+        <style>{`
+          .cwc-browser-preview .sp-wrapper,
+          .cwc-browser-preview .sp-layout,
+          .cwc-browser-preview .sp-stack,
+          .cwc-browser-preview .sp-preview-container,
+          .cwc-browser-preview .sp-preview {
+            width: 100% !important;
+            height: 100% !important;
+            min-height: 0 !important;
+          }
 
-              #root {
-                min-height: 100%;
-              }
+          .cwc-browser-preview .sp-wrapper,
+          .cwc-browser-preview .sp-stack,
+          .cwc-browser-preview .sp-preview-container {
+            display: flex !important;
+            flex-direction: column !important;
+            flex: 1 !important;
+          }
 
-              .sp-wrapper,
-              .sp-layout,
-              .sp-stack,
-              .sp-preview-container,
-              .sp-preview-iframe {
-                width: 100% !important;
-                height: 100% !important;
-                min-height: 100% !important;
-                max-height: 100% !important;
-              }
+          .cwc-browser-preview iframe.sp-preview-iframe {
+            display: block !important;
+            width: 100% !important;
+            height: 100% !important;
+            min-height: 0 !important;
+            flex: 1 !important;
+            border: 0 !important;
+            pointer-events: auto !important;
+          }
 
-              .sp-wrapper,
-              .sp-layout,
-              .sp-stack {
-                flex: 1 !important;
-                min-height: 0 !important;
-              }
-            `,
-          }}
+          .cwc-browser-preview .sp-preview-actions {
+            display: none !important;
+          }
+
+          .cwc-browser-preview iframe.sp-bridge-frame {
+            position: fixed !important;
+            top: -10000px !important;
+            left: -10000px !important;
+            width: 1px !important;
+            height: 1px !important;
+            min-width: 0 !important;
+            min-height: 0 !important;
+            max-width: 1px !important;
+            max-height: 1px !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+            border: 0 !important;
+          }
+        `}</style>
+
+        <PreviewLoadingSurface
+          onRetry={() => setAttempt((current) => current + 1)}
         />
-
-        <div className="h-full w-full">
-          <SandpackPreview
-            showNavigator={false}
-            showRefreshButton={false}
-            showOpenInCodeSandbox={false}
-            style={{
-              width: "100%",
-              height: "100%",
-              minHeight: "100%",
-            }}
-          />
-        </div>
       </SandpackProvider>
     </main>
   );

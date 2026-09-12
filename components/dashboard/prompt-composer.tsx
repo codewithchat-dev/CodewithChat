@@ -1,7 +1,7 @@
-'use client'
+"use client";
 
-import { useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
+import { useEffect, useRef, useState } from "react";
+// import Link from "next/link";
 import {
   ArrowUp,
   Plus,
@@ -9,35 +9,31 @@ import {
   MicOff,
   X,
   ChevronDown,
-  Hammer,
-  ClipboardList,
-} from 'lucide-react'
-import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
+  Globe2,
+  Database,
+} from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { Spinner } from '@/components/ui/spinner'
+} from "@/components/ui/dropdown-menu";
+import { Spinner } from "@/components/ui/spinner";
+
+export type ProjectType = "frontend" | "fullstack";
 
 interface PromptComposerProps {
-  value: string
-  onChange: (value: string) => void
-  onSubmit: (attachedImage?: string | null) => void
-  loading?: boolean
-  disabled?: boolean
-  placeholder?: string
-  compact?: boolean
-  submitHint?: string
-
-  /** Current composer mode */
-  // mode?: 'build' | 'plan'
-
-  /** Called when Build / Plan mode changes */
-  // onModeChange?: (mode: 'build' | 'plan') => void
+  value: string;
+  onChange: (value: string) => void;
+  onSubmit: (attachedImage?: string | null, projectType?: ProjectType) => void;
+  loading?: boolean;
+  disabled?: boolean;
+  placeholder?: string;
+  compact?: boolean;
+  submitHint?: string;
 }
 
 export function PromptComposer({
@@ -46,156 +42,151 @@ export function PromptComposer({
   onSubmit,
   loading = false,
   disabled = false,
-  placeholder = 'Ask a question or request a change…',
+  placeholder = "Ask a question or request a change…",
   compact = false,
   submitHint,
-  // mode = 'build',
-  // onModeChange,
 }: PromptComposerProps) {
-  const [isListening, setIsListening] = useState(false)
-  const [attachedImage, setAttachedImage] = useState<string | null>(null)
-  const [mode, setMode] = useState<'build' | 'plan'>('build')
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [isListening, setIsListening] = useState(false);
+  const [attachedImage, setAttachedImage] = useState<string | null>(null);
+  const [projectType, setProjectType] = useState<ProjectType>("frontend");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const recognitionRef = useRef<{
-    start: () => void
-    stop: () => void
-  } | null>(null)
+    start: () => void;
+    stop: () => void;
+  } | null>(null);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
+    if (typeof window === "undefined") return;
 
     const w = window as Window & {
       SpeechRecognition?: new () => {
-        continuous: boolean
-        interimResults: boolean
-        onresult: (
-          event: {
-            results: {
+        continuous: boolean;
+        interimResults: boolean;
+        onresult: (event: {
+          results: {
+            [index: number]: {
               [index: number]: {
-                [index: number]: {
-                  transcript: string
-                }
-              }
-            }
-          }
-        ) => void
-        onerror: (() => void) | null
-        onend: (() => void) | null
-        start: () => void
-        stop: () => void
-      }
+                transcript: string;
+              };
+            };
+          };
+        }) => void;
+        onerror: (() => void) | null;
+        onend: (() => void) | null;
+        start: () => void;
+        stop: () => void;
+      };
       webkitSpeechRecognition?: new () => {
-        continuous: boolean
-        interimResults: boolean
-        onresult: (
-          event: {
-            results: {
+        continuous: boolean;
+        interimResults: boolean;
+        onresult: (event: {
+          results: {
+            [index: number]: {
               [index: number]: {
-                [index: number]: {
-                  transcript: string
-                }
-              }
-            }
-          }
-        ) => void
-        onerror: (() => void) | null
-        onend: (() => void) | null
-        start: () => void
-        stop: () => void
-      }
-    }
+                transcript: string;
+              };
+            };
+          };
+        }) => void;
+        onerror: (() => void) | null;
+        onend: (() => void) | null;
+        start: () => void;
+        stop: () => void;
+      };
+    };
 
     const SpeechRecognitionCtor =
-      w.SpeechRecognition || w.webkitSpeechRecognition
+      w.SpeechRecognition || w.webkitSpeechRecognition;
 
-    if (!SpeechRecognitionCtor) return
+    if (!SpeechRecognitionCtor) return;
 
-    const recognition = new SpeechRecognitionCtor()
+    const recognition = new SpeechRecognitionCtor();
 
-    recognition.continuous = false
-    recognition.interimResults = false
+    recognition.continuous = false;
+    recognition.interimResults = false;
 
     recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript
+      const transcript = event.results[0][0].transcript;
 
-      onChange(value ? `${value} ${transcript}` : transcript)
+      onChange(value ? `${value} ${transcript}` : transcript);
 
-      setIsListening(false)
-    }
+      setIsListening(false);
+    };
 
     recognition.onerror = () => {
-      setIsListening(false)
-      toast.error('Voice recognition failed. Please try again.')
-    }
+      setIsListening(false);
+      toast.error("Voice recognition failed. Please try again.");
+    };
 
-    recognition.onend = () => setIsListening(false)
+    recognition.onend = () => setIsListening(false);
 
-    recognitionRef.current = recognition
-  }, [onChange, value])
+    recognitionRef.current = recognition;
+  }, [onChange, value]);
 
   const toggleListening = () => {
     if (!recognitionRef.current) {
-      toast.error('Speech recognition is not supported in this browser.')
-      return
+      toast.error("Speech recognition is not supported in this browser.");
+      return;
     }
 
     if (isListening) {
-      recognitionRef.current.stop()
-      setIsListening(false)
+      recognitionRef.current.stop();
+      setIsListening(false);
     } else {
-      recognitionRef.current.start()
-      setIsListening(true)
-      toast.info('Listening…')
+      recognitionRef.current.start();
+      setIsListening(true);
+      toast.info("Listening…");
     }
-  }
+  };
+
+   const handleSubmitClick = () => {
+    if (disabled || loading) return;
+    if (!value.trim() && !attachedImage) return;
+
+    onSubmit(attachedImage, projectType);
+    setAttachedImage(null);
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-
-      if (!disabled && !loading && (value.trim() || attachedImage)) {
-        onSubmit(attachedImage)
-        setAttachedImage(null)
-      }
+    if (
+      e.key === "Enter" &&
+      !e.shiftKey &&
+      !e.nativeEvent.isComposing
+    ) {
+      e.preventDefault();
+      handleSubmitClick();
     }
-  }
-
-  const handleSubmitClick = () => {
-    if (!value.trim() && !attachedImage) return
-
-    onSubmit(attachedImage)
-    setAttachedImage(null)
-  }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
+    const file = e.target.files?.[0];
 
-    if (!file) return
+    if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file.')
-      return
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file.");
+      return;
     }
 
     // Max 4MB
     if (file.size > 4 * 1024 * 1024) {
-      toast.error('Image is too large. Max size is 4MB.')
-      return
+      toast.error("Image is too large. Max size is 4MB.");
+      return;
     }
 
-    const reader = new FileReader()
+    const reader = new FileReader();
 
     reader.onload = (e) => {
-      setAttachedImage(e.target?.result as string)
-    }
+      setAttachedImage(e.target?.result as string);
+    };
 
-    reader.readAsDataURL(file)
+    reader.readAsDataURL(file);
 
     if (fileInputRef.current) {
-      fileInputRef.current.value = ''
+      fileInputRef.current.value = "";
     }
-  }
+  };
 
   return (
     <div className="relative w-full">
@@ -264,11 +255,11 @@ export function PromptComposer({
             ${
               compact
                 ? attachedImage
-                  ? 'min-h-[40px]'
-                  : 'min-h-[88px]'
+                  ? "min-h-[40px]"
+                  : "min-h-[88px]"
                 : attachedImage
-                  ? 'min-h-[60px]'
-                  : 'min-h-[120px]'
+                  ? "min-h-[60px]"
+                  : "min-h-[120px]"
             }
             max-h-[300px]
             overflow-y-auto
@@ -328,8 +319,8 @@ export function PromptComposer({
                 size-9
                 ${
                   isListening
-                    ? 'text-red-500 bg-red-500/10'
-                    : 'text-muted-foreground hover:text-foreground'
+                    ? "text-red-500 bg-red-500/10"
+                    : "text-muted-foreground hover:text-foreground"
                 }
               `}
               title="Voice dictation"
@@ -341,7 +332,7 @@ export function PromptComposer({
               )}
             </Button>
 
-            {/* Build / Plan Dropdown */}
+            {/* Project type selector */}
             <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
                 <button
@@ -363,48 +354,45 @@ export function PromptComposer({
                     disabled:opacity-50
                   "
                 >
-                  {mode === 'build' ? (
-                    <Hammer className="size-3.5" />
+                  {projectType === "frontend" ? (
+                    <Globe2 className="size-3.5" />
                   ) : (
-                    <ClipboardList className="size-3.5" />
+                    <Database className="size-3.5" />
                   )}
 
                   <span>
-                    {mode === 'build' ? 'Build' : 'Plan'}
+                    {projectType === "frontend" ? "Frontend" : "Full-Stack"}
                   </span>
 
                   <ChevronDown className="size-3 opacity-50" />
                 </button>
               </DropdownMenuTrigger>
 
-              <DropdownMenuContent
-                align="start"
-                className="w-40"
-              >
+              <DropdownMenuContent align="start" className="w-52">
                 <DropdownMenuItem
-                  onClick={() => setMode('build')}
+                  onClick={() => setProjectType("frontend")}
                   className="cursor-pointer gap-2"
                 >
-                  <Hammer className="size-4" />
+                  <Globe2 className="size-4" />
 
                   <div className="flex flex-col">
-                    <span>Build</span>
+                    <span>Frontend Website</span>
                     <span className="text-[10px] text-muted-foreground">
-                      Create & modify
+                      UI-focused and fast
                     </span>
                   </div>
                 </DropdownMenuItem>
 
                 <DropdownMenuItem
-                  onClick={() => setMode('plan')}
+                  onClick={() => setProjectType("fullstack")}
                   className="cursor-pointer gap-2"
                 >
-                  <ClipboardList className="size-4" />
+                  <Database className="size-4" />
 
                   <div className="flex flex-col">
-                    <span>Plan</span>
+                    <span>Full-Stack Web App</span>
                     <span className="text-[10px] text-muted-foreground">
-                      Plan before building
+                      Database, auth and APIs
                     </span>
                   </div>
                 </DropdownMenuItem>
@@ -417,11 +405,7 @@ export function PromptComposer({
             type="button"
             size="icon"
             onClick={handleSubmitClick}
-            disabled={
-              disabled ||
-              loading ||
-              (!value.trim() && !attachedImage)
-            }
+            disabled={disabled || loading || (!value.trim() && !attachedImage)}
             className="
               rounded-full
               size-10
@@ -434,7 +418,7 @@ export function PromptComposer({
               shrink-0
               transition-all duration-200
             "
-            title={submitHint || 'Send'}
+            title={submitHint || "Send"}
           >
             {loading ? (
               <Spinner className="size-4" />
@@ -445,5 +429,5 @@ export function PromptComposer({
         </div>
       </div>
     </div>
-  )
+  );
 }

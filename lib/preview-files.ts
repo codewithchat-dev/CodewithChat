@@ -438,47 +438,49 @@ function repairGeneratedSource(content: string, path: string): string {
 export function sanitizeGeneratedProjectFiles(
   files: Array<ProjectFileInput | null | undefined> | undefined,
 ): Array<{ path: string; content: string }> {
-  if (!files?.length) {
+  if (!Array.isArray(files)) {
     return [];
   }
 
-  const sanitized = files.flatMap((file) => {
-    if (!file?.path || typeof file.content !== "string") {
-      return [];
+  const result = new Map<string, { path: string; content: string }>();
+
+  for (const file of files) {
+    if (
+      !file ||
+      typeof file.path !== "string" ||
+      typeof file.content !== "string"
+    ) {
+      continue;
     }
 
-    const path = normalizePreviewPath(file.path);
+    const rawPath = file.path.trim();
 
-    const content = repairGeneratedSource(file.content, path);
+    if (!rawPath) continue;
 
-    if (path === "/src/index.css" && !content.trim()) {
-      return [{ path, content: DEFAULT_INDEX_CSS }];
+    const path = normalizePreviewPath(rawPath);
+    const segments = path.slice(1).split("/");
+
+    const invalidPath =
+      path === "/" ||
+      segments.some(
+        (segment) => !segment || segment === "." || segment === "..",
+      ) ||
+      /[\u0000-\u001f\u007f:]/.test(path);
+
+    if (invalidPath) {
+      throw new Error(`Invalid generated file path: ${rawPath}`);
     }
 
-    if (path === "/src/components/common/SafeImage.tsx") {
-      return [{ path, content: CANONICAL_SAFE_IMAGE }];
-    }
-
-    if (!content.trim()) {
-      return [];
-    }
-
-    return [{ path, content }];
-  });
-
-  const hasSrcFiles = sanitized.some((file) => file.path.startsWith("/src/"));
-  const hasSafeImage = sanitized.some(
-    (file) => file.path === "/src/components/common/SafeImage.tsx",
-  );
-
-  if (hasSrcFiles && !hasSafeImage) {
-    sanitized.push({
-      path: "/src/components/common/SafeImage.tsx",
-      content: CANONICAL_SAFE_IMAGE,
+    // Preserve the exact source content.
+    // Syntax errors should be reported by the compiler,
+    // not "fixed" by guessing brackets or rewriting strings.
+    result.set(path, {
+      path,
+      content: file.content,
     });
   }
 
-  return sanitized;
+  return [...result.values()];
 }
 
 export function mergeGeneratedProjectFiles(
@@ -1668,11 +1670,7 @@ const PREVIEW_HOST_CLEANUP = `(function () {
 })();`;
 
 function withPreviewHostCleanup(code: string): string {
-  if (code.includes("cdn-cgi/challenge-platform")) {
-    return code;
-  }
-
-  return `${PREVIEW_HOST_CLEANUP}\n\n${code}`;
+  return code;
 }
 
 /**
@@ -1712,12 +1710,26 @@ export function buildPreviewIndexHtml(
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Preview</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
     ${configScript}
     <style>
-      html, body { min-height: 100%; height: auto; margin: 0; overflow: auto !important; overscroll-behavior: contain; }
-      body { touch-action: pan-y pan-x; }
-      #root { min-height: 100vh; }
+      html {
+  height: 100%;
+  margin: 0;
+  overflow-y: auto;
+}
+
+body {
+  min-height: 100%;
+  height: auto;
+  margin: 0;
+  overflow: visible;
+  touch-action: auto;
+}
+
+#root {
+  min-height: 100vh;
+}
       script, noscript {
         display: none !important;
         visibility: hidden !important;
@@ -1733,7 +1745,6 @@ export function buildPreviewIndexHtml(
         pointer-events: none !important;
       }
     </style>
-    <script>${PREVIEW_HOST_CLEANUP.replace(/<\/script/gi, "<\\\\/script")}</script>
   </head>
   <body>
     <div id="root"></div>

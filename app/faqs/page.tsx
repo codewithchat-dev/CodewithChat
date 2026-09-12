@@ -1,20 +1,25 @@
-import { SiteHeader } from '@/components/landing/site-header'
-import { SiteFooter } from '@/components/landing/site-footer'
-import { AnimatedBackground } from '@/components/landing/animated-background'
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
-import { 
-  HelpCircle, 
-  Cpu, 
-  ShieldCheck, 
+import { SiteHeader } from "@/components/landing/site-header";
+import { SiteFooter } from "@/components/landing/site-footer";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import {
+  HelpCircle,
+  Cpu,
+  ShieldCheck,
   CreditCard,
   MessageSquare,
-  Sparkles
-} from 'lucide-react'
+  Sparkles,
+} from "lucide-react";
 
 export const metadata = {
-  title: 'Frequently Asked Questions | CodewithChat',
-  description: 'Find answers to common questions about building software, technology stacks, billing, and ownership on CodewithChat.',
-}
+  title: "Frequently Asked Questions | CodewithChat",
+  description:
+    "Find answers to common questions about building software, technology stacks, billing, and ownership on CodewithChat.",
+};
 
 const faqCategories = [
   {
@@ -24,17 +29,21 @@ const faqCategories = [
     items: [
       {
         question: "What is CodewithChat?",
-        answer: "CodewithChat is an AI-powered software engineering companion designed to help you build production-ready full-stack applications. By describing your ideas in natural language, the platform guides you step-by-step from an empty directory to a fully functioning cloud application."
+        answer:
+          "CodewithChat is an AI-powered software engineering companion designed to help you build production-ready full-stack applications. By describing your ideas in natural language, the platform guides you step-by-step from an empty directory to a fully functioning cloud application.",
       },
       {
         question: "Do I need programming experience to build apps?",
-        answer: "No coding background is required! The platform automatically manages complex database relations, Next.js page routing, state logic, and CSS layouts. At the same time, because the generated repository is fully visible and editable, it serves as a powerful learning tool for developers who want to inspect clean software architecture."
+        answer:
+          "No coding background is required! The platform automatically manages complex database relations, Next.js page routing, state logic, and CSS layouts. At the same time, because the generated repository is fully visible and editable, it serves as a powerful learning tool for developers who want to inspect clean software architecture.",
       },
       {
-        question: "How is CodewithChat different from tools like ChatGPT or Claude?",
-        answer: "Generic AI chatbots output raw code snippets but leave the assembly, folder creation, package installations, and database bindings to you. CodewithChat is a cohesive engineering agent that manages the entire lifecycle. It creates files, manages packages, executes sandboxed code, compiles previews, and tests for errors automatically."
-      }
-    ]
+        question:
+          "How is CodewithChat different from tools like ChatGPT or Claude?",
+        answer:
+          "Generic AI chatbots output raw code snippets but leave the assembly, folder creation, package installations, and database bindings to you. CodewithChat is a cohesive engineering agent that manages the entire lifecycle. It creates files, manages packages, executes sandboxed code, compiles previews, and tests for errors automatically.",
+      },
+    ],
   },
   {
     id: "technical",
@@ -43,17 +52,20 @@ const faqCategories = [
     items: [
       {
         question: "What technologies does the AI builder use?",
-        answer: "Our AI compiles code using a modern, scalable stack: Next.js (App Router), TypeScript, Tailwind CSS, Prisma ORM, and Supabase (for authentication and PostgreSQL databases). Visual layouts are styled using Shadcn UI components."
+        answer:
+          "Our AI compiles code using a modern, scalable stack: Next.js (App Router), TypeScript, Tailwind CSS, Prisma ORM, and Supabase (for authentication and PostgreSQL databases). Visual layouts are styled using Shadcn UI components.",
       },
       {
         question: "Can I download or export my codebase?",
-        answer: "Yes, absolutely! You are never locked in. You can export your entire project directory as a standard ZIP archive at any point, or push it directly to a private GitHub repository for easy deployment on hosting platforms like Vercel, Netlify, or AWS."
+        answer:
+          "Yes, absolutely! You are never locked in. You can export your entire project directory as a standard ZIP archive at any point, or push it directly to a private GitHub repository for easy deployment on hosting platforms like Vercel, Netlify, or AWS.",
       },
       {
         question: "Can I connect my own custom APIs or databases?",
-        answer: "Yes. The platform generates standard Next.js code. You can edit the environment variables (`.env`) to point to your own cloud databases, database schemas, or inject custom API endpoint secret keys."
-      }
-    ]
+        answer:
+          "Yes. The platform generates standard Next.js code. You can edit the environment variables (`.env`) to point to your own cloud databases, database schemas, or inject custom API endpoint secret keys.",
+      },
+    ],
   },
   {
     id: "security",
@@ -62,13 +74,15 @@ const faqCategories = [
     items: [
       {
         question: "Do I own the code generated by the AI?",
-        answer: "Yes, you own the intellectual property rights to the generated code 100%. You are free to monetize, modify, license, open-source, or sell your applications with no restrictive licensing callbacks or royalties."
+        answer:
+          "Yes, you own the intellectual property rights to the generated code 100%. You are free to monetize, modify, license, open-source, or sell your applications with no restrictive licensing callbacks or royalties.",
       },
       {
         question: "How secure is my code and data?",
-        answer: "All workspace transmissions are encrypted using TLS 1.3. We perform ephemeral processing for model prompt completions and enforce zero-retention policies on third-party APIs. Your proprietary codebase is never used to train public LLM models."
-      }
-    ]
+        answer:
+          "All workspace transmissions are encrypted using TLS 1.3. We perform ephemeral processing for model prompt completions and enforce zero-retention policies on third-party APIs. Your proprietary codebase is never used to train public LLM models.",
+      },
+    ],
   },
   {
     id: "billing",
@@ -77,30 +91,31 @@ const faqCategories = [
     items: [
       {
         question: "Is there a free trial?",
-        answer: "Yes, we offer a free sandbox environment where you can prototype concepts, test the chat agent, and generate template pages. Premium subscriptions unlock full project generation, GitHub pushes, and unlimited compilation sandboxes."
+        answer:
+          "Yes, we offer a free sandbox environment where you can prototype concepts, test the chat agent, and generate template pages. Premium subscriptions unlock full project generation, GitHub pushes, and unlimited compilation sandboxes.",
       },
       {
         question: "How does the refund policy work?",
-        answer: "We offer a 14-day money-back guarantee for all premium subscriptions. If you find the service doesn't fit your workflow, email hello@codewithchat.dev and we will issue a full refund, no questions asked."
+        answer:
+          "We offer a 14-day money-back guarantee for all premium subscriptions. If you find the service doesn't fit your workflow, email hello@codewithchat.dev and we will issue a full refund, no questions asked.",
       },
       {
         question: "How do I cancel my subscription?",
-        answer: "You can manage or cancel your subscription at any time with a single click. Navigate to the Billing tab in your dashboard, which redirects to the secure Stripe Customer Portal."
-      }
-    ]
-  }
-]
+        answer:
+          "You can manage or cancel your subscription at any time with a single click. Navigate to the Billing tab in your dashboard, which redirects to the secure Stripe Customer Portal.",
+      },
+    ],
+  },
+];
 
 export default function FAQsPage() {
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground selection:bg-primary/20">
       <SiteHeader />
-      
+
       <main className="flex-1">
         {/* Hero Section */}
         <section className="relative overflow-hidden pt-32 pb-20 border-b border-border/40 bg-gradient-to-b from-background via-background/95 to-background/50">
-          <AnimatedBackground />
-          
           {/* Ambient blur bubbles */}
           <div className="absolute left-1/3 top-1/4 -z-10 h-72 w-72 rounded-full bg-emerald-500/10 blur-[100px] pointer-events-none" />
           <div className="absolute right-1/3 bottom-10 -z-10 h-80 w-80 rounded-full bg-primary/10 blur-[120px] pointer-events-none" />
@@ -110,12 +125,13 @@ export default function FAQsPage() {
               <Sparkles className="size-3.5" />
               <span>Questions & Resources</span>
             </div>
-            
+
             <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl bg-gradient-to-r from-foreground via-foreground to-muted-foreground bg-clip-text text-transparent">
               Frequently Asked Questions
             </h1>
             <p className="mt-6 text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              Everything you need to know about building, scaling, licensing, and managing your apps with CodewithChat.
+              Everything you need to know about building, scaling, licensing,
+              and managing your apps with CodewithChat.
             </p>
           </div>
         </section>
@@ -124,22 +140,31 @@ export default function FAQsPage() {
         <section className="mx-auto max-w-4xl px-6 py-16 lg:py-24">
           <div className="space-y-12">
             {faqCategories.map((category) => {
-              const Icon = category.icon
+              const Icon = category.icon;
               return (
-                <div key={category.id} className="p-6 sm:p-8 rounded-3xl border border-border/80 bg-card/40 backdrop-blur-md shadow-sm">
+                <div
+                  key={category.id}
+                  className="p-6 sm:p-8 rounded-3xl border border-border/80 bg-card/40 backdrop-blur-md shadow-sm"
+                >
                   {/* Category Header */}
                   <div className="flex items-center gap-3 border-b border-border/60 pb-4 mb-6">
                     <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
                       <Icon className="size-5" />
                     </div>
-                    <h2 className="text-xl font-bold tracking-tight text-foreground">{category.title}</h2>
+                    <h2 className="text-xl font-bold tracking-tight text-foreground">
+                      {category.title}
+                    </h2>
                   </div>
 
                   {/* Accordion Questions */}
-                  <Accordion type="single" collapsible className="w-full space-y-2">
+                  <Accordion
+                    type="single"
+                    collapsible
+                    className="w-full space-y-2"
+                  >
                     {category.items.map((item, index) => (
-                      <AccordionItem 
-                        key={index} 
+                      <AccordionItem
+                        key={index}
                         value={`${category.id}-item-${index}`}
                         className="border-b border-border/40 last:border-0 pb-1"
                       >
@@ -153,7 +178,7 @@ export default function FAQsPage() {
                     ))}
                   </Accordion>
                 </div>
-              )
+              );
             })}
           </div>
 
@@ -161,12 +186,16 @@ export default function FAQsPage() {
           <div className="mt-16 text-center p-8 rounded-3xl border border-primary/20 bg-primary/5 max-w-2xl mx-auto relative overflow-hidden">
             <div className="absolute right-0 top-0 -z-10 h-32 w-32 rounded-full bg-primary/20 blur-[50px] pointer-events-none" />
             <MessageSquare className="size-8 text-primary mx-auto mb-4" />
-            <h3 className="text-lg font-bold text-foreground">Still have questions?</h3>
+            <h3 className="text-lg font-bold text-foreground">
+              Still have questions?
+            </h3>
             <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto leading-relaxed">
-              Our engineering support team is always available to help you configure setups, manage subscriptions, or answer privacy concerns.
+              Our engineering support team is always available to help you
+              configure setups, manage subscriptions, or answer privacy
+              concerns.
             </p>
-            <a 
-              href="mailto:hello@codewithchat.dev" 
+            <a
+              href="mailto:hello@codewithchat.dev"
               className="mt-5 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground px-6 py-2.5 text-sm font-semibold hover:opacity-90 shadow-md transition-all"
             >
               Contact Support
@@ -174,9 +203,8 @@ export default function FAQsPage() {
           </div>
         </section>
       </main>
-      
+
       <SiteFooter />
     </div>
-  )
+  );
 }
-

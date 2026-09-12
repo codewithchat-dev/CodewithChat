@@ -51,6 +51,7 @@ import {
 } from "@/components/dashboard/build-activity-feed";
 import type { FileSource } from "@/components/dashboard/build-activity-feed";
 import { PromptComposer } from "@/components/dashboard/prompt-composer";
+import type { ProjectType } from "@/components/dashboard/prompt-composer";
 
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -510,14 +511,22 @@ export default function ProjectPage() {
 
     setProjectUpdatedAt(now);
 
-    updateProjectAction(projectId, JSON.stringify(completedPlan))
+       updateProjectAction(projectId, JSON.stringify(completedPlan))
       .then((res) => {
         if (!res.success) {
           console.error("[Project] Failed to save project:", res.error);
+
+          toast.error(
+            "Project generated, but saving failed. Download the ZIP before refreshing.",
+          );
         }
       })
-      .catch((error) => {
+      .catch((error: unknown) => {
         console.error("[Project] Error saving project:", error);
+
+        toast.error(
+          "Could not save the project. Download the ZIP before refreshing.",
+        );
       });
   }, [loading, plan, projectId]);
 
@@ -713,7 +722,10 @@ export default function ProjectPage() {
   // SEND CHAT / CODE CHANGE
   // ───────────────────────────────────────────────────────────
 
-  async function handleSendChat(attachedImage?: string | null) {
+  async function handleSendChat(
+    attachedImage?: string | null,
+    projectType: ProjectType = "frontend",
+  ) {
     if (!idea.trim()) return;
 
     const trimmed = chatInput.trim();
@@ -724,11 +736,15 @@ export default function ProjectPage() {
       return;
     }
 
+    const projectTypeInstruction =
+      projectType === "fullstack"
+        ? "Build this as a full-stack web app with a real database, authentication, API routes, and persistent data."
+        : "Keep this as a frontend website with polished responsive UI and client-side interactions.";
     const finalMessage = attachedImage
       ? trimmed
-        ? `${trimmed}\n\n[IMAGE: ${attachedImage}]`
-        : `[IMAGE: ${attachedImage}]`
-      : trimmed;
+        ? `${trimmed}\n\nProject type: ${projectTypeInstruction}\n\n[IMAGE: ${attachedImage}]`
+        : `Project type: ${projectTypeInstruction}\n\n[IMAGE: ${attachedImage}]`
+      : `${trimmed}\n\nProject type: ${projectTypeInstruction}`;
 
     const userMessage: ChatMessage = {
       role: "user",

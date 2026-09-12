@@ -3,9 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
+  READY_SCRIPT,
+  PreviewLoadingSurface,
+} from "@/components/ide/preview-loading-surface";
+
+import {
   SandpackProvider,
   SandpackCodeEditor,
-  SandpackPreview as SandpackPreviewPane,
+  // SandpackPreview as SandpackPreviewPane,
   SandpackLayout,
   SandpackFileExplorer,
   useSandpack,
@@ -670,6 +675,20 @@ export function SandpackPreview({
       }
     }
 
+    const html = result["/index.html"];
+
+if (html && !html.code.includes(READY_SCRIPT)) {
+  result["/index.html"] = {
+    ...html,
+    code: /<\/body>/i.test(html.code)
+      ? html.code.replace(
+          /<\/body>/i,
+          () => `${READY_SCRIPT}\n</body>`,
+        )
+      : `${html.code}\n${READY_SCRIPT}`,
+  };
+}
+
     return result;
   }, [files, activeFile]);
 
@@ -735,11 +754,14 @@ export function SandpackPreview({
               .sp-stack,
               .sp-preview-container,
               .sp-preview-iframe,
-              .sp-preview,
-              .sp-preview-actions {
+              .sp-preview {
                 height: 100% !important;
                 min-height: 100% !important;
                 width: 100% !important;
+              }
+
+              .sp-preview-actions {
+                display: none !important;
               }
 
               .sp-wrapper,
@@ -760,6 +782,21 @@ export function SandpackPreview({
 
               .sp-preview-iframe {
                 flex: 1 !important;
+                border: 0 !important;
+              }
+
+              iframe.sp-bridge-frame {
+                position: fixed !important;
+                top: -10000px !important;
+                left: -10000px !important;
+                width: 1px !important;
+                height: 1px !important;
+                min-width: 0 !important;
+                min-height: 0 !important;
+                max-width: 1px !important;
+                max-height: 1px !important;
+                opacity: 0 !important;
+                pointer-events: none !important;
                 border: 0 !important;
               }
             `,
@@ -832,11 +869,11 @@ export function SandpackPreview({
             className="h-full min-h-0 w-full flex-1 flex-col"
           >
             <div className="relative h-full min-h-0 w-full flex-1 overflow-auto">
-              <PreviewStatusOverlay
+              {/* <PreviewStatusOverlay
                 isEmpty={isEmpty}
                 onRefresh={refreshPreview}
                 onAutoFix={onAutoFix}
-              />
+              /> */}
 
               {isLoading && !isEmpty ? (
                 <div className="pointer-events-none absolute inset-x-0 top-3 z-30 flex justify-center">
@@ -871,18 +908,7 @@ export function SandpackPreview({
                     borderRadius: 0,
                   }}
                 >
-                  <SandpackPreviewPane
-                    showNavigator={false}
-                    showOpenInCodeSandbox={false}
-                    showRefreshButton={false}
-                    style={{
-                      height: "100%",
-
-                      width: "100%",
-
-                      minHeight: "100%",
-                    }}
-                  />
+                  <PreviewLoadingSurface onRetry={refreshPreview} />
                 </SandpackLayout>
               </div>
             </div>
