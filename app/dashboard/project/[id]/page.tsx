@@ -1,67 +1,51 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import dynamic from "next/dynamic";
-import { useParams } from "next/navigation";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 
 import {
-  Eye,
-  Code2,
   BookOpen,
-  ExternalLink,
-  RotateCw,
-  Download,
-  MoreHorizontal,
-  Github,
-  Settings,
-  Pin,
-  PinOff,
-  Pencil,
   Check,
-  X,
+  ChevronDown,
+  Code2,
+  Download,
+  ExternalLink,
+  Eye,
   FileCode2,
+  Home,
+  Loader2,
+  MessageSquare,
   Monitor,
-  Smartphone,
-  Tablet,
-  Zap,
+  MoreHorizontal,
   PanelLeftClose,
   PanelLeftOpen,
-  Gift,
-  Home,
-  LayoutDashboard,
-  ChevronDown,
-  Coins,
-  LogOut,
+  Pencil,
+  Pin,
+  PinOff,
+  RotateCw,
+  Smartphone,
+  Sparkles,
+  Tablet,
+  X,
 } from "lucide-react";
 
+import { experimental_useObject } from "@ai-sdk/react";
+import { z } from "zod";
 import { toast } from "sonner";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
-import { experimental_useObject } from "@ai-sdk/react";
-import { z } from "zod";
-
-import { ShareProjectModal } from "@/components/dashboard/share-project-modal";
-import { PublishProjectModal } from "@/components/dashboard/publish-project-modal";
-import { ProjectGuide } from "@/components/dashboard/project-guide";
-import {
-  BuildActivityFeed,
-  buildActivitiesFromPlan,
-} from "@/components/dashboard/build-activity-feed";
-import type { FileSource } from "@/components/dashboard/build-activity-feed";
-import { PromptComposer } from "@/components/dashboard/prompt-composer";
-import type { ProjectType } from "@/components/dashboard/prompt-composer";
 
 import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
-
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 import {
   DropdownMenu,
@@ -71,21 +55,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import { planSchema } from "@/lib/schema";
+import { ShareProjectModal } from "@/components/dashboard/share-project-modal";
+import { PublishProjectModal } from "@/components/dashboard/publish-project-modal";
+import { ProjectGuide } from "@/components/dashboard/project-guide";
 
 import {
-  buildInstantPreviewFiles,
-  hasPreviewEntry,
-  getProjectRuntimeDependencies,
-  sanitizeGeneratedProjectFiles,
-  mergeGeneratedProjectFiles,
-} from "@/lib/preview-files";
-
-import { buildFullStackFiles } from "@/lib/fullstack-files";
-
-import { isTrivialMessage, shouldRegenerateCode } from "@/lib/chat-intent";
-
-import { DEFAULT_TECH_STACK, DEFAULT_PLATFORM } from "@/lib/project-structure";
+  PromptComposer,
+  type ProjectType,
+} from "@/components/dashboard/prompt-composer";
 
 import {
   getProjectByIdAction,
@@ -95,1663 +72,1690 @@ import {
 } from "@/app/actions/projects";
 
 import { getCreditsAction } from "@/app/actions/credits";
-import { MAX_DAILY_CREDITS } from "@/lib/credits";
+
+import {
+  buildInstantPreviewFiles,
+  getProjectRuntimeDependencies,
+  hasPreviewEntry,
+  mergeGeneratedProjectFiles,
+  sanitizeGeneratedProjectFiles,
+} from "@/lib/preview-files";
+
+import { buildFullStackFiles } from "@/lib/fullstack-files";
+import { planSchema } from "@/lib/schema";
+
+import {
+  DEFAULT_PLATFORM,
+  DEFAULT_TECH_STACK,
+} from "@/lib/project-structure";
 
 import type {
   SandpackView,
   ViewportSize,
 } from "@/components/ide/SandpackPreview";
 
-type Plan = z.infer<typeof planSchema>;
+// -----------------------------------------------------------------------------
+// Types and helpers
+// -----------------------------------------------------------------------------
 
-type ChatMessage = {
-  role: string;
-  content: string;
+type Plan = z.infer<typeof planSchema>;
+type ComposerMode = "build" | "ask";
+type SaveState = "idle" | "saving" | "saved" | "error";
+
+const conversationSchema = z.array(
+  z.object({
+    id: z.string().optional(),
+    role: z.enum(["user", "assistant"]),
+    content: z.string(),
+    displayContent: z.string().optional(),
+    files: z.array(z.string()).optional(),
+    deletedFiles: z.array(z.string()).optional(),
+    failed: z.boolean().optional(),
+    durationMs: z.number().nonnegative().optional(),
+  }),
+);
+
+type ChatMessage = z.infer<typeof conversationSchema>[number];
+
+type GenerationJob = {
+  startedAt: number;
+  basePlan: Plan | undefined;
+  incremental: boolean;
 };
 
-// ─────────────────────────────────────────────────────────────
-// SANDPACK
-// ─────────────────────────────────────────────────────────────
+function messageWithId(message: ChatMessage): ChatMessage {
+  return {
+    ...message,
+    id: message.id ?? crypto.randomUUID(),
+  };
+}
+
+function apiMessages(messages: ChatMessage[]) {
+  return messages.map(({ role, content }) => ({
+    role,
+    content,
+  }));
+}
+
+function displayMessage(message: ChatMessage) {
+  if (message.displayContent) {
+    return message.displayContent;
+  }
+
+  if (message.role === "assistant") {
+    return message.content;
+  }
+
+  return (
+    message.content
+      .replace(/\[IMAGE:[\s\S]*?\]/g, "")
+      .replace(/\n\nProject type:[\s\S]*$/, "")
+      .trim() || "Use the attached image."
+  );
+}
+
+function formatDuration(ms: number) {
+  const seconds = Math.max(0, Math.floor(ms / 1000));
+
+  if (seconds < 1) return "<1s";
+  if (seconds < 60) return `${seconds}s`;
+
+  const minutes = Math.floor(seconds / 60);
+  const remaining = seconds % 60;
+
+  return remaining
+    ? `${minutes}m ${remaining}s`
+    : `${minutes}m`;
+}
+
+function normalizePath(path: string) {
+  return path
+    .trim()
+    .replace(/\\/g, "/")
+    .replace(/\/+/g, "/")
+    .replace(/^\/+/, "");
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error
+    ? error.message
+    : "Something went wrong. Please try again.";
+}
+
+function Brand({ animated = false }: { animated?: boolean }) {
+  return (
+    <div className="flex items-center gap-2">
+      <img
+        src="/dark_logo.png"
+        alt=""
+        width={32}
+        height={24}
+        className={`h-6 w-8 object-contain ${
+          animated
+            ? "animate-pulse motion-reduce:animate-none"
+            : ""
+        }`}
+      />
+
+      <span className="text-xs font-semibold text-foreground">
+        CodewithChat
+      </span>
+    </div>
+  );
+}
+
+function ElapsedTime({ startedAt }: { startedAt: number }) {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    const update = () => {
+      setElapsed(Math.max(0, Date.now() - startedAt));
+    };
+
+    update();
+
+    const interval = window.setInterval(update, 1000);
+
+    return () => window.clearInterval(interval);
+  }, [startedAt]);
+
+  return <span>{formatDuration(elapsed)}</span>;
+}
 
 const SandpackPreview = dynamic(
   () =>
     import("@/components/ide/SandpackPreview").then(
-      (mod) => mod.SandpackPreview,
+      (module) => module.SandpackPreview,
     ),
   {
     ssr: false,
-
     loading: () => (
-      <div className="flex h-full items-center justify-center bg-[#151515]">
-        <Spinner className="size-8 text-primary" />
+      <div className="flex h-full items-center justify-center gap-3">
+        <Brand animated />
+        <Loader2 className="size-4 animate-spin" />
       </div>
     ),
   },
 );
 
-// ─────────────────────────────────────────────────────────────
-// MAIN PAGE
-// ─────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
+// Route
+// -----------------------------------------------------------------------------
 
 export default function ProjectPage() {
   const params = useParams();
+  const rawId = params.id;
 
-  const projectId = params.id as string;
+  const projectId = Array.isArray(rawId)
+    ? rawId[0]
+    : rawId;
 
-  // Canonical generated stack
+  if (!projectId) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <Loader2 className="size-6 animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <ProjectWorkspace
+      key={projectId}
+      projectId={projectId}
+    />
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Workspace
+// -----------------------------------------------------------------------------
+
+function ProjectWorkspace({
+  projectId,
+}: {
+  projectId: string;
+}) {
   const tech = DEFAULT_TECH_STACK;
   const platform = DEFAULT_PLATFORM;
 
-  // ───────────────────────────────────────────────────────────
-  // PROJECT DATA
-  // ───────────────────────────────────────────────────────────
+  const [projectLoading, setProjectLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [idea, setIdea] = useState("");
-
-  const [projectTitle, setProjectTitle] = useState("");
-
+  const [projectTitle, setProjectTitle] = useState("Project");
   const [isPinned, setIsPinned] = useState(false);
+  const [pinBusy, setPinBusy] = useState(false);
 
-  const [credits, setCredits] = useState(MAX_DAILY_CREDITS);
-
-  const [projectNotFound, setProjectNotFound] = useState(false);
-
-  const [projectLoading, setProjectLoading] = useState(true);
-
-  // ───────────────────────────────────────────────────────────
-  // RENAME
-  // ───────────────────────────────────────────────────────────
+  const [credits, setCredits] = useState<number | null>(null);
 
   const [isRenaming, setIsRenaming] = useState(false);
-
   const [renameValue, setRenameValue] = useState("");
-
+  const [renameBusy, setRenameBusy] = useState(false);
   const renameRef = useRef<HTMLInputElement>(null);
 
-  // ───────────────────────────────────────────────────────────
-  // CHAT
-  // ───────────────────────────────────────────────────────────
-
-  const [chatInput, setChatInput] = useState("");
+  const [localPlan, setLocalPlan] = useState<Plan>();
+  const localPlanRef = useRef<Plan | undefined>(undefined);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const messagesRef = useRef<ChatMessage[]>([]);
+
+  const [chatInput, setChatInput] = useState("");
+  const [composerMode, setComposerMode] =
+    useState<ComposerMode>("build");
+
+  const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
+
+  const [operationKind, setOperationKind] =
+    useState<ComposerMode>("build");
+
+  const [operationStartedAt, setOperationStartedAt] =
+    useState<number | null>(null);
+
+  const generationJobRef = useRef<GenerationJob | null>(null);
+  const [generationError, setGenerationError] =
+    useState<string | null>(null);
 
   const [chatPanelOpen, setChatPanelOpen] = useState(true);
-
-  const [chatLoading, setChatLoading] = useState(false);
-
-  // ───────────────────────────────────────────────────────────
-  // GENERATION
-  // ───────────────────────────────────────────────────────────
-
-  const [genError, setGenError] = useState<string | null>(null);
-
-  const [buildStartedAt, setBuildStartedAt] = useState<number | null>(null);
-
-  const [buildDurationMs, setBuildDurationMs] = useState<number | null>(null);
-
-  const [buildCompletedAt, setBuildCompletedAt] = useState<number | null>(null);
-
-  const [projectUpdatedAt, setProjectUpdatedAt] = useState<Date | null>(null);
-
-  const buildStartedAtRef = useRef<number | null>(null);
-
-  /**
-   * Used to make sure a completed generated plan
-   * is committed only once.
-   */
-  const generationInFlightRef = useRef(false);
-  const incrementalUpdateRef = useRef(false);
-
-  /**
-   * Prevent duplicate project loading/generation
-   * during React development Strict Mode.
-   */
-  const loadedProjectRef = useRef<string | null>(null);
-
-  // ───────────────────────────────────────────────────────────
-  // PREVIEW UI
-  // ───────────────────────────────────────────────────────────
+  const chatScrollRef = useRef<HTMLDivElement>(null);
+  const followChatRef = useRef(true);
 
   const [view, setView] = useState<SandpackView>("preview");
+  const [rightPanel, setRightPanel] =
+    useState<"preview" | "guide">("preview");
 
-  const [previewKey, setPreviewKey] = useState(0);
-
-  const [isRefreshingPreview, setIsRefreshingPreview] = useState(false);
-
-  const [previewError, setPreviewError] = useState<string | null>(null);
-
-  const handleRefreshPreview = useCallback(() => {
-    if (isRefreshingPreview) return;
-
-    setIsRefreshingPreview(true);
-    setPreviewError(null);
-
-    setPreviewKey((current) => current + 1);
-
-    window.setTimeout(() => {
-      setIsRefreshingPreview(false);
-    }, 800);
-  }, [isRefreshingPreview]);
-
-  const handlePreviewError = useCallback((message: string) => {
-    setPreviewError(message);
-  }, []);
-
-  const [rightPanel, setRightPanel] = useState<"preview" | "guide">("preview");
-
-  const [viewportSize, setViewportSize] = useState<ViewportSize>("desktop");
+  const [viewportSize, setViewportSize] =
+    useState<ViewportSize>("desktop");
 
   const [activeFile, setActiveFile] = useState<string | null>(null);
+  const [previewKey, setPreviewKey] = useState(0);
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
-  const handleOpenFile = useCallback((path: string) => {
-    setView("code");
-    setActiveFile(path);
-    setRightPanel("preview");
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [saveAttempt, setSaveAttempt] = useState(0);
+
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const saveRevisionRef = useRef(0);
+  const lastSavedRef = useRef("");
+
+  const loadedRef = useRef(false);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+
+    return () => {
+      mountedRef.current = false;
+    };
   }, []);
 
-  // ───────────────────────────────────────────────────────────
-  // COMPLETE STABLE PLAN
-  // ───────────────────────────────────────────────────────────
+  const replaceMessages = useCallback((next: ChatMessage[]) => {
+    const identified = next.map(messageWithId);
 
-  /**
-   * IMPORTANT:
-   *
-   * localPlan always represents the LAST COMPLETE project.
-   *
-   * The streaming `plan` from experimental_useObject is NOT
-   * sent directly to Sandpack.
-   *
-   * This prevents Sandpack from recompiling for every partial
-   * streamed file/token.
-   */
-  const [localPlan, setLocalPlan] = useState<Plan | null>(null);
+    messagesRef.current = identified;
+    setMessages(identified);
 
-  // History of all past completed builds (shown stacked in chat)
-  type BuildSnapshot = {
-    idea: string;
-    plan: Plan;
-    durationMs: number;
-    completedAt: number;
-  };
-  const [activityHistory, setActivityHistory] = useState<BuildSnapshot[]>([]);
+    return identified;
+  }, []);
 
-  // ───────────────────────────────────────────────────────────
-  // AI GENERATION
-  // ───────────────────────────────────────────────────────────
+  const appendMessage = useCallback((message: ChatMessage) => {
+    const next = [
+      ...messagesRef.current,
+      messageWithId(message),
+    ];
+
+    messagesRef.current = next;
+    setMessages(next);
+
+    return next;
+  }, []);
+
+  const commitPlan = useCallback((next: Plan) => {
+    localPlanRef.current = next;
+    setLocalPlan(next);
+  }, []);
+
+  const refreshCredits = useCallback(async () => {
+    try {
+      const result = await getCreditsAction();
+
+      if (result.success && mountedRef.current) {
+        setCredits(result.credits);
+        window.dispatchEvent(new Event("credits-updated"));
+      }
+    } catch (error) {
+      console.error("[Credits]", error);
+    }
+  }, []);
+
+  const finishOperation = useCallback(() => {
+    busyRef.current = false;
+    setBusy(false);
+    setOperationStartedAt(null);
+  }, []);
+
+  const failGeneration = useCallback(
+    (error: unknown) => {
+      const job = generationJobRef.current;
+
+      // Prevent duplicate reports from onError and onFinish.
+      if (!job) return;
+
+      generationJobRef.current = null;
+
+      const message = errorMessage(error);
+
+      setGenerationError(message);
+
+      appendMessage({
+        role: "assistant",
+        content: `I couldn't apply this update. ${message}`,
+        failed: true,
+        durationMs: Math.max(0, Date.now() - job.startedAt),
+      });
+
+      finishOperation();
+      void refreshCredits();
+
+      toast.error(message);
+    },
+    [appendMessage, finishOperation, refreshCredits],
+  );
 
   const {
-    object: plan,
-    submit,
-    isLoading: loading,
+    object: streamingPlan,
+    submit: submitObject,
+    isLoading: generationLoading,
   } = experimental_useObject({
     api: "/api/generate-plan",
-
     schema: planSchema,
 
-    onFinish: () => {
-      console.log("[CodewithChat] Generation finished successfully");
+    onError: failGeneration,
 
-      setGenError(null);
-      setPreviewError(null);
+    onFinish: ({ object, error }) => {
+      const job = generationJobRef.current;
 
-      const finishedAt = Date.now();
+      if (!job || !mountedRef.current) return;
 
-      if (buildStartedAtRef.current) {
-        const ms = finishedAt - buildStartedAtRef.current;
-
-        setBuildDurationMs(ms);
-        setBuildCompletedAt(finishedAt);
-
-        setProjectUpdatedAt(new Date(finishedAt));
-
-        // Snapshot this build into history BEFORE it gets replaced
-        setLocalPlan((prev) => {
-          if (prev) {
-            setActivityHistory((h) => [
-              ...h,
-              {
-                idea,
-                plan: prev,
-                durationMs: ms,
-                completedAt: finishedAt,
-              },
-            ]);
-          }
-          return prev;
-        });
+      if (error) {
+        failGeneration(error);
+        return;
       }
 
-      // Intentionally not adding a "Done!" chat message here.
-      // We rely on the BuildActivityFeed to show completion status and project files.
-    },
+      const parsed = planSchema.safeParse(object);
 
-    onError: (err) => {
-      console.error("[CodewithChat] Generation error:", err);
-
-      generationInFlightRef.current = false;
-
-      const errMsg = err?.message || "Unknown error";
-
-      setGenError(errMsg);
-
-      if (errMsg.includes("NO_CREDITS") || errMsg.includes("402")) {
-        setCredits(0);
-
-        toast.error("Daily credits used up. Upgrade to continue building.");
-      } else {
-        toast.error("Failed to generate project. Please try again.");
-      }
-
-      setMessages((prev) => {
-        if (prev.length > 0 && prev[prev.length - 1].role === "user") {
-          return prev.slice(0, -1);
-        }
-
-        return prev;
-      });
-    },
-  });
-
-  // ───────────────────────────────────────────────────────────
-  // ACTIVE PLAN
-  // ───────────────────────────────────────────────────────────
-
-  /**
-   * CRITICAL PERFORMANCE FIX:
-   *
-   * DO NOT:
-   *
-   * const activePlan = plan || localPlan
-   *
-   * Because `plan` changes continuously while streaming.
-   *
-   * Sandpack should only receive a complete stable project.
-   */
-  const activePlan = localPlan;
-
-  // ───────────────────────────────────────────────────────────
-  // DEPENDENCIES
-  // ───────────────────────────────────────────────────────────
-
-  const activeDependencies = useMemo<Record<string, string>>(() => {
-    if (!activePlan) {
-      return {};
-    }
-
-    return getProjectRuntimeDependencies(
-      activePlan.previewFiles,
-      activePlan.dependencies ?? {},
-    );
-  }, [activePlan]);
-  // ───────────────────────────────────────────────────────────
-  // CREDITS
-  // ───────────────────────────────────────────────────────────
-
-  const refreshCredits = useCallback(() => {
-    getCreditsAction().then((res) => {
-      if (!res.success) return;
-
-      setCredits(res.credits);
-
-      window.dispatchEvent(new Event("credits-updated"));
-    });
-  }, []);
-
-  useEffect(() => {
-    refreshCredits();
-  }, [refreshCredits]);
-
-  useEffect(() => {
-    if (!loading) {
-      refreshCredits();
-    }
-  }, [loading, refreshCredits]);
-
-  // ───────────────────────────────────────────────────────────
-  // BUILD TIMER
-  // ───────────────────────────────────────────────────────────
-
-  useEffect(() => {
-    if (loading) {
-      const now = Date.now();
-
-      buildStartedAtRef.current = now;
-
-      setBuildStartedAt(now);
-      setBuildDurationMs(null);
-      setBuildCompletedAt(null);
-
-      return;
-    }
-
-    if (buildStartedAtRef.current && !buildCompletedAt) {
-      const finishedAt = Date.now();
-
-      setBuildDurationMs(finishedAt - buildStartedAtRef.current);
-
-      setBuildCompletedAt(finishedAt);
-    }
-  }, [loading, buildCompletedAt]);
-
-  // ───────────────────────────────────────────────────────────
-  // COMMIT FINISHED STREAM
-  // ───────────────────────────────────────────────────────────
-
-  /**
-   * Streaming plan:
-   *
-   * AI tokens
-   *      ↓
-   * `plan` changes continuously
-   *      ↓
-   * Sandpack DOES NOT receive it
-   *
-   * Once generation finishes:
-   *
-   * complete plan
-   *      ↓
-   * validate schema
-   *      ↓
-   * setLocalPlan()
-   *      ↓
-   * Sandpack gets files ONCE
-   */
-  useEffect(() => {
-    if (loading) {
-      generationInFlightRef.current = true;
-
-      return;
-    }
-
-    if (!generationInFlightRef.current || !plan || !projectId) {
-      return;
-    }
-
-    const parsed = planSchema.safeParse(plan);
-
-    if (!parsed.success) {
-      console.error(
-        "[Project] Generated plan is incomplete or invalid:",
-        parsed.error,
-      );
-
-      generationInFlightRef.current = false;
-
-      setGenError("Generated project was incomplete. Please regenerate.");
-
-      return;
-    }
-
-    generationInFlightRef.current = false;
-
-    const incomingFiles = parsed.data.previewFiles ?? [];
-    const previewFiles = incrementalUpdateRef.current
-      ? mergeGeneratedProjectFiles(
-          localPlan?.previewFiles,
-          incomingFiles,
-          parsed.data.deletedFilePaths,
-        )
-      : sanitizeGeneratedProjectFiles(incomingFiles);
-
-    incrementalUpdateRef.current = false;
-
-    const completedPlan = {
-      ...parsed.data,
-      previewFiles,
-    };
-
-    /**
-     * This is the ONLY point where the live preview
-     * swaps to the newly generated code.
-     */
-    setLocalPlan(completedPlan);
-
-    const now = new Date();
-
-    setProjectUpdatedAt(now);
-
-       updateProjectAction(projectId, JSON.stringify(completedPlan))
-      .then((res) => {
-        if (!res.success) {
-          console.error("[Project] Failed to save project:", res.error);
-
-          toast.error(
-            "Project generated, but saving failed. Download the ZIP before refreshing.",
-          );
-        }
-      })
-      .catch((error: unknown) => {
-        console.error("[Project] Error saving project:", error);
-
-        toast.error(
-          "Could not save the project. Download the ZIP before refreshing.",
+      if (!parsed.success) {
+        failGeneration(
+          new Error(
+            "The generation response was incomplete. Your existing files were preserved.",
+          ),
         );
-      });
-  }, [loading, plan, projectId]);
+        return;
+      }
 
-  // ───────────────────────────────────────────────────────────
-  // LOAD PROJECT
-  // ───────────────────────────────────────────────────────────
+      try {
+        const generated = parsed.data;
+        const incomingFiles = generated.previewFiles ?? [];
+        const deletedPaths = generated.deletedFilePaths ?? [];
 
-  useEffect(() => {
-    if (!projectId) return;
-
-    /**
-     * Prevent duplicate load / duplicate first generation
-     * in React Strict Mode.
-     */
-    if (loadedProjectRef.current === projectId) {
-      return;
-    }
-
-    loadedProjectRef.current = projectId;
-
-    console.log("[CodewithChat] Loading project:", projectId);
-
-    setProjectLoading(true);
-
-    getProjectByIdAction(projectId)
-      .then((res) => {
-        setProjectLoading(false);
-
-        if (!res.success || !res.data) {
-          console.log("[CodewithChat] Project not found or unauthorized");
-
-          setProjectNotFound(true);
-
+        if (!incomingFiles.length && !deletedPaths.length) {
+          failGeneration(
+            new Error(
+              "The generation API returned no source changes. It must return previewFiles containing the updated code.",
+            ),
+          );
           return;
         }
 
-        console.log(
-          "[CodewithChat] Project loaded. Has code:",
-          Boolean(res.data.code),
+        const previousFiles = job.basePlan?.previewFiles ?? [];
+
+        const nextFiles = job.incremental
+          ? mergeGeneratedProjectFiles(
+              previousFiles,
+              incomingFiles,
+              deletedPaths,
+            )
+          : sanitizeGeneratedProjectFiles(incomingFiles);
+
+        const previousContents = new Map(
+          previousFiles.map((file) => [
+            normalizePath(file.path),
+            file.content,
+          ]),
         );
 
-        setIdea(res.data.prompt);
+        const nextPaths = new Set(
+          nextFiles.map((file) => normalizePath(file.path)),
+        );
 
-        setProjectTitle(res.data.title);
+        const changedFiles = nextFiles
+          .filter(
+            (file) =>
+              previousContents.get(normalizePath(file.path)) !==
+              file.content,
+          )
+          .map((file) => file.path);
 
-        setIsPinned(res.data.isPinned || false);
+        const removedFiles = previousFiles
+          .filter(
+            (file) => !nextPaths.has(normalizePath(file.path)),
+          )
+          .map((file) => file.path);
 
-        if (res.data.updatedAt) {
-          setProjectUpdatedAt(new Date(res.data.updatedAt));
+        const nextPlan: Plan = {
+          ...generated,
+          dependencies: {
+            ...(job.incremental
+              ? job.basePlan?.dependencies ?? {}
+              : {}),
+            ...(generated.dependencies ?? {}),
+          },
+          previewFiles: nextFiles,
+        };
+
+        generationJobRef.current = null;
+
+        commitPlan(nextPlan);
+        setSaveState("saving");
+        setGenerationError(null);
+        setPreviewError(null);
+
+        appendMessage({
+          role: "assistant",
+          content:
+            changedFiles.length || removedFiles.length
+              ? generated.overview ||
+                "Your project files have been updated."
+              : "The returned files match the current project. No source changes were applied.",
+          files: changedFiles,
+          deletedFiles: removedFiles,
+          durationMs: Math.max(0, Date.now() - job.startedAt),
+        });
+
+        if (!job.basePlan) {
+          setView("preview");
+          setRightPanel("preview");
         }
 
-        // ─── EXISTING PROJECT ────────────────────────────
+        finishOperation();
+        void refreshCredits();
+      } catch (error) {
+        failGeneration(error);
+      }
+    },
+  });
 
-        if (res.data.code) {
-          try {
-            const parsed = JSON.parse(res.data.code);
+  const startGeneration = useCallback(
+    (
+      input: Parameters<typeof submitObject>[0],
+      basePlan: Plan | undefined,
+      incremental: boolean,
+    ) => {
+      if (busyRef.current) return;
 
-            console.log(
-              "[CodewithChat] Parsed saved plan. previewFiles:",
-              parsed?.previewFiles?.length || 0,
-            );
+      const startedAt = Date.now();
 
-            /**
-             * Keep backward compatibility with old saved
-             * projects here.
-             *
-             * New generations are validated before save.
-             */
-            setLocalPlan({
-              ...(parsed as Plan),
-              previewFiles: sanitizeGeneratedProjectFiles(parsed.previewFiles),
-            });
+      generationJobRef.current = {
+        startedAt,
+        basePlan,
+        incremental,
+      };
 
-            return;
-          } catch (error) {
-            console.error(
-              "[CodewithChat] Failed to parse project code:",
-              error,
-            );
+      busyRef.current = true;
+      followChatRef.current = true;
 
-            console.log(
-              "[CodewithChat] Triggering regeneration due to corrupted saved code",
-            );
+      setBusy(true);
+      setOperationKind("build");
+      setOperationStartedAt(startedAt);
+      setGenerationError(null);
 
-            submit({
-              idea: res.data.prompt,
-              tech,
-              platform,
-              messages: [],
-            });
+      try {
+        submitObject(input);
+      } catch (error) {
+        failGeneration(error);
+      }
+    },
+    [submitObject, failGeneration],
+  );
 
-            return;
-          }
+  // ---------------------------------------------------------------------------
+  // Load saved project once per workspace
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    if (loadedRef.current) return;
+
+    loadedRef.current = true;
+
+    async function loadProject() {
+      try {
+        const result = await getProjectByIdAction(projectId);
+
+        if (!mountedRef.current) return;
+
+        if (!result.success) {
+          throw new Error(result.error || "Unable to load project.");
         }
 
-        // ─── FIRST GENERATION ────────────────────────────
+        const project = result.data;
 
-        console.log("[CodewithChat] No code saved, checking credits...");
+        setIdea(project.prompt);
+        setProjectTitle(project.title);
+        setIsPinned(Boolean(project.isPinned));
 
-        getCreditsAction().then((creditResult) => {
-          if (!creditResult.success) {
-            return;
+        replaceMessages([
+          {
+            role: "user",
+            content: project.prompt,
+          },
+        ]);
+
+        if (project.code) {
+          const raw = JSON.parse(project.code);
+
+          if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+            throw new Error("The saved project data is invalid.");
           }
 
-          setCredits(creditResult.credits);
+          // Conversation is stored alongside the plan, not inside the
+          // generation context's existingPlan.
+          const {
+            conversation,
+            ...storedPlan
+          } = raw;
 
-          if (creditResult.credits <= 0) {
-            toast.error(
-              "Daily credits used up. Upgrade to generate this project.",
-            );
+          const restored = conversationSchema.safeParse(conversation);
 
-            return;
-          }
+          const restoredMessages =
+            restored.success && restored.data.length
+              ? restored.data
+              : [
+                  {
+                    role: "user" as const,
+                    content: project.prompt,
+                  },
+                  {
+                    role: "assistant" as const,
+                    content:
+                      typeof storedPlan.overview === "string"
+                        ? storedPlan.overview
+                        : "Your saved project is ready.",
+                    files: sanitizeGeneratedProjectFiles(
+                      storedPlan.previewFiles,
+                    ).map((file) => file.path),
+                  },
+                ];
 
-          submit({
-            idea: res.data.prompt,
+          // Preserve compatibility with previously saved plans.
+          const restoredPlan = {
+            ...storedPlan,
+            previewFiles: sanitizeGeneratedProjectFiles(
+              storedPlan.previewFiles,
+            ),
+          } as Plan;
+
+          const identified = replaceMessages(restoredMessages);
+
+          lastSavedRef.current = JSON.stringify({
+            ...restoredPlan,
+            conversation: identified,
+          });
+
+          commitPlan(restoredPlan);
+          setSaveState("saved");
+          setProjectLoading(false);
+
+          void refreshCredits();
+          return;
+        }
+
+        const creditResult = await getCreditsAction();
+
+        if (!mountedRef.current) return;
+
+        setProjectLoading(false);
+
+        if (!creditResult.success) {
+          setGenerationError(
+            "Unable to check credits. Please try generating again.",
+          );
+          return;
+        }
+
+        setCredits(creditResult.credits);
+
+        if (creditResult.credits <= 0) {
+          setGenerationError("You have no generation credits remaining.");
+          return;
+        }
+
+        startGeneration(
+          {
+            idea: project.prompt,
             tech,
             platform,
             messages: [],
-          });
-        });
-      })
-      .catch((error) => {
-        console.error("[CodewithChat] Failed to load project:", error);
+          },
+          undefined,
+          false,
+        );
+      } catch (error) {
+        if (!mountedRef.current) return;
 
+        console.error("[Project load]", error);
+
+        setLoadError(errorMessage(error));
         setProjectLoading(false);
-        setProjectNotFound(true);
-      });
-  }, [projectId, submit, tech, platform]);
+      }
+    }
 
-  // ───────────────────────────────────────────────────────────
-  // FOCUS RENAME INPUT
-  // ───────────────────────────────────────────────────────────
+    void loadProject();
+  }, [
+    projectId,
+    tech,
+    platform,
+    replaceMessages,
+    commitPlan,
+    refreshCredits,
+    startGeneration,
+  ]);
+
+  // ---------------------------------------------------------------------------
+  // Save completed project and chronological conversation
+  // ---------------------------------------------------------------------------
 
   useEffect(() => {
-    if (isRenaming && renameRef.current) {
-      renameRef.current.focus();
-      renameRef.current.select();
+    if (projectLoading || loadError || !localPlan || busy) {
+      return;
+    }
+
+    const payload = JSON.stringify({
+      ...localPlan,
+      conversation: messages,
+    });
+
+    if (payload === lastSavedRef.current) return;
+
+    const revision = ++saveRevisionRef.current;
+
+    setSaveState("saving");
+
+    saveQueueRef.current = saveQueueRef.current.then(async () => {
+      try {
+        const result = await updateProjectAction(projectId, payload);
+
+        if (!result.success) {
+          throw new Error(result.error || "Unable to save project.");
+        }
+
+        lastSavedRef.current = payload;
+
+        if (
+          mountedRef.current &&
+          revision === saveRevisionRef.current
+        ) {
+          setSaveState("saved");
+        }
+      } catch (error) {
+        console.error("[Project save]", error);
+
+        if (
+          mountedRef.current &&
+          revision === saveRevisionRef.current
+        ) {
+          setSaveState("error");
+          toast.error("Changes are not saved. Use Retry save.");
+        }
+      }
+    });
+  }, [
+    projectId,
+    projectLoading,
+    loadError,
+    localPlan,
+    messages,
+    busy,
+    saveAttempt,
+  ]);
+
+  // Keep following incoming content unless the user scrolls upward.
+  useEffect(() => {
+    const viewport = chatScrollRef.current;
+    const content = viewport?.firstElementChild;
+
+    if (!viewport || !content) return;
+
+    const observer = new ResizeObserver(() => {
+      if (followChatRef.current) {
+        viewport.scrollTop = viewport.scrollHeight;
+      }
+    });
+
+    observer.observe(content);
+
+    return () => observer.disconnect();
+  }, [projectLoading, loadError, chatPanelOpen]);
+
+  useEffect(() => {
+    if (isRenaming) {
+      renameRef.current?.focus();
+      renameRef.current?.select();
     }
   }, [isRenaming]);
 
-  // ───────────────────────────────────────────────────────────
-  // CHAT ONLY
-  // ───────────────────────────────────────────────────────────
-
-  async function handleChatOnly(userMessage: string, history: ChatMessage[]) {
-    setChatLoading(true);
-
-    try {
-      const response = await fetch("/api/project-chat", {
-        method: "POST",
-
-        headers: {
-          "Content-Type": "application/json",
-        },
-
-        body: JSON.stringify({
-          message: userMessage,
-          idea,
-          tech,
-          platform,
-          messages: history,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Chat failed");
-      }
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: data.reply,
-        },
-      ]);
-    } catch (error) {
-      console.error("[Project Chat] Error:", error);
-
-      toast.error("Could not get a reply. Try again.");
-
-      setMessages((prev) =>
-        prev[prev.length - 1]?.role === "user" ? prev.slice(0, -1) : prev,
-      );
-    } finally {
-      setChatLoading(false);
-    }
-  }
-
-  // ───────────────────────────────────────────────────────────
-  // SEND CHAT / CODE CHANGE
-  // ───────────────────────────────────────────────────────────
+  // ---------------------------------------------------------------------------
+  // Build and Ask
+  // ---------------------------------------------------------------------------
 
   async function handleSendChat(
     attachedImage?: string | null,
     projectType: ProjectType = "frontend",
   ) {
-    if (!idea.trim()) return;
+    if (busyRef.current || projectLoading || loadError) return;
 
-    const trimmed = chatInput.trim();
+    const text = chatInput.trim();
 
-    if (isTrivialMessage(trimmed) && !attachedImage) {
-      toast.error("Please ask a question or describe a real change.");
+    if (!text && !attachedImage) return;
 
+    if (composerMode === "ask" && attachedImage) {
+      toast.info("Use Build mode to apply an attached image.");
       return;
     }
 
-    const projectTypeInstruction =
-      projectType === "fullstack"
-        ? "Build this as a full-stack web app with a real database, authentication, API routes, and persistent data."
-        : "Keep this as a frontend website with polished responsive UI and client-side interactions.";
-    const finalMessage = attachedImage
-      ? trimmed
-        ? `${trimmed}\n\nProject type: ${projectTypeInstruction}\n\n[IMAGE: ${attachedImage}]`
-        : `Project type: ${projectTypeInstruction}\n\n[IMAGE: ${attachedImage}]`
-      : `${trimmed}\n\nProject type: ${projectTypeInstruction}`;
+    if (composerMode === "build" && credits !== null && credits <= 0) {
+      toast.error("You have no generation credits remaining.");
+      return;
+    }
 
-    const userMessage: ChatMessage = {
+    const mode = composerMode;
+    let content = text;
+
+    if (mode === "build") {
+      content = [
+        text || "Update the project using the attached image.",
+        "",
+        `Project type: ${projectType}`,
+        projectType === "fullstack"
+          ? "Implement the requested full-stack changes in the project files."
+          : "Apply the requested interface changes. Preserve existing backend functionality unless the user asks to change it.",
+        "Edit the existing project supplied in existingPlan.",
+        "Return the actual updated source files in previewFiles using the required schema.",
+        "For each changed file, return its complete content.",
+        "Preserve unrelated files and working features.",
+        "Use deletedFilePaths only for intentional file deletions.",
+        "Do not replace implementation with advice or instructions for the user.",
+        attachedImage ? `\n[IMAGE: ${attachedImage}]` : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+    }
+
+    const history = appendMessage({
       role: "user",
-      content: finalMessage,
-    };
-
-    const nextMessages = [...messages, userMessage];
-
-    setMessages(nextMessages);
-    setChatInput("");
-
-    const requiresGeneration =
-      Boolean(attachedImage) || shouldRegenerateCode(trimmed);
-
-    // ─── NORMAL CHAT ─────────────────────────────────────
-
-    if (!requiresGeneration) {
-      await handleChatOnly(finalMessage, nextMessages);
-
-      return;
-    }
-
-    // ─── CODE CHANGE ─────────────────────────────────────
-
-    if (credits <= 0) {
-      toast.error("Daily credits used up. Upgrade to continue building.");
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content:
-            "Your daily generation credits are used up. Normal questions are still available.",
-        },
-      ]);
-
-      return;
-    }
-
-    /**
-     * Always modify the LAST COMPLETE project.
-     *
-     * Never send the partially streaming plan as
-     * existingPlan.
-     */
-    const existingPlan = localPlan;
-
-    incrementalUpdateRef.current = Boolean(existingPlan?.previewFiles?.length);
-
-    submit({
-      idea,
-      tech,
-      platform,
-      messages: nextMessages,
-      existingPlan,
+      content,
+      displayContent: text || "Use the attached image.",
     });
+
+    setChatInput("");
+    followChatRef.current = true;
+
+    if (mode === "build") {
+      const existingPlan = localPlanRef.current;
+
+      startGeneration(
+        {
+          idea,
+          tech,
+          platform,
+          messages: apiMessages(history),
+          existingPlan,
+        },
+        existingPlan,
+        Boolean(existingPlan),
+      );
+
+      return;
+    }
+
+    const startedAt = Date.now();
+
+    busyRef.current = true;
+    setBusy(true);
+    setOperationKind("ask");
+    setOperationStartedAt(startedAt);
+
+    try {
+      const response = await fetch("/api/project-chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: text,
+          idea,
+          tech,
+          platform,
+          messages: apiMessages(history),
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Unable to get a response.");
+      }
+
+      if (typeof result.reply !== "string" || !result.reply.trim()) {
+        throw new Error("The chat API returned an empty response.");
+      }
+
+      if (!mountedRef.current) return;
+
+      appendMessage({
+        role: "assistant",
+        content: result.reply,
+        durationMs: Math.max(0, Date.now() - startedAt),
+      });
+    } catch (error) {
+      if (!mountedRef.current) return;
+
+      appendMessage({
+        role: "assistant",
+        content: errorMessage(error),
+        failed: true,
+        durationMs: Math.max(0, Date.now() - startedAt),
+      });
+
+      toast.error(errorMessage(error));
+    } finally {
+      if (mountedRef.current) {
+        finishOperation();
+      }
+    }
   }
 
-  // ───────────────────────────────────────────────────────────
-  // REGENERATE
-  // ───────────────────────────────────────────────────────────
-
   function handleRegenerateProject() {
-    if (!idea.trim()) return;
+    if (busyRef.current || !idea.trim()) return;
 
-    if (credits <= 0) {
-      toast.error("Daily credits used up. Upgrade to continue building.");
-
+    if (credits !== null && credits <= 0) {
+      toast.error("You have no generation credits remaining.");
       return;
     }
 
-    setGenError(null);
-    setMessages([]);
-
-    incrementalUpdateRef.current = false;
-
-    submit({
-      idea,
-      tech,
-      platform,
-      messages: [],
-      existingPlan: localPlan,
+    appendMessage({
+      role: "user",
+      content: "Regenerate this project from the original request.",
     });
+
+    startGeneration(
+      {
+        idea,
+        tech,
+        platform,
+        messages: [],
+        existingPlan: localPlanRef.current,
+      },
+      localPlanRef.current,
+      false,
+    );
   }
 
   function handleAutoFixPreview() {
-    if (!idea.trim() || !localPlan || loading) return;
+    const existingPlan = localPlanRef.current;
 
-    if (credits <= 0) {
-      toast.error("Daily credits used up. Upgrade to continue building.");
+    if (!existingPlan || !previewError || busyRef.current) return;
+
+    if (credits !== null && credits <= 0) {
+      toast.error("You have no generation credits remaining.");
       return;
     }
 
-    const fixRequest: ChatMessage = {
+    const history = appendMessage({
       role: "user",
-      content: `Fix the generated project preview.
-
-The preview compiler reported this error:
-${previewError || "The generated project failed to compile."}
-
-Repair the root cause in the existing project. Return the COMPLETE project
-in previewFiles, preserve the existing design and features, and verify every
-local import, bracket, CSS block, and dependency before finishing. Do not
-return explanations instead of files.`,
-    };
-
-    const nextMessages = [...messages, fixRequest];
-
-    setMessages(nextMessages);
-    setPreviewError(null);
-    setGenError(null);
-
-    incrementalUpdateRef.current = Boolean(localPlan?.previewFiles?.length);
-
-    submit({
-      idea,
-      tech,
-      platform,
-      messages: nextMessages,
-      existingPlan: localPlan,
+      displayContent: "Fix the preview error.",
+      content: [
+        "Fix this preview error in the existing project:",
+        previewError,
+        "",
+        "Return actual corrected source files in previewFiles.",
+        "Return complete content for each changed file.",
+        "Preserve unrelated features, layout, and styling.",
+      ].join("\n"),
     });
+
+    startGeneration(
+      {
+        idea,
+        tech,
+        platform,
+        messages: apiMessages(history),
+        existingPlan,
+      },
+      existingPlan,
+      true,
+    );
   }
 
-  // ───────────────────────────────────────────────────────────
-  // DOWNLOAD REAL PROJECT ZIP
-  // ───────────────────────────────────────────────────────────
+  // ---------------------------------------------------------------------------
+  // Project controls
+  // ---------------------------------------------------------------------------
 
-  const handleDownloadZip = async () => {
-    const projectFiles = activePlan?.previewFiles;
+  async function handleRename() {
+    const title = renameValue.trim();
 
-    if (!projectFiles?.length) {
-      toast.error("No project files available to download.");
+    if (!title || renameBusy) return;
 
+    setRenameBusy(true);
+
+    try {
+      const result = await renameProjectAction(projectId, title);
+
+      if (!result.success) {
+        throw new Error(result.error || "Unable to rename project.");
+      }
+
+      setProjectTitle(title);
+      setIsRenaming(false);
+      toast.success("Project renamed.");
+    } catch (error) {
+      toast.error(errorMessage(error));
+    } finally {
+      setRenameBusy(false);
+    }
+  }
+
+  async function handleTogglePin() {
+    if (pinBusy) return;
+
+    const next = !isPinned;
+
+    setPinBusy(true);
+
+    try {
+      const result = await togglePinProjectAction(projectId, next);
+
+      if (!result.success) {
+        throw new Error(result.error || "Unable to update pin.");
+      }
+
+      setIsPinned(next);
+    } catch (error) {
+      toast.error(errorMessage(error));
+    } finally {
+      setPinBusy(false);
+    }
+  }
+
+  async function handleDownloadZip() {
+    const files = localPlanRef.current?.previewFiles;
+
+    if (!files?.length) {
+      toast.error("No project files to download.");
       return;
     }
 
     try {
       const zip = new JSZip();
-      let hasTsConfigNode = false;
-      let hasTsConfig = false;
 
-      for (const file of projectFiles) {
-        if (!file?.path || typeof file.content !== "string") {
-          continue;
+      for (const file of files) {
+        const path = normalizePath(file.path);
+
+        if (!path || path.split("/").includes("..")) {
+          throw new Error("The project contains an invalid file path.");
         }
 
-        const filePath = file.path.replace(/\\/g, "/").replace(/^\/+/, "");
-
-        if (!filePath) continue;
-
-        if (filePath === "tsconfig.node.json") hasTsConfigNode = true;
-        if (filePath === "tsconfig.json") hasTsConfig = true;
-
-        zip.file(filePath, file.content);
+        zip.file(path, file.content);
       }
 
-      if (hasTsConfig && !hasTsConfigNode) {
-        zip.file(
-          "tsconfig.node.json",
-          `{
-  "compilerOptions": {
-    "composite": true,
-    "skipLibCheck": true,
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "allowSyntheticDefaultImports": true,
-    "strict": true
-  },
-  "include": ["vite.config.ts"]
-}`,
-        );
-      }
+      const blob = await zip.generateAsync({ type: "blob" });
 
-      const content = await zip.generateAsync({
-        type: "blob",
-      });
+      const filename =
+        projectTitle
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-+|-+$/g, "") || "project";
 
-      saveAs(content, `${projectTitle || "codewithchat-project"}.zip`);
-
-      toast.success("Downloaded complete project ZIP!");
+      saveAs(blob, `${filename}.zip`);
     } catch (error) {
-      console.error("[Project] ZIP error:", error);
-
-      toast.error("Failed to generate ZIP file.");
+      toast.error(errorMessage(error));
     }
-  };
+  }
 
-  // ───────────────────────────────────────────────────────────
-  // PIN PROJECT
-  // ───────────────────────────────────────────────────────────
+  function handleOpenFile(path: string) {
+    setActiveFile(path);
+    setView("code");
+    setRightPanel("preview");
+  }
 
-  const handleTogglePin = async () => {
-    const newValue = !isPinned;
+  // ---------------------------------------------------------------------------
+  // Stable preview inputs
+  // -----------------------------------------------------------------------------
 
-    setIsPinned(newValue);
-
-    const result = await togglePinProjectAction(projectId, newValue);
-
-    if (!result.success) {
-      setIsPinned(!newValue);
-
-      toast.error("Failed to update pin.");
-    }
-  };
-
-  // ───────────────────────────────────────────────────────────
-  // RENAME PROJECT
-  // ───────────────────────────────────────────────────────────
-
-  const handleRename = async () => {
-    const value = renameValue.trim();
-
-    if (!value || value === projectTitle) {
-      setIsRenaming(false);
-      return;
-    }
-
-    const result = await renameProjectAction(projectId, value);
-
-    if (result.success) {
-      setProjectTitle(value);
-
-      toast.success("Project renamed.");
-    } else {
-      toast.error("Failed to rename.");
-    }
-
-    setIsRenaming(false);
-  };
-
-  // ───────────────────────────────────────────────────────────
-  // LEGACY FULLSTACK FILES
-  // ───────────────────────────────────────────────────────────
+  const activeDependencies = useMemo(
+    () =>
+      localPlan
+        ? getProjectRuntimeDependencies(
+            localPlan.previewFiles,
+            localPlan.dependencies ?? {},
+          )
+        : {},
+    [localPlan],
+  );
 
   const legacyFullStackFiles = useMemo(
-    () => buildFullStackFiles(activePlan?.fullStackFiles),
-    [activePlan?.fullStackFiles],
+    () => buildFullStackFiles(localPlan?.fullStackFiles),
+    [localPlan],
   );
 
-  // ───────────────────────────────────────────────────────────
-  // BUILD PREVIEW
-  // ───────────────────────────────────────────────────────────
-
-  /**
-   * New projects:
-   *
-   * previewFiles
-   *   ↓
-   * real Vite project
-   *   ↓
-   * buildInstantPreviewFiles()
-   *   ↓
-   * Sandpack runtime files
-   *
-   * Old projects can temporarily fall back to
-   * fullStackFiles.
-   */
-  const previewFileMap = useMemo(() => {
-    if (!activePlan) {
-      return {};
-    }
-
-    return buildInstantPreviewFiles(
-      activePlan.previewFiles,
-      legacyFullStackFiles,
-      true,
-    );
-  }, [activePlan, legacyFullStackFiles]);
-
-  const previewReady = useMemo(
-    () => hasPreviewEntry(previewFileMap),
-    [previewFileMap],
+  const previewFileMap = useMemo(
+    () =>
+      buildInstantPreviewFiles(
+        localPlan?.previewFiles,
+        legacyFullStackFiles,
+        true,
+      ),
+    [localPlan, legacyFullStackFiles],
   );
 
-  // ───────────────────────────────────────────────────────────
-  // AUTO SWITCH TO PREVIEW
-  // ───────────────────────────────────────────────────────────
+  const previewReady = hasPreviewEntry(previewFileMap);
 
-  useEffect(() => {
-    if (!loading && !genError && previewReady) {
-      setView("preview");
-      setRightPanel("preview");
+  const currentPaths = useMemo(
+    () =>
+      new Set(
+        (localPlan?.previewFiles ?? []).map((file) =>
+          normalizePath(file.path),
+        ),
+      ),
+    [localPlan],
+  );
+
+  // These are received partial files, not claims that builds passed.
+  const receivingFiles = useMemo(() => {
+    if (!generationLoading || !generationJobRef.current) {
+      return [];
     }
-  }, [loading, genError, previewReady]);
 
-  // ───────────────────────────────────────────────────────────
-  // NOT FOUND
-  // ───────────────────────────────────────────────────────────
+    const paths = new Set<string>();
 
-  if (projectNotFound) {
+    for (const file of streamingPlan?.previewFiles ?? []) {
+      if (
+        typeof file?.path === "string" &&
+        file.path.trim() &&
+        typeof file.content === "string" &&
+        file.content.length > 0
+      ) {
+        paths.add(file.path);
+      }
+    }
+
+    return [...paths];
+  }, [generationLoading, streamingPlan]);
+
+  const canPublish =
+    Boolean(localPlan) &&
+    !busy &&
+    saveState === "saved";
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
+
+  if (loadError) {
     return (
-      <div className="flex h-full min-h-screen flex-col items-center justify-center gap-6 bg-background px-4 text-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-border bg-muted shadow-sm">
-            <FileCode2 className="size-8 text-muted-foreground" />
-          </div>
+      <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
+        <FileCode2 className="size-9 text-muted-foreground" />
 
-          <h1 className="text-2xl font-bold tracking-tight">
-            Project Not Found
-          </h1>
+        <h1 className="text-lg font-semibold">
+          Unable to open project
+        </h1>
 
-          <p className="max-w-sm text-sm text-muted-foreground">
-            This project doesn&apos;t exist or you don&apos;t have permission to
-            view it.
-          </p>
+        <p className="max-w-md text-sm text-muted-foreground">
+          {loadError}
+        </p>
+
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => window.location.reload()}
+          >
+            Retry
+          </Button>
+
+          <Button asChild>
+            <Link href="/dashboard">Back to dashboard</Link>
+          </Button>
         </div>
-
-        <Link
-          href="/dashboard"
-          className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow transition-colors hover:bg-primary/90"
-        >
-          ← Back to Dashboard
-        </Link>
       </div>
     );
   }
 
-  // ───────────────────────────────────────────────────────────
-  // RENDER
-  // ───────────────────────────────────────────────────────────
-
   return (
-    <TooltipProvider delayDuration={300}>
-      <div className="flex h-full min-h-0 flex-col overflow-hidden">
-        {/* ───────────────────────────────────────────────
-            TOP HEADER
-        ─────────────────────────────────────────────── */}
+    <TooltipProvider>
+      <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background text-foreground">
+        <header className="flex h-12 shrink-0 items-center gap-3 border-b border-border px-3">
+          <Link
+            href="/dashboard"
+            title="Dashboard"
+            className="rounded-md p-2 hover:bg-muted"
+          >
+            <Home className="size-4" />
+          </Link>
 
-        <div className="flex h-11 shrink-0 items-center justify-between border-b border-border/40 bg-background px-4">
-          {/* LEFT */}
+          <div className="h-5 w-px bg-border" />
 
-          <div className="flex min-w-0 items-center gap-3">
-            {/* CwC LOGO DROPDOWN */}
+          {isRenaming ? (
+            <div className="flex min-w-0 items-center gap-1">
+              <input
+                ref={renameRef}
+                value={renameValue}
+                onChange={(event) =>
+                  setRenameValue(event.target.value)
+                }
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    void handleRename();
+                  }
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="mr-1 flex items-center gap-1.5 rounded-md px-2 py-1 transition-colors hover:bg-muted focus:outline-none"
-                >
-                  <span className="text-xl font-bold italic tracking-tight">
-                    CwC
-                  </span>
-                  <ChevronDown className="size-3 text-muted-foreground" />
-                </button>
-              </DropdownMenuTrigger>
+                  if (event.key === "Escape") {
+                    setIsRenaming(false);
+                  }
+                }}
+                className="h-8 min-w-0 rounded-md border border-border bg-muted px-2 text-sm outline-none focus:ring-1 focus:ring-primary"
+              />
 
-              <DropdownMenuContent align="start" className="w-56">
-                {/* HOME */}
-                <DropdownMenuItem asChild>
-                  <Link href="/dashboard" className="flex items-center gap-2">
-                    <Home className="size-3.5" />
-                    <span>Home</span>
-                  </Link>
-                </DropdownMenuItem>
-
-                {/* <DropdownMenuItem asChild>
-                  <Link
-                    href="/dashboard"
-                    className="flex items-center gap-2"
-                  >
-                    <LayoutDashboard className="size-3.5" />
-                    <span>Dashboard</span>
-                  </Link>
-                </DropdownMenuItem> */}
-
-                <DropdownMenuSeparator />
-
-                {/* CREDITS INDICATOR */}
-                <div className="px-2 py-2">
-                  <div className="mb-1.5 flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Coins className="size-3" />
-                      <span>Daily Credits</span>
-                    </div>
-                    <span
-                      className={`text-xs font-semibold ${
-                        credits <= 0
-                          ? "text-destructive"
-                          : credits <= 2
-                            ? "text-orange-500"
-                            : "text-green-500"
-                      }`}
-                    >
-                      {credits}/{MAX_DAILY_CREDITS}
-                    </span>
-                  </div>
-
-                  {/* PROGRESS BAR */}
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                    <div
-                      className={`h-full rounded-full transition-all duration-500 ${
-                        credits <= 0
-                          ? "bg-destructive"
-                          : credits <= 2
-                            ? "bg-orange-500"
-                            : "bg-green-500"
-                      }`}
-                      style={{
-                        width: `${(credits / MAX_DAILY_CREDITS) * 100}%`,
-                      }}
-                    />
-                  </div>
-
-                  {credits <= 0 && (
-                    <p className="mt-1.5 text-[11px] text-destructive">
-                      Credits used up. Upgrade to continue.
-                    </p>
-                  )}
-                </div>
-
-                <DropdownMenuSeparator />
-
-                {/* UPGRADE */}
-                <DropdownMenuItem>
-                  <Gift className="mr-2 size-3.5" />
-                  Upgrade Plan
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <div className="mr-1 h-5 w-px shrink-0 bg-border/50" />
-
-            {/* PROJECT NAME */}
-
-            {isRenaming ? (
-              <div className="flex items-center gap-1.5">
-                <input
-                  ref={renameRef}
-                  value={renameValue}
-                  onChange={(event) => setRenameValue(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      handleRename();
-                    }
-
-                    if (event.key === "Escape") {
-                      setIsRenaming(false);
-                    }
-                  }}
-                  className="h-7 w-40 rounded-md border border-border bg-muted/50 px-2 text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-primary"
-                />
-
-                <button
-                  type="button"
-                  onClick={handleRename}
-                  className="rounded p-1 text-green-500 hover:bg-muted"
-                >
-                  <Check className="size-3.5" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setIsRenaming(false)}
-                  className="rounded p-1 text-muted-foreground hover:bg-muted"
-                >
-                  <X className="size-3.5" />
-                </button>
-              </div>
-            ) : (
-              <span
-                className="max-w-[200px] truncate text-sm font-semibold"
-                title={projectTitle}
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={handleRename}
+                disabled={renameBusy}
+                aria-label="Save title"
               >
-                {projectTitle || "Untitled Project"}
+                <Check className="size-4" />
+              </Button>
+
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => setIsRenaming(false)}
+                aria-label="Cancel rename"
+              >
+                <X className="size-4" />
+              </Button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setRenameValue(projectTitle);
+                setIsRenaming(true);
+              }}
+              className="flex min-w-0 items-center gap-2 text-sm font-medium"
+            >
+              <span className="max-w-64 truncate">
+                {projectTitle}
+              </span>
+              <Pencil className="size-3 text-muted-foreground" />
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={handleTogglePin}
+            disabled={pinBusy}
+            title={isPinned ? "Unpin project" : "Pin project"}
+            className="rounded-md p-2 text-muted-foreground hover:bg-muted disabled:opacity-50"
+          >
+            {isPinned ? (
+              <PinOff className="size-4" />
+            ) : (
+              <Pin className="size-4" />
+            )}
+          </button>
+
+          <div className="ml-auto flex items-center gap-3">
+            {credits !== null && (
+              <span className="hidden text-xs text-muted-foreground sm:block">
+                {credits} credits
               </span>
             )}
 
-            {/* PIN */}
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  onClick={handleTogglePin}
-                  className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                >
-                  {isPinned ? (
-                    <PinOff className="size-3.5" />
-                  ) : (
-                    <Pin className="size-3.5" />
-                  )}
-                </button>
-              </TooltipTrigger>
-
-              <TooltipContent side="bottom" className="text-xs">
-                {isPinned ? "Unpin" : "Pin"} project
-              </TooltipContent>
-            </Tooltip>
-
-            {/* SETTINGS */}
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                >
-                  <Settings className="size-3.5" />
-                </button>
-              </DropdownMenuTrigger>
-
-              <DropdownMenuContent align="start" className="w-44 text-sm">
-                <DropdownMenuItem
-                  onClick={() => {
-                    setRenameValue(projectTitle);
-
-                    setIsRenaming(true);
-                  }}
-                >
-                  <Pencil className="mr-2 size-3.5" />
-                  Rename
-                </DropdownMenuItem>
-
-                <DropdownMenuItem>
-                  <Settings className="mr-2 size-3.5" />
-                  Project Settings
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <Link
+              href="/pricing"
+              className="text-xs font-medium text-primary"
+            >
+              Upgrade
+            </Link>
           </div>
-
-          {/* RIGHT (Moved to preview toolbar) */}
-        </div>
-
-        {/* ───────────────────────────────────────────────
-            MAIN
-        ─────────────────────────────────────────────── */}
+        </header>
 
         <div className="flex min-h-0 flex-1">
-          {/* ─────────────────────────────────────────────
-              LEFT CHAT PANEL
-          ───────────────────────────────────────────── */}
+          {chatPanelOpen && (
+            <aside className="flex h-full w-[360px] max-w-[85vw] shrink-0 flex-col border-r border-border">
+              <div
+                ref={chatScrollRef}
+                onScroll={(event) => {
+                  const element = event.currentTarget;
 
-          <div
-            className={`flex h-full shrink-0 flex-col overflow-hidden border-r border-border transition-all duration-300 ease-in-out ${
-              chatPanelOpen
-                ? "w-[360px] min-w-[300px] max-w-[420px] opacity-100"
-                : "w-0 min-w-0 border-r-0 opacity-0"
-            }`}
-          >
-            {/* CHAT CONTENT */}
+                  followChatRef.current =
+                    element.scrollHeight -
+                      element.scrollTop -
+                      element.clientHeight <
+                    80;
+                }}
+                className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5"
+              >
+                <div className="flex min-w-0 flex-col gap-7">
+                  {messages.map((message) => (
+                    <article
+                      key={message.id}
+                      className={
+                        message.role === "user"
+                          ? "ml-6 min-w-0 self-end rounded-2xl bg-muted/60 px-4 py-3"
+                          : "min-w-0"
+                      }
+                    >
+                      {message.role === "assistant" && (
+                        <div className="mb-3">
+                          <Brand />
+                        </div>
+                      )}
 
-            <div className="min-h-0 flex-1 overflow-y-auto p-4">
-              <div className="flex flex-col gap-4">
-                {messages.map((message, index) => (
+                      <p
+                        className={`whitespace-pre-wrap break-words text-[13px] leading-6 ${
+                          message.failed
+                            ? "text-red-400"
+                            : "text-foreground/90"
+                        }`}
+                      >
+                        {displayMessage(message)}
+                      </p>
+
+                      {message.files !== undefined && (
+                        <details open className="group mt-3 min-w-0">
+                          <summary className="flex cursor-pointer list-none items-center gap-2 py-2 text-xs text-muted-foreground [&::-webkit-details-marker]:hidden">
+                            <Check className="size-3.5 shrink-0 text-emerald-500" />
+
+                            <span>
+                              {message.files.length} files changed
+                              {message.deletedFiles?.length
+                                ? ` · ${message.deletedFiles.length} removed`
+                                : ""}
+                            </span>
+
+                            <ChevronDown className="ml-auto size-3.5 transition-transform group-open:rotate-180" />
+                          </summary>
+
+                          <div className="space-y-1 border-l border-border/60 pl-3">
+                            {message.files.map((path) => {
+                              const exists = currentPaths.has(
+                                normalizePath(path),
+                              );
+
+                              return (
+                                <button
+                                  key={path}
+                                  type="button"
+                                  disabled={!exists}
+                                  onClick={() => handleOpenFile(path)}
+                                  title={
+                                    exists
+                                      ? "Open current file version"
+                                      : "This file is no longer in the project"
+                                  }
+                                  className="flex w-full min-w-0 items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-muted/50 disabled:opacity-40"
+                                >
+                                  <FileCode2 className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+
+                                  <span className="min-w-0 break-all font-mono text-xs leading-5">
+                                    {path}
+                                  </span>
+                                </button>
+                              );
+                            })}
+
+                            {message.deletedFiles?.map((path) => (
+                              <p
+                                key={path}
+                                className="break-all px-2 py-2 font-mono text-xs text-muted-foreground"
+                              >
+                                Removed: {path}
+                              </p>
+                            ))}
+                          </div>
+                        </details>
+                      )}
+
+                      {message.role === "assistant" &&
+                        message.durationMs !== undefined && (
+                          <p className="mt-3 text-[11px] text-muted-foreground">
+                            {message.failed
+                              ? "Stopped after"
+                              : "Finished in"}{" "}
+                            {formatDuration(message.durationMs)}
+                          </p>
+                        )}
+                    </article>
+                  ))}
+
+                  {busy && (
+                    <article className="min-w-0">
+                      <Brand animated />
+
+                      <div
+                        role="status"
+                        className="mt-3 flex items-center gap-2 text-xs text-muted-foreground"
+                      >
+                        <Loader2 className="size-3.5 shrink-0 animate-spin" />
+
+                        <span>
+                          {operationKind === "ask"
+                            ? "Preparing response…"
+                            : localPlan
+                              ? "Generating your changes…"
+                              : "Generating your project…"}
+                        </span>
+                      </div>
+
+                      {operationKind === "build" &&
+                        receivingFiles.length > 0 && (
+                          <div className="mt-4 space-y-2 border-l border-border/60 pl-3">
+                            <p className="pb-1 text-[11px] text-muted-foreground">
+                              Receiving source files
+                            </p>
+
+                            {receivingFiles.map((path) => (
+                              <div
+                                key={path}
+                                className="flex min-w-0 items-start gap-2 py-1"
+                              >
+                                <FileCode2 className="mt-0.5 size-4 shrink-0 text-primary" />
+
+                                <span className="min-w-0 break-all font-mono text-xs leading-5">
+                                  {path}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                      {operationStartedAt !== null && (
+                        <p className="mt-3 text-[11px] text-muted-foreground">
+                          Working for{" "}
+                          <ElapsedTime startedAt={operationStartedAt} />
+                        </p>
+                      )}
+                    </article>
+                  )}
+                </div>
+              </div>
+
+              <div className="shrink-0 border-t border-border bg-muted/10 p-3">
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <div className="flex rounded-lg bg-muted/60 p-1">
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => setComposerMode("build")}
+                      aria-pressed={composerMode === "build"}
+                      className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs transition-colors ${
+                        composerMode === "build"
+                          ? "bg-background text-foreground shadow-sm"
+                          : "text-muted-foreground"
+                      }`}
+                    >
+                      <Sparkles className="size-3.5" />
+                      Build
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => setComposerMode("ask")}
+                      aria-pressed={composerMode === "ask"}
+                      className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs transition-colors ${
+                        composerMode === "ask"
+                          ? "bg-background text-foreground shadow-sm"
+                          : "text-muted-foreground"
+                      }`}
+                    >
+                      <MessageSquare className="size-3.5" />
+                      Ask
+                    </button>
+                  </div>
+
                   <div
-                    key={index}
-                    className={`max-w-[92%] whitespace-pre-wrap text-[13px] leading-relaxed ${
-                      message.role === "user"
-                        ? "ml-auto self-end rounded-[20px] rounded-br-sm border border-border/40 bg-muted/40 px-3.5 py-2.5 text-foreground"
-                        : "w-full self-start py-1 text-foreground/90"
-                    }`}
+                    role="status"
+                    className="text-[11px] text-muted-foreground"
                   >
-                    {message.content}
+                    {saveState === "saving" && "Saving…"}
+                    {saveState === "saved" && "Saved"}
+
+                    {saveState === "error" && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSaveAttempt((value) => value + 1)
+                        }
+                        className="text-red-400 underline underline-offset-2"
+                      >
+                        Retry save
+                      </button>
+                    )}
                   </div>
-                ))}
+                </div>
 
-                {/* PAST BUILD ACTIVITIES */}
+                <PromptComposer
+                  value={chatInput}
+                  onChange={setChatInput}
+                  onSubmit={handleSendChat}
+                  loading={busy || projectLoading}
+                  compact
+                  submitHint={
+                    composerMode === "build"
+                      ? "Apply code changes"
+                      : "Ask a question"
+                  }
+                  placeholder={
+                    composerMode === "build"
+                      ? "Describe what you want to change…"
+                      : "Ask about your project…"
+                  }
+                />
+              </div>
+            </aside>
+          )}
 
-                {activityHistory.map((hist, idx) => (
-                  <div
-                    key={idx}
-                    className="w-full self-start py-1 text-foreground/90"
+          <section className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <div className="flex min-h-11 shrink-0 flex-wrap items-center gap-2 border-b border-border px-3 py-1.5">
+              <button
+                type="button"
+                onClick={() => setChatPanelOpen((open) => !open)}
+                title={chatPanelOpen ? "Hide chat" : "Show chat"}
+                className="rounded-md p-1.5 hover:bg-muted"
+              >
+                {chatPanelOpen ? (
+                  <PanelLeftClose className="size-4" />
+                ) : (
+                  <PanelLeftOpen className="size-4" />
+                )}
+              </button>
+
+              <div className="flex rounded-lg bg-muted/50 p-0.5">
+                {[
+                  { id: "preview", label: "Preview", Icon: Eye },
+                  { id: "code", label: "Code", Icon: Code2 },
+                  { id: "guide", label: "Guide", Icon: BookOpen },
+                ].map(({ id, label, Icon }) => {
+                  const selected =
+                    id === "guide"
+                      ? rightPanel === "guide"
+                      : rightPanel === "preview" && view === id;
+
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => {
+                        if (id === "guide") {
+                          setRightPanel("guide");
+                        } else {
+                          setRightPanel("preview");
+                          setView(id as SandpackView);
+                        }
+                      }}
+                      className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs ${
+                        selected
+                          ? "bg-background shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      <Icon className="size-3.5" />
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {localPlan && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setViewportSize((current) =>
+                        current === "desktop"
+                          ? "tablet"
+                          : current === "tablet"
+                            ? "mobile"
+                            : "desktop",
+                      )
+                    }
+                    title={`Viewport: ${viewportSize}`}
+                    className="rounded-md p-1.5 hover:bg-muted"
                   >
-                    <BuildActivityFeed
-                      plan={hist.plan}
-                      loading={false}
-                      idea={hist.idea}
-                      startedAt={hist.completedAt - hist.durationMs}
-                      durationMs={hist.durationMs}
-                      completedAt={hist.completedAt}
-                      fallbackUpdatedAt={new Date(hist.completedAt)}
-                      compact
-                      onOpenFile={handleOpenFile}
-                    />
-                  </div>
-                ))}
+                    {viewportSize === "desktop" ? (
+                      <Monitor className="size-4" />
+                    ) : viewportSize === "tablet" ? (
+                      <Tablet className="size-4" />
+                    ) : (
+                      <Smartphone className="size-4" />
+                    )}
+                  </button>
 
-                {/* CURRENT BUILD ACTIVITY */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPreviewError(null);
+                      setPreviewKey((key) => key + 1);
+                    }}
+                    title="Restart preview"
+                    className="rounded-md p-1.5 hover:bg-muted"
+                  >
+                    <RotateCw className="size-4" />
+                  </button>
 
-                {(loading ||
-                  activePlan?.overview ||
-                  activePlan?.steps?.length) && (
-                  <div className="w-full self-start py-1 text-foreground/90">
-                    <BuildActivityFeed
-                      plan={activePlan ?? undefined}
-                      loading={loading}
-                      idea={idea}
-                      startedAt={buildStartedAt}
-                      durationMs={buildDurationMs}
-                      completedAt={buildCompletedAt}
-                      fallbackUpdatedAt={projectUpdatedAt}
-                      compact
-                      onOpenFile={handleOpenFile}
-                    />
-                  </div>
+                  <a
+                    href={`/preview/${projectId}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    title="Open saved preview"
+                    className="rounded-md p-1.5 hover:bg-muted"
+                  >
+                    <ExternalLink className="size-4" />
+                  </a>
+                </>
+              )}
+
+              <div className="ml-auto flex items-center gap-1">
+                {localPlan && (
+                  <>
+                    <ShareProjectModal projectId={projectId} />
+
+                    {canPublish ? (
+                      <PublishProjectModal projectId={projectId} />
+                    ) : (
+                      <Button
+                        size="sm"
+                        disabled
+                        className="h-8 text-xs"
+                        title="Wait until changes are saved"
+                      >
+                        Publish
+                      </Button>
+                    )}
+
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="size-8"
+                          aria-label="Project actions"
+                        >
+                          <MoreHorizontal className="size-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={handleDownloadZip}>
+                          <Download className="mr-2 size-4" />
+                          Download ZIP
+                        </DropdownMenuItem>
+
+                        <DropdownMenuSeparator />
+
+                        <DropdownMenuItem
+                          disabled={busy}
+                          onClick={handleRegenerateProject}
+                        >
+                          <RotateCw className="mr-2 size-4" />
+                          Regenerate project
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </>
                 )}
               </div>
             </div>
 
-            {/* CHAT INPUT */}
-
-            <div className="shrink-0 border-t border-border bg-muted/20 p-3">
-              <PromptComposer
-                value={chatInput}
-                onChange={setChatInput}
-                onSubmit={handleSendChat}
-                loading={loading || chatLoading}
-                compact
-                submitHint={
-                  shouldRegenerateCode(chatInput) && chatInput.trim()
-                    ? "Send code update"
-                    : "Ask AI"
-                }
-                placeholder="Ask a question with CodewithChat"
-              />
-            </div>
-          </div>
-
-          {/* ─────────────────────────────────────────────
-              RIGHT PANEL
-          ───────────────────────────────────────────── */}
-
-          <div className="flex h-full min-w-0 flex-1 flex-col">
-            {/* PROJECT LOADING */}
-
-            {!activePlan && projectLoading && (
-              <div className="flex h-full items-center justify-center">
-                <Spinner className="size-8 text-primary" />
-              </div>
-            )}
-
-            {/* FIRST GENERATION */}
-
-            {!activePlan && loading && !projectLoading && (
-              <div className="flex h-full animate-in flex-col items-center justify-center px-4 text-center fade-in zoom-in-95 duration-500">
-                <div className="relative mb-6 flex items-center justify-center">
-                  <div className="absolute size-24 rounded-full bg-primary/20 blur-2xl" />
-
-                  <div className="relative flex items-center justify-center rounded-2xl border border-primary/20 bg-gradient-to-b from-primary/20 to-transparent p-5 shadow-2xl backdrop-blur-md">
-                    <Gift className="size-12 text-primary" />
+            <div className="relative min-h-0 flex-1">
+              {projectLoading ? (
+                <div className="flex h-full items-center justify-center gap-3">
+                  <Brand animated />
+                  <Loader2 className="size-4 animate-spin" />
+                </div>
+              ) : localPlan ? (
+                rightPanel === "guide" ? (
+                  <ProjectGuide
+                    plan={localPlan}
+                    projectId={projectId}
+                    idea={idea}
+                    tech={tech}
+                  />
+                ) : previewReady ? (
+                  <SandpackPreview
+                    key={previewKey}
+                    files={previewFileMap}
+                    dependencies={activeDependencies}
+                    view={view}
+                    isTerminalOpen={false}
+                    onCloseTerminal={() => {}}
+                    previewKey={previewKey}
+                    tech={tech}
+                    isLoading={busy && operationKind === "build"}
+                    viewportSize={viewportSize}
+                    activeFile={activeFile}
+                    onPreviewError={setPreviewError}
+                    onAutoFix={handleAutoFixPreview}
+                  />
+                ) : (
+                  <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
+                    <FileCode2 className="size-8 text-muted-foreground" />
+                    <p className="text-sm">
+                      Project files are saved, but no preview entry was found.
+                    </p>
+                    <Button
+                      disabled={busy}
+                      onClick={handleRegenerateProject}
+                    >
+                      Regenerate project
+                    </Button>
                   </div>
-                </div>
+                )
+              ) : busy ? (
+                <div className="flex h-full flex-col items-center justify-center gap-5 p-6 text-center">
+                  <img
+                    src="/dark_logo.png"
+                    alt="CodewithChat"
+                    width={100}
+                    height={72}
+                    className="h-18 w-25 animate-pulse object-contain motion-reduce:animate-none"
+                  />
 
-                <h3 className="mb-2 text-xl font-semibold text-foreground">
-                  Refer & earn
-                </h3>
-
-                <p className="mb-8 max-w-xs text-sm leading-relaxed text-muted-foreground">
-                  Share CodewithChat with friends and get rewarded when they
-                  subscribe
-                </p>
-
-                <Button
-                  variant="outline"
-                  className="mb-12 h-10 gap-2 rounded-lg border-border bg-transparent px-6 text-sm shadow-sm transition-all hover:bg-muted/50 hover:text-foreground"
-                >
-                  <Gift className="size-4" />
-                  Earn $50
-                </Button>
-
-                <p className="flex items-center gap-2 text-[13px] text-muted-foreground">
-                  <Spinner className="size-3.5" />
-                  <span className="text-foreground/80">Your</span>
-                  preview will appear here
-                </p>
-              </div>
-            )}
-
-            {/* NO PLAN / FAILED */}
-
-            {!activePlan && !loading && !projectLoading && (
-              <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-muted">
-                  <Zap className="size-6 text-muted-foreground" />
-                </div>
-
-                <div>
-                  <h3 className="mb-1 text-base font-semibold">
-                    {genError ? "Generation Failed" : "No preview yet"}
-                  </h3>
-
-                  <p className="max-w-xs text-sm text-muted-foreground">
-                    {genError
-                      ? genError
-                      : "Generate your project to build the live preview."}
+                  <p className="text-sm text-muted-foreground">
+                    Your preview will appear when the project is ready.
                   </p>
+
+                  <Loader2 className="size-5 animate-spin text-muted-foreground" />
                 </div>
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
+                  <Brand />
 
-                <Button
-                  onClick={() => {
-                    setGenError(null);
+                  <p className="max-w-md text-sm text-muted-foreground">
+                    {generationError || "Your project is ready to generate."}
+                  </p>
 
-                    handleRegenerateProject();
-                  }}
-                  disabled={!idea.trim()}
-                  className="gap-2"
-                >
-                  <Zap className="size-4" />
-
-                  {genError ? "Retry Generation" : "Generate Project"}
-                </Button>
-              </div>
-            )}
-
-            {/* ───────────────────────────────────────────
-                ACTIVE PROJECT
-            ─────────────────────────────────────────── */}
-
-            {activePlan && (
-              <>
-                {/* TOOLBAR */}
-
-                <div className="flex h-11 shrink-0 items-center gap-1 border-b border-border bg-card/80 px-3 backdrop-blur">
-                  {/* CHAT PANEL TOGGLE */}
-
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        type="button"
-                        onClick={() => setChatPanelOpen((open) => !open)}
-                        className={`shrink-0 rounded-md p-1.5 transition-colors ${
-                          chatPanelOpen
-                            ? "bg-muted text-foreground"
-                            : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                        }`}
-                        aria-label={
-                          chatPanelOpen ? "Hide chat panel" : "Show chat panel"
-                        }
-                      >
-                        {chatPanelOpen ? (
-                          <PanelLeftClose className="size-3.5" />
-                        ) : (
-                          <PanelLeftOpen className="size-3.5" />
-                        )}
-                      </button>
-                    </TooltipTrigger>
-
-                    <TooltipContent side="bottom" className="text-xs">
-                      {chatPanelOpen
-                        ? "Hide chat & activity"
-                        : "Show chat & activity"}
-                    </TooltipContent>
-                  </Tooltip>
-
-                  <div className="ml-1 h-5 w-px shrink-0 bg-border" />
-
-                  {/* PREVIEW / CODE / GUIDE */}
-
-                  <div className="flex rounded-lg border border-border/60 bg-muted/40 p-0.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setView("preview");
-
-                        setRightPanel("preview");
-                      }}
-                      className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all ${
-                        view === "preview" && rightPanel === "preview"
-                          ? "bg-card text-foreground shadow-sm"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      <Eye className="size-3.5" />
-                      Preview
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setView("code");
-
-                        setRightPanel("preview");
-                      }}
-                      className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all ${
-                        view === "code" && rightPanel === "preview"
-                          ? "bg-card text-foreground shadow-sm"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      <Code2 className="size-3.5" />
-                      Code
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setRightPanel("guide")}
-                      className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all ${
-                        rightPanel === "guide"
-                          ? "bg-card text-foreground shadow-sm"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      <BookOpen className="size-3.5" />
-                      Guide
-                    </button>
-                  </div>
-
-                  {/* CENTER URL */}
-
-                  <div className="flex flex-1 justify-center items-center gap-2">
-                    {rightPanel === "preview" && view === "preview" && (
-                      <>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setViewportSize((prev) =>
-                                  prev === "desktop"
-                                    ? "tablet"
-                                    : prev === "tablet"
-                                      ? "mobile"
-                                      : "desktop",
-                                )
-                              }
-                              className="flex items-center justify-center rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-                            >
-                              {viewportSize === "desktop" ? (
-                                <Monitor className="size-4" />
-                              ) : viewportSize === "tablet" ? (
-                                <Tablet className="size-4" />
-                              ) : (
-                                <Smartphone className="size-4" />
-                              )}
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom" className="text-xs">
-                            Toggle Viewport ({viewportSize})
-                          </TooltipContent>
-                        </Tooltip>
-
-                        <div className="flex min-w-[300px] max-w-[400px] items-center gap-2 rounded-full border border-border/60 bg-muted/30 px-3 py-1.5">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                type="button"
-                                onClick={handleRefreshPreview}
-                                disabled={isRefreshingPreview}
-                                className="text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
-                              >
-                                <RotateCw
-                                  className={`size-3.5 ${
-                                    isRefreshingPreview ? "animate-spin" : ""
-                                  }`}
-                                />
-                              </button>
-                            </TooltipTrigger>
-
-                            <TooltipContent side="bottom" className="text-xs">
-                              Refresh preview
-                            </TooltipContent>
-                          </Tooltip>
-
-                          <div className="flex-1 truncate text-center font-mono text-xs text-muted-foreground">
-                            codewithchat.dev/preview/
-                            {projectId.slice(0, 8)}
-                            ...
-                          </div>
-
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <a
-                                href={`/preview/${projectId}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-muted-foreground transition-colors hover:text-foreground"
-                              >
-                                <ExternalLink className="size-3.5" />
-                              </a>
-                            </TooltipTrigger>
-
-                            <TooltipContent side="bottom" className="text-xs">
-                              Open in new tab
-                            </TooltipContent>
-                          </Tooltip>
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  {/* ACTIONS */}
-
-                  <div className="flex items-center gap-1.5">
-                    {activePlan && (
-                      <>
-                        <Button
-                          asChild
-                          variant="secondary"
-                          className="hidden h-8 rounded-md bg-muted/40 px-3 text-xs font-medium hover:bg-muted sm:flex"
-                        >
-                          <Link href="/pricing">Upgrade</Link>
-                        </Button>
-
-                        <ShareProjectModal projectId={projectId} />
-
-                        <PublishProjectModal projectId={projectId} />
-
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                            >
-                              <MoreHorizontal className="size-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-
-                          <DropdownMenuContent
-                            align="end"
-                            className="w-48 text-sm font-medium"
-                          >
-                            <DropdownMenuItem>
-                              <Github className="mr-2 size-4" />
-                              Connect GitHub
-                            </DropdownMenuItem>
-
-                            <DropdownMenuItem>
-                              <FileCode2 className="mr-2 size-4" />
-                              Open in VS Code
-                            </DropdownMenuItem>
-
-                            <DropdownMenuSeparator />
-
-                            <DropdownMenuItem onClick={handleDownloadZip}>
-                              <Download className="mr-2 size-4" />
-                              Download ZIP
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </>
-                    )}
-                  </div>
+                  <Button
+                    onClick={handleRegenerateProject}
+                    disabled={!idea.trim()}
+                  >
+                    {generationError ? "Retry generation" : "Generate project"}
+                  </Button>
                 </div>
-
-                {/* CONTENT */}
-
-                <div className="relative min-h-0 flex-1">
-                  {rightPanel === "guide" ? (
-                    <ProjectGuide
-                      plan={activePlan}
-                      projectId={projectId}
-                      idea={idea}
-                      tech={tech}
-                    />
-                  ) : previewReady ? (
-                    <SandpackPreview
-                      key={previewKey}
-                      files={previewFileMap}
-                      dependencies={activeDependencies}
-                      view={view}
-                      isTerminalOpen={false}
-                      onCloseTerminal={() => {}}
-                      previewKey={previewKey}
-                      tech={tech}
-                      isLoading={loading}
-                      viewportSize={viewportSize}
-                      activeFile={activeFile}
-                      onPreviewError={handlePreviewError}
-                      onAutoFix={handleAutoFixPreview}
-                    />
-                  ) : loading ? (
-                    <div className="flex h-full flex-col items-center justify-center gap-3 bg-[#151515] text-muted-foreground">
-                      <Spinner className="size-6" />
-
-                      <p className="text-sm">Building preview…</p>
-
-                      <p className="text-xs text-muted-foreground/70">
-                        Preview will update when the complete project is ready
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="flex h-full flex-col items-center justify-center gap-4 bg-background px-6 text-center">
-                      <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-muted">
-                        <Eye className="size-6 text-muted-foreground" />
-                      </div>
-
-                      <div>
-                        <h3 className="mb-1 text-base font-semibold">
-                          Preview not ready
-                        </h3>
-
-                        <p className="max-w-sm text-sm text-muted-foreground">
-                          Regenerate the project to build the live preview.
-                        </p>
-                      </div>
-
-                      <Button
-                        onClick={() => {
-                          setGenError(null);
-
-                          handleRegenerateProject();
-                        }}
-                        disabled={loading || !idea.trim()}
-                        className="gap-2"
-                      >
-                        <Zap className="size-4" />
-                        Regenerate Project
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
+              )}
+            </div>
+          </section>
         </div>
       </div>
     </TooltipProvider>

@@ -263,16 +263,30 @@ function discoverDependenciesFromFiles(
 function ActiveFileOpener({ filePath }: { filePath?: string | null }) {
   const { sandpack } = useSandpack();
 
+  const lastOpenedRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (!filePath) {
+      lastOpenedRef.current = null;
       return;
     }
 
+    const normalized = normalizePath(filePath);
     const runtimePath = toRuntimePath(filePath);
 
-    if (sandpack.files[runtimePath]) {
-      sandpack.openFile(runtimePath);
+    // Prefer the original path when it exists.
+    const target = sandpack.files[normalized]
+      ? normalized
+      : sandpack.files[runtimePath]
+        ? runtimePath
+        : null;
+
+    if (!target || lastOpenedRef.current === target) {
+      return;
     }
+
+    lastOpenedRef.current = target;
+    sandpack.openFile(target);
   }, [filePath, sandpack]);
 
   return null;
@@ -677,17 +691,14 @@ export function SandpackPreview({
 
     const html = result["/index.html"];
 
-if (html && !html.code.includes(READY_SCRIPT)) {
-  result["/index.html"] = {
-    ...html,
-    code: /<\/body>/i.test(html.code)
-      ? html.code.replace(
-          /<\/body>/i,
-          () => `${READY_SCRIPT}\n</body>`,
-        )
-      : `${html.code}\n${READY_SCRIPT}`,
-  };
-}
+    if (html && !html.code.includes(READY_SCRIPT)) {
+      result["/index.html"] = {
+        ...html,
+        code: /<\/body>/i.test(html.code)
+          ? html.code.replace(/<\/body>/i, () => `${READY_SCRIPT}\n</body>`)
+          : `${html.code}\n${READY_SCRIPT}`,
+      };
+    }
 
     return result;
   }, [files, activeFile]);
@@ -851,8 +862,10 @@ if (html && !html.code.includes(READY_SCRIPT)) {
                 closableTabs
                 style={{
                   height: "100%",
-
                   flex: 1,
+                  minWidth: 0,
+                  minHeight: 0,
+                  overflow: "hidden",
                 }}
               />
             </SandpackLayout>
