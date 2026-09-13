@@ -110,15 +110,15 @@ export function PreviewLoadingSurface({
               />
 
               <img
-                src="/dark_logo.png"
-                alt="CodewithChat"
-                width={144}
-                height={80}
-                draggable={false}
-                className={`relative h-20 w-36 object-contain transition-transform duration-300 group-hover:scale-105 motion-reduce:transition-none ${
-                  failed ? "" : "animate-pulse motion-reduce:animate-none"
-                }`}
-              />
+  src="/dark_logo.png"
+  alt={failed ? "CodewithChat" : "Loading preview"}
+  width={72}
+  height={72}
+  className={`h-18 w-18 object-contain ${
+    failed ? "" : "animate-spin motion-reduce:animate-none"
+  }`}
+  style={{ animationDuration: "2s" }}
+/>
             </div>
 
             <div role="status" aria-live="polite">

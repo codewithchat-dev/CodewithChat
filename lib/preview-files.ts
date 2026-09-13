@@ -667,6 +667,38 @@ export function buildPreviewFiles(
     result[path] = file.content;
   }
 
+  // Repair the standard Vite TypeScript config only when missing.
+  const rootTsconfig = result["/tsconfig.json"];
+
+  const referencesNodeConfig =
+    typeof rootTsconfig === "string" &&
+    /"path"\s*:\s*"(?:\.\/)?tsconfig\.node\.json"/.test(rootTsconfig);
+
+  if (
+    referencesNodeConfig &&
+    !result["/tsconfig.node.json"] &&
+    typeof result["/vite.config.ts"] === "string"
+  ) {
+    result["/tsconfig.node.json"] = JSON.stringify(
+      {
+        compilerOptions: {
+          composite: true,
+          target: "ES2020",
+          module: "ESNext",
+          moduleResolution: "Bundler",
+          allowSyntheticDefaultImports: true,
+          declaration: true,
+          emitDeclarationOnly: true,
+          outDir: "./node_modules/.cache/tsconfig-node",
+          tsBuildInfoFile: "./node_modules/.cache/tsconfig-node.tsbuildinfo",
+        },
+        include: ["vite.config.ts"],
+      },
+      null,
+      2,
+    );
+  }
+
   return result;
 }
 

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-// import Link from "next/link";
+import type { ChangeEvent, KeyboardEvent } from "react";
+
 import {
   ArrowUp,
   Plus,
@@ -12,29 +13,62 @@ import {
   Globe2,
   Database,
 } from "lucide-react";
+
 import { toast } from "sonner";
+
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Spinner } from "@/components/ui/spinner";
+
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Spinner } from "@/components/ui/spinner";
+
+// Future mein full-stack enable karne ke liye true karo.
+const FULLSTACK_ENABLED: boolean = false;
 
 export type ProjectType = "frontend" | "fullstack";
 
 interface PromptComposerProps {
   value: string;
   onChange: (value: string) => void;
-  onSubmit: (attachedImage?: string | null, projectType?: ProjectType) => void;
+
+  onSubmit: (
+    attachedImage?: string | null,
+    projectType?: ProjectType,
+  ) => void;
+
   loading?: boolean;
   disabled?: boolean;
   placeholder?: string;
   compact?: boolean;
   submitHint?: string;
 }
+
+interface RecognitionResultEvent {
+  results: {
+    [index: number]: {
+      [index: number]: {
+        transcript: string;
+      };
+    };
+  };
+}
+
+interface RecognitionInstance {
+  continuous: boolean;
+  interimResults: boolean;
+  onresult: ((event: RecognitionResultEvent) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+}
+
+type RecognitionConstructor = new () => RecognitionInstance;
 
 export function PromptComposer({
   value,
@@ -47,69 +81,69 @@ export function PromptComposer({
   submitHint,
 }: PromptComposerProps) {
   const [isListening, setIsListening] = useState(false);
-  const [attachedImage, setAttachedImage] = useState<string | null>(null);
-  const [projectType, setProjectType] = useState<ProjectType>("frontend");
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const recognitionRef = useRef<{
-    start: () => void;
-    stop: () => void;
-  } | null>(null);
+  const [attachedImage, setAttachedImage] =
+    useState<string | null>(null);
+
+  const [projectType, setProjectType] =
+    useState<ProjectType>("frontend");
+
+  const effectiveProjectType: ProjectType =
+    FULLSTACK_ENABLED ? projectType : "frontend";
+
+  const blocked = disabled || loading;
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const readerRef = useRef<FileReader | null>(null);
+
+  const recognitionRef =
+    useRef<RecognitionInstance | null>(null);
+
+  const latestInputRef = useRef({
+    value,
+    onChange,
+    blocked,
+  });
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    latestInputRef.current = {
+      value,
+      onChange,
+      blocked,
+    };
+  }, [value, onChange, blocked]);
 
-    const w = window as Window & {
-      SpeechRecognition?: new () => {
-        continuous: boolean;
-        interimResults: boolean;
-        onresult: (event: {
-          results: {
-            [index: number]: {
-              [index: number]: {
-                transcript: string;
-              };
-            };
-          };
-        }) => void;
-        onerror: (() => void) | null;
-        onend: (() => void) | null;
-        start: () => void;
-        stop: () => void;
-      };
-      webkitSpeechRecognition?: new () => {
-        continuous: boolean;
-        interimResults: boolean;
-        onresult: (event: {
-          results: {
-            [index: number]: {
-              [index: number]: {
-                transcript: string;
-              };
-            };
-          };
-        }) => void;
-        onerror: (() => void) | null;
-        onend: (() => void) | null;
-        start: () => void;
-        stop: () => void;
-      };
+  // Voice input
+  useEffect(() => {
+    const browser = window as Window & {
+      SpeechRecognition?: RecognitionConstructor;
+      webkitSpeechRecognition?: RecognitionConstructor;
     };
 
-    const SpeechRecognitionCtor =
-      w.SpeechRecognition || w.webkitSpeechRecognition;
+    const Recognition =
+      browser.SpeechRecognition ||
+      browser.webkitSpeechRecognition;
 
-    if (!SpeechRecognitionCtor) return;
+    if (!Recognition) return;
 
-    const recognition = new SpeechRecognitionCtor();
+    const recognition = new Recognition();
 
     recognition.continuous = false;
     recognition.interimResults = false;
 
     recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
+      const transcript =
+        event.results[0]?.[0]?.transcript?.trim();
 
-      onChange(value ? `${value} ${transcript}` : transcript);
+      const current = latestInputRef.current;
+
+      if (transcript && !current.blocked) {
+        current.onChange(
+          current.value
+            ? `${current.value} ${transcript}`
+            : transcript,
+        );
+      }
 
       setIsListening(false);
     };
@@ -119,123 +153,166 @@ export function PromptComposer({
       toast.error("Voice recognition failed. Please try again.");
     };
 
-    recognition.onend = () => setIsListening(false);
+    recognition.onend = () => {
+      setIsListening(false);
+    };
 
     recognitionRef.current = recognition;
-  }, [onChange, value]);
 
-  const toggleListening = () => {
-    if (!recognitionRef.current) {
-      toast.error("Speech recognition is not supported in this browser.");
+    return () => {
+      recognition.onresult = null;
+      recognition.onerror = null;
+      recognition.onend = null;
+
+      recognition.stop();
+      recognitionRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (blocked) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+    }
+  }, [blocked]);
+
+  useEffect(() => {
+    return () => {
+      readerRef.current?.abort();
+    };
+  }, []);
+
+  function toggleListening() {
+    if (blocked) return;
+
+    const recognition = recognitionRef.current;
+
+    if (!recognition) {
+      toast.error(
+        "Speech recognition is not supported in this browser.",
+      );
       return;
     }
 
     if (isListening) {
-      recognitionRef.current.stop();
+      recognition.stop();
       setIsListening(false);
-    } else {
-      recognitionRef.current.start();
+      return;
+    }
+
+    try {
+      recognition.start();
       setIsListening(true);
       toast.info("Listening…");
+    } catch {
+      setIsListening(false);
+      toast.error("Could not start voice recognition.");
     }
-  };
+  }
 
-   const handleSubmitClick = () => {
-    if (disabled || loading) return;
-    if (!value.trim() && !attachedImage) return;
+  function handleSubmitClick() {
+    if (blocked || (!value.trim() && !attachedImage)) return;
 
-    onSubmit(attachedImage, projectType);
+    recognitionRef.current?.stop();
+    setIsListening(false);
+
+    // Both Enter and the send button use the same project type.
+    onSubmit(attachedImage, effectiveProjectType);
+
     setAttachedImage(null);
-  };
+  }
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  function handleKeyDown(
+    event: KeyboardEvent<HTMLTextAreaElement>,
+  ) {
     if (
-      e.key === "Enter" &&
-      !e.shiftKey &&
-      !e.nativeEvent.isComposing
+      event.key === "Enter" &&
+      !event.shiftKey &&
+      !event.nativeEvent.isComposing
     ) {
-      e.preventDefault();
+      event.preventDefault();
       handleSubmitClick();
     }
-  };
+  }
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  function handleFileChange(
+    event: ChangeEvent<HTMLInputElement>,
+  ) {
+    const file = event.target.files?.[0];
 
-    if (!file) return;
+    event.target.value = "";
+
+    if (!file || blocked) return;
 
     if (!file.type.startsWith("image/")) {
       toast.error("Please select an image file.");
       return;
     }
 
-    // Max 4MB
     if (file.size > 4 * 1024 * 1024) {
-      toast.error("Image is too large. Max size is 4MB.");
+      toast.error("Image is too large. Maximum size is 4 MB.");
       return;
     }
 
-    const reader = new FileReader();
+    readerRef.current?.abort();
 
-    reader.onload = (e) => {
-      setAttachedImage(e.target?.result as string);
+    const reader = new FileReader();
+    readerRef.current = reader;
+
+    reader.onload = () => {
+      if (
+        typeof reader.result === "string" &&
+        !latestInputRef.current.blocked
+      ) {
+        setAttachedImage(reader.result);
+      }
+
+      readerRef.current = null;
+    };
+
+    reader.onerror = () => {
+      readerRef.current = null;
+      toast.error("Could not read the image. Please try again.");
     };
 
     reader.readAsDataURL(file);
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  };
+  }
 
   return (
     <div className="relative w-full">
       <div
         className="
-          relative flex flex-col
-          bg-card/50
-          backdrop-blur-xl
-          border border-white/10
-          hover:border-white/20
-          rounded-2xl
+          relative flex flex-col overflow-hidden
+          rounded-2xl border border-white/10
+          bg-card/50 backdrop-blur-xl
+          shadow-[0_2px_20px_rgba(0,0,0,0.3)]
           transition-all duration-300
+          hover:border-white/20
           focus-within:border-white/30
           focus-within:shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_8px_40px_rgba(0,0,0,0.4)]
-          shadow-[0_2px_20px_rgba(0,0,0,0.3)]
-          overflow-hidden
         "
       >
-        {/* Image Preview */}
         {attachedImage && (
-          <div className="px-4 pt-4 flex gap-2">
-            <div className="relative inline-block group/img">
+          <div className="flex gap-2 px-4 pt-4">
+            <div className="relative inline-block">
               <img
                 src={attachedImage}
                 alt="Attached preview"
-                className="
-                  h-16 w-16
-                  object-cover
-                  rounded-md
-                  border border-border/50
-                  shadow-sm
-                "
+                className="h-16 w-16 rounded-md border border-border/50 object-cover shadow-sm"
               />
 
               <button
                 type="button"
+                disabled={blocked}
                 onClick={() => setAttachedImage(null)}
+                aria-label="Remove attached image"
                 className="
-                  absolute -top-2 -right-2
-                  bg-background
-                  border border-border
-                  text-muted-foreground
+                  absolute -right-2 -top-2
+                  rounded-full border border-border
+                  bg-background p-1
+                  text-muted-foreground shadow-sm
                   hover:text-foreground
-                  rounded-full
-                  p-1
-                  shadow-sm
-                  opacity-0
-                  group-hover/img:opacity-100
-                  transition-opacity
+                  disabled:opacity-50
                 "
               >
                 <X className="size-3" />
@@ -244,13 +321,13 @@ export function PromptComposer({
           </div>
         )}
 
-        {/* Input */}
         <Textarea
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(event) => onChange(event.target.value)}
           onKeyDown={handleKeyDown}
-          disabled={disabled || loading}
+          disabled={blocked}
           placeholder={placeholder}
+          aria-label="Project prompt"
           className={`
             ${
               compact
@@ -261,69 +338,58 @@ export function PromptComposer({
                   ? "min-h-[60px]"
                   : "min-h-[120px]"
             }
-            max-h-[300px]
-            overflow-y-auto
-            resize-none
-            border-0
-            bg-transparent
-            px-4
-            py-4
-            text-sm
-            focus-visible:ring-0
+            max-h-[300px] resize-none overflow-y-auto
+            border-0 bg-transparent px-4 py-4
+            text-sm shadow-none
             placeholder:text-foreground/60
-            shadow-none
+            focus-visible:ring-0
             disabled:opacity-60
           `}
         />
 
-        {/* Bottom Controls */}
-        <div className="flex items-center justify-between px-3 pb-3 gap-2">
-          {/* Left controls */}
-          <div className="flex items-center gap-1 min-w-0">
-            {/* Hidden File Input */}
+        <div className="flex items-center justify-between gap-2 px-3 pb-3">
+          <div className="flex min-w-0 items-center gap-1">
             <input
+              ref={fileInputRef}
               type="file"
               accept="image/*"
+              disabled={blocked}
               className="hidden"
-              ref={fileInputRef}
               onChange={handleFileChange}
             />
 
-            {/* Attach */}
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              disabled={disabled || loading}
+              disabled={blocked}
               onClick={() => fileInputRef.current?.click()}
-              className="
-                rounded-full
-                size-9
-                text-muted-foreground
-                hover:text-foreground
-              "
+              className="size-9 rounded-full text-muted-foreground hover:text-foreground"
               title="Attach image"
+              aria-label="Attach image"
             >
               <Plus className="size-4" />
             </Button>
 
-            {/* Voice */}
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              disabled={disabled || loading}
+              disabled={blocked}
               onClick={toggleListening}
+              title={isListening ? "Stop dictation" : "Voice dictation"}
+              aria-label={
+                isListening ? "Stop dictation" : "Voice dictation"
+              }
+              aria-pressed={isListening}
               className={`
-                rounded-full
-                size-9
+                size-9 rounded-full
                 ${
                   isListening
-                    ? "text-red-500 bg-red-500/10"
+                    ? "bg-red-500/10 text-red-500"
                     : "text-muted-foreground hover:text-foreground"
                 }
               `}
-              title="Voice dictation"
             >
               {isListening ? (
                 <MicOff className="size-4 animate-pulse" />
@@ -332,93 +398,121 @@ export function PromptComposer({
               )}
             </Button>
 
-            {/* Project type selector */}
             <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  disabled={disabled || loading}
+                  disabled={blocked}
+                  aria-label="Select project type"
                   className="
-                    flex items-center
-                    gap-1.5
-                    text-[11px]
-                    font-medium
-                    text-muted-foreground
-                    bg-muted/30
-                    hover:bg-muted/60
-                    px-2.5
-                    py-1.5
-                    rounded-full
-                    border border-border/50
+                    flex items-center gap-1.5
+                    rounded-full border border-border/50
+                    bg-muted/30 px-2.5 py-1.5
+                    text-[11px] font-medium text-muted-foreground
                     transition-colors
+                    hover:bg-muted/60
                     disabled:opacity-50
                   "
                 >
-                  {projectType === "frontend" ? (
+                  {effectiveProjectType === "frontend" ? (
                     <Globe2 className="size-3.5" />
                   ) : (
                     <Database className="size-3.5" />
                   )}
 
                   <span>
-                    {projectType === "frontend" ? "Frontend" : "Full-Stack"}
+                    {effectiveProjectType === "frontend"
+                      ? "Frontend"
+                      : "Full-Stack"}
                   </span>
 
                   <ChevronDown className="size-3 opacity-50" />
                 </button>
               </DropdownMenuTrigger>
 
-              <DropdownMenuContent align="start" className="w-52">
+              <DropdownMenuContent
+                align="start"
+                className="w-52"
+              >
                 <DropdownMenuItem
-                  onClick={() => setProjectType("frontend")}
+                  onSelect={() => setProjectType("frontend")}
                   className="cursor-pointer gap-2"
                 >
                   <Globe2 className="size-4" />
 
                   <div className="flex flex-col">
                     <span>Frontend Website</span>
+
                     <span className="text-[10px] text-muted-foreground">
                       UI-focused and fast
                     </span>
                   </div>
                 </DropdownMenuItem>
 
-                <DropdownMenuItem
-                  onClick={() => setProjectType("fullstack")}
-                  className="cursor-pointer gap-2"
-                >
-                  <Database className="size-4" />
+                {FULLSTACK_ENABLED ? (
+                  <DropdownMenuItem
+                    onSelect={() => setProjectType("fullstack")}
+                    className="cursor-pointer gap-2"
+                  >
+                    <Database className="size-4" />
 
-                  <div className="flex flex-col">
-                    <span>Full-Stack Web App</span>
-                    <span className="text-[10px] text-muted-foreground">
-                      Database, auth and APIs
+                    <div className="flex flex-col">
+                      <span>Full-Stack Web App</span>
+
+                      <span className="text-[10px] text-muted-foreground">
+                        Database, auth and APIs
+                      </span>
+                    </div>
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem
+                    aria-disabled="true"
+                    aria-label="Full-Stack Web App — Coming soon"
+                    onSelect={(event) => event.preventDefault()}
+                    className="group relative min-h-9 cursor-not-allowed gap-2"
+                  >
+                    <Database
+                      aria-hidden="true"
+                      className="size-4 text-muted-foreground/50"
+                    />
+
+                    <span
+                      aria-hidden="true"
+                      className="
+                        pointer-events-none absolute left-9
+                        whitespace-nowrap text-[11px]
+                        text-muted-foreground opacity-0
+                        transition-opacity
+                        group-hover:opacity-100
+                        group-data-[highlighted]:opacity-100
+                      "
+                    >
+                      Coming soon
                     </span>
-                  </div>
-                </DropdownMenuItem>
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
 
-          {/* Send */}
           <Button
             type="button"
             size="icon"
             onClick={handleSubmitClick}
-            disabled={disabled || loading || (!value.trim() && !attachedImage)}
-            className="
-              rounded-full
-              size-10
-              bg-foreground/10
-              hover:bg-foreground
-              text-foreground
-              hover:text-background
-              border border-foreground/20
-              hover:border-foreground
-              shrink-0
-              transition-all duration-200
-            "
+            disabled={
+              blocked || (!value.trim() && !attachedImage)
+            }
             title={submitHint || "Send"}
+            aria-label={submitHint || "Send"}
+            className="
+              size-10 shrink-0 rounded-full
+              border border-foreground/20
+              bg-foreground/10 text-foreground
+              transition-all duration-200
+              hover:border-foreground
+              hover:bg-foreground
+              hover:text-background
+            "
           >
             {loading ? (
               <Spinner className="size-4" />

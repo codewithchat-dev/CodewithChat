@@ -2,7 +2,15 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowUp, Sparkles, Plus, Mic, MicOff } from "lucide-react";
+import {
+  ArrowUp,
+  Sparkles,
+  Plus,
+  Mic,
+  MicOff,
+  Globe2,
+  Database,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth, useClerk } from "@clerk/nextjs";
@@ -233,10 +241,35 @@ export function Hero() {
                       <Mic className="size-4" />
                     )}
                   </Button>
-                  {/* <div className="ml-3 hidden sm:flex items-center gap-2 text-xs font-medium text-muted-foreground bg-surface-elevated px-3 py-1.5 rounded-lg border border-border/50">
-                    <Sparkles className="size-3.5 text-primary" />
-                    <span>CodewithChat</span>
-                  </div> */}
+                  {/* Project type */}
+                  <div className="ml-1 flex items-center gap-1.5">
+                    <div
+                      className="flex items-center gap-1.5 rounded-full border border-border/50 bg-muted/30 px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground"
+                      aria-label="Frontend Website selected"
+                    >
+                      <Globe2 className="size-3.5" aria-hidden="true" />
+                      <span>Frontend</span>
+                    </div>
+
+                    <div className="group relative flex items-center">
+                      <button
+                        type="button"
+                        aria-disabled="true"
+                        aria-label="Full-Stack Web App — Coming soon"
+                        onClick={(event) => event.preventDefault()}
+                        className="flex size-9 cursor-not-allowed items-center justify-center rounded-full border border-border/40 bg-muted/20 text-muted-foreground/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <Database className="size-4" aria-hidden="true" />
+                      </button>
+
+                      <span
+                        aria-hidden="true"
+                        className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md border border-border bg-popover px-2.5 py-1.5 text-[11px] text-popover-foreground opacity-0 shadow-md transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                      >
+                        Full-stack · Coming soon
+                      </span>
+                    </div>
+                  </div>
                 </div>
 
                 <Button

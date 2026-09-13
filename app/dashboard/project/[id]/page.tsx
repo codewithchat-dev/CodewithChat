@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -46,6 +40,7 @@ import { saveAs } from "file-saver";
 
 import { Button } from "@/components/ui/button";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { applyGeneratedProjectTemplates } from "@/lib/generated-project-templates";
 
 import {
   DropdownMenu,
@@ -84,10 +79,7 @@ import {
 import { buildFullStackFiles } from "@/lib/fullstack-files";
 import { planSchema } from "@/lib/schema";
 
-import {
-  DEFAULT_PLATFORM,
-  DEFAULT_TECH_STACK,
-} from "@/lib/project-structure";
+import { DEFAULT_PLATFORM, DEFAULT_TECH_STACK } from "@/lib/project-structure";
 
 import type {
   SandpackView,
@@ -163,9 +155,7 @@ function formatDuration(ms: number) {
   const minutes = Math.floor(seconds / 60);
   const remaining = seconds % 60;
 
-  return remaining
-    ? `${minutes}m ${remaining}s`
-    : `${minutes}m`;
+  return remaining ? `${minutes}m ${remaining}s` : `${minutes}m`;
 }
 
 function normalizePath(path: string) {
@@ -191,9 +181,7 @@ function Brand({ animated = false }: { animated?: boolean }) {
         width={32}
         height={24}
         className={`h-6 w-8 object-contain ${
-          animated
-            ? "animate-pulse motion-reduce:animate-none"
-            : ""
+          animated ? "animate-pulse motion-reduce:animate-none" : ""
         }`}
       />
 
@@ -246,9 +234,7 @@ export default function ProjectPage() {
   const params = useParams();
   const rawId = params.id;
 
-  const projectId = Array.isArray(rawId)
-    ? rawId[0]
-    : rawId;
+  const projectId = Array.isArray(rawId) ? rawId[0] : rawId;
 
   if (!projectId) {
     return (
@@ -258,23 +244,14 @@ export default function ProjectPage() {
     );
   }
 
-  return (
-    <ProjectWorkspace
-      key={projectId}
-      projectId={projectId}
-    />
-  );
+  return <ProjectWorkspace key={projectId} projectId={projectId} />;
 }
 
 // -----------------------------------------------------------------------------
 // Workspace
 // -----------------------------------------------------------------------------
 
-function ProjectWorkspace({
-  projectId,
-}: {
-  projectId: string;
-}) {
+function ProjectWorkspace({ projectId }: { projectId: string }) {
   const tech = DEFAULT_TECH_STACK;
   const platform = DEFAULT_PLATFORM;
 
@@ -300,32 +277,28 @@ function ProjectWorkspace({
   const messagesRef = useRef<ChatMessage[]>([]);
 
   const [chatInput, setChatInput] = useState("");
-  const [composerMode, setComposerMode] =
-    useState<ComposerMode>("build");
+  const [composerMode, setComposerMode] = useState<ComposerMode>("build");
 
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
 
-  const [operationKind, setOperationKind] =
-    useState<ComposerMode>("build");
+  const [operationKind, setOperationKind] = useState<ComposerMode>("build");
 
-  const [operationStartedAt, setOperationStartedAt] =
-    useState<number | null>(null);
+  const [operationStartedAt, setOperationStartedAt] = useState<number | null>(
+    null,
+  );
 
   const generationJobRef = useRef<GenerationJob | null>(null);
-  const [generationError, setGenerationError] =
-    useState<string | null>(null);
+  const [generationError, setGenerationError] = useState<string | null>(null);
 
   const [chatPanelOpen, setChatPanelOpen] = useState(true);
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const followChatRef = useRef(true);
 
   const [view, setView] = useState<SandpackView>("preview");
-  const [rightPanel, setRightPanel] =
-    useState<"preview" | "guide">("preview");
+  const [rightPanel, setRightPanel] = useState<"preview" | "guide">("preview");
 
-  const [viewportSize, setViewportSize] =
-    useState<ViewportSize>("desktop");
+  const [viewportSize, setViewportSize] = useState<ViewportSize>("desktop");
 
   const [activeFile, setActiveFile] = useState<string | null>(null);
   const [previewKey, setPreviewKey] = useState(0);
@@ -359,10 +332,7 @@ function ProjectWorkspace({
   }, []);
 
   const appendMessage = useCallback((message: ChatMessage) => {
-    const next = [
-      ...messagesRef.current,
-      messageWithId(message),
-    ];
+    const next = [...messagesRef.current, messageWithId(message)];
 
     messagesRef.current = next;
     setMessages(next);
@@ -469,7 +439,7 @@ function ProjectWorkspace({
 
         const previousFiles = job.basePlan?.previewFiles ?? [];
 
-        const nextFiles = job.incremental
+        const mergedFiles = job.incremental
           ? mergeGeneratedProjectFiles(
               previousFiles,
               incomingFiles,
@@ -477,11 +447,10 @@ function ProjectWorkspace({
             )
           : sanitizeGeneratedProjectFiles(incomingFiles);
 
+        const nextFiles = applyGeneratedProjectTemplates(mergedFiles);
+
         const previousContents = new Map(
-          previousFiles.map((file) => [
-            normalizePath(file.path),
-            file.content,
-          ]),
+          previousFiles.map((file) => [normalizePath(file.path), file.content]),
         );
 
         const nextPaths = new Set(
@@ -491,23 +460,18 @@ function ProjectWorkspace({
         const changedFiles = nextFiles
           .filter(
             (file) =>
-              previousContents.get(normalizePath(file.path)) !==
-              file.content,
+              previousContents.get(normalizePath(file.path)) !== file.content,
           )
           .map((file) => file.path);
 
         const removedFiles = previousFiles
-          .filter(
-            (file) => !nextPaths.has(normalizePath(file.path)),
-          )
+          .filter((file) => !nextPaths.has(normalizePath(file.path)))
           .map((file) => file.path);
 
         const nextPlan: Plan = {
           ...generated,
           dependencies: {
-            ...(job.incremental
-              ? job.basePlan?.dependencies ?? {}
-              : {}),
+            ...(job.incremental ? (job.basePlan?.dependencies ?? {}) : {}),
             ...(generated.dependencies ?? {}),
           },
           previewFiles: nextFiles,
@@ -524,8 +488,7 @@ function ProjectWorkspace({
           role: "assistant",
           content:
             changedFiles.length || removedFiles.length
-              ? generated.overview ||
-                "Your project files have been updated."
+              ? generated.overview || "Your project files have been updated."
               : "The returned files match the current project. No source changes were applied.",
           files: changedFiles,
           deletedFiles: removedFiles,
@@ -619,10 +582,7 @@ function ProjectWorkspace({
 
           // Conversation is stored alongside the plan, not inside the
           // generation context's existingPlan.
-          const {
-            conversation,
-            ...storedPlan
-          } = raw;
+          const { conversation, ...storedPlan } = raw;
 
           const restored = conversationSchema.safeParse(conversation);
 
@@ -750,19 +710,13 @@ function ProjectWorkspace({
 
         lastSavedRef.current = payload;
 
-        if (
-          mountedRef.current &&
-          revision === saveRevisionRef.current
-        ) {
+        if (mountedRef.current && revision === saveRevisionRef.current) {
           setSaveState("saved");
         }
       } catch (error) {
         console.error("[Project save]", error);
 
-        if (
-          mountedRef.current &&
-          revision === saveRevisionRef.current
-        ) {
+        if (mountedRef.current && revision === saveRevisionRef.current) {
           setSaveState("error");
           toast.error("Changes are not saved. Use Retry save.");
         }
@@ -1122,9 +1076,7 @@ function ProjectWorkspace({
   const currentPaths = useMemo(
     () =>
       new Set(
-        (localPlan?.previewFiles ?? []).map((file) =>
-          normalizePath(file.path),
-        ),
+        (localPlan?.previewFiles ?? []).map((file) => normalizePath(file.path)),
       ),
     [localPlan],
   );
@@ -1151,10 +1103,7 @@ function ProjectWorkspace({
     return [...paths];
   }, [generationLoading, streamingPlan]);
 
-  const canPublish =
-    Boolean(localPlan) &&
-    !busy &&
-    saveState === "saved";
+  const canPublish = Boolean(localPlan) && !busy && saveState === "saved";
 
   // ---------------------------------------------------------------------------
   // Render
@@ -1165,19 +1114,12 @@ function ProjectWorkspace({
       <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
         <FileCode2 className="size-9 text-muted-foreground" />
 
-        <h1 className="text-lg font-semibold">
-          Unable to open project
-        </h1>
+        <h1 className="text-lg font-semibold">Unable to open project</h1>
 
-        <p className="max-w-md text-sm text-muted-foreground">
-          {loadError}
-        </p>
+        <p className="max-w-md text-sm text-muted-foreground">{loadError}</p>
 
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => window.location.reload()}
-          >
+          <Button variant="outline" onClick={() => window.location.reload()}>
             Retry
           </Button>
 
@@ -1208,9 +1150,7 @@ function ProjectWorkspace({
               <input
                 ref={renameRef}
                 value={renameValue}
-                onChange={(event) =>
-                  setRenameValue(event.target.value)
-                }
+                onChange={(event) => setRenameValue(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
                     event.preventDefault();
@@ -1252,9 +1192,7 @@ function ProjectWorkspace({
               }}
               className="flex min-w-0 items-center gap-2 text-sm font-medium"
             >
-              <span className="max-w-64 truncate">
-                {projectTitle}
-              </span>
+              <span className="max-w-64 truncate">{projectTitle}</span>
               <Pencil className="size-3 text-muted-foreground" />
             </button>
           )}
@@ -1280,10 +1218,7 @@ function ProjectWorkspace({
               </span>
             )}
 
-            <Link
-              href="/pricing"
-              className="text-xs font-medium text-primary"
-            >
+            <Link href="/pricing" className="text-xs font-medium text-primary">
               Upgrade
             </Link>
           </div>
@@ -1323,9 +1258,7 @@ function ProjectWorkspace({
 
                       <p
                         className={`whitespace-pre-wrap break-words text-[13px] leading-6 ${
-                          message.failed
-                            ? "text-red-400"
-                            : "text-foreground/90"
+                          message.failed ? "text-red-400" : "text-foreground/90"
                         }`}
                       >
                         {displayMessage(message)}
@@ -1389,9 +1322,7 @@ function ProjectWorkspace({
                       {message.role === "assistant" &&
                         message.durationMs !== undefined && (
                           <p className="mt-3 text-[11px] text-muted-foreground">
-                            {message.failed
-                              ? "Stopped after"
-                              : "Finished in"}{" "}
+                            {message.failed ? "Stopped after" : "Finished in"}{" "}
                             {formatDuration(message.durationMs)}
                           </p>
                         )}
@@ -1494,9 +1425,7 @@ function ProjectWorkspace({
                     {saveState === "error" && (
                       <button
                         type="button"
-                        onClick={() =>
-                          setSaveAttempt((value) => value + 1)
-                        }
+                        onClick={() => setSaveAttempt((value) => value + 1)}
                         className="text-red-400 underline underline-offset-2"
                       >
                         Retry save
@@ -1684,45 +1613,65 @@ function ProjectWorkspace({
                   <Brand animated />
                   <Loader2 className="size-4 animate-spin" />
                 </div>
-              ) : localPlan ? (
-                rightPanel === "guide" ? (
-                  <ProjectGuide
-                    plan={localPlan}
-                    projectId={projectId}
-                    idea={idea}
-                    tech={tech}
-                  />
-                ) : previewReady ? (
-                  <SandpackPreview
-                    key={previewKey}
-                    files={previewFileMap}
-                    dependencies={activeDependencies}
-                    view={view}
-                    isTerminalOpen={false}
-                    onCloseTerminal={() => {}}
-                    previewKey={previewKey}
-                    tech={tech}
-                    isLoading={busy && operationKind === "build"}
-                    viewportSize={viewportSize}
-                    activeFile={activeFile}
-                    onPreviewError={setPreviewError}
-                    onAutoFix={handleAutoFixPreview}
-                  />
-                ) : (
-                  <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
-                    <FileCode2 className="size-8 text-muted-foreground" />
-                    <p className="text-sm">
-                      Project files are saved, but no preview entry was found.
-                    </p>
-                    <Button
-                      disabled={busy}
-                      onClick={handleRegenerateProject}
-                    >
-                      Regenerate project
-                    </Button>
-                  </div>
-                )
-              ) : busy ? (
+             ) : localPlan ? (
+  <div className="relative h-full min-h-0 w-full">
+    {/* Keep Sandpack mounted while the Guide is visible. */}
+    <div
+      aria-hidden={rightPanel === "guide"}
+      className="absolute inset-0"
+      style={{
+        visibility:
+          rightPanel === "guide" ? "hidden" : "visible",
+        pointerEvents:
+          rightPanel === "guide" ? "none" : "auto",
+      }}
+    >
+      {previewReady ? (
+        <SandpackPreview
+          key={previewKey}
+          files={previewFileMap}
+          dependencies={activeDependencies}
+          view={view}
+          isTerminalOpen={false}
+          onCloseTerminal={() => {}}
+          previewKey={previewKey}
+          tech={tech}
+          isLoading={busy && operationKind === "build"}
+          viewportSize={viewportSize}
+          activeFile={activeFile}
+          onPreviewError={setPreviewError}
+          onAutoFix={handleAutoFixPreview}
+        />
+      ) : (
+        <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
+          <FileCode2 className="size-8 text-muted-foreground" />
+
+          <p className="text-sm">
+            Project files are saved, but no preview entry was found.
+          </p>
+
+          <Button
+            disabled={busy}
+            onClick={handleRegenerateProject}
+          >
+            Regenerate project
+          </Button>
+        </div>
+      )}
+    </div>
+
+    {rightPanel === "guide" && (
+      <div className="absolute inset-0 overflow-auto bg-background">
+        <ProjectGuide
+          plan={localPlan}
+          projectId={projectId}
+          idea={idea}
+          tech={tech}
+        />
+      </div>
+    )}
+  </div>
+) : busy ? (
                 <div className="flex h-full flex-col items-center justify-center gap-5 p-6 text-center">
                   <img
                     src="/dark_logo.png"
