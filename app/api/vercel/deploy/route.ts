@@ -5,16 +5,12 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { projectName } from "@/lib/project-name";
 import { buildPreviewFiles } from "@/lib/preview-files";
+import { applyGeneratedProjectTemplates } from "@/lib/generated-project-templates";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const BUSY = new Set([
-  "QUEUED",
-  "INITIALIZING",
-  "BUILDING",
-  "FINALIZING",
-]);
+const BUSY = new Set(["QUEUED", "INITIALIZING", "BUILDING", "FINALIZING"]);
 
 class ApiError extends Error {
   constructor(
@@ -45,11 +41,7 @@ async function vercel<T>(
   const token = process.env.VERCEL_TOKEN?.trim();
   const team = process.env.VERCEL_TEAM_ID?.trim();
 
-  if (
-    !token ||
-    token === "replace_with_vercel_token" ||
-    !team
-  ) {
+  if (!token || token === "replace_with_vercel_token" || !team) {
     throw new ApiError(
       "Configure VERCEL_TOKEN and VERCEL_TEAM_ID on the server.",
       503,
@@ -76,8 +68,7 @@ async function vercel<T>(
 
   if (!response.ok) {
     throw new ApiError(
-      data?.error?.message ||
-        `Vercel request failed (${response.status}).`,
+      data?.error?.message || `Vercel request failed (${response.status}).`,
       response.status === 429 ? 429 : 502,
       response.status,
     );
@@ -120,10 +111,7 @@ async function getOwnedProject(projectId: string) {
   return project;
 }
 
-async function getDeployment(
-  deploymentId: string,
-  vercelProjectId: string,
-) {
+async function getDeployment(deploymentId: string, vercelProjectId: string) {
   const result = await vercel<Deployment>(
     `/v13/deployments/${encodeURIComponent(deploymentId)}`,
   );
@@ -140,10 +128,7 @@ function errorResponse(error: unknown) {
 
   return NextResponse.json(
     {
-      error:
-        error instanceof Error
-          ? error.message
-          : "Publishing failed.",
+      error: error instanceof Error ? error.message : "Publishing failed.",
     },
     {
       status: error instanceof ApiError ? error.status : 502,
@@ -153,10 +138,7 @@ function errorResponse(error: unknown) {
 
 function validateFiles(code: string | null) {
   if (!code) {
-    throw new ApiError(
-      "Generate and save the project first.",
-      400,
-    );
+    throw new ApiError("Generate and save the project first.", 400);
   }
 
   let plan;
@@ -167,41 +149,30 @@ function validateFiles(code: string | null) {
     throw new ApiError("Invalid saved project.", 400);
   }
 
-  if (
-    !Array.isArray(plan?.previewFiles) ||
-    !plan.previewFiles.length
-  ) {
+  if (!Array.isArray(plan?.previewFiles) || !plan.previewFiles.length) {
     throw new ApiError("No source files to publish.", 400);
   }
 
   for (const file of plan.previewFiles) {
-    if (
-      typeof file?.path !== "string" ||
-      typeof file.content !== "string"
-    ) {
+    if (typeof file?.path !== "string" || typeof file.content !== "string") {
       throw new ApiError("Invalid source file.", 400);
     }
 
     const parts = file.path.replace(/\\/g, "/").split("/");
 
-    if (
-      parts.includes("..") ||
-      /[\0\r\n:]/.test(file.path)
-    ) {
+    if (parts.includes("..") || /[\0\r\n:]/.test(file.path)) {
       throw new ApiError("Invalid source path.", 400);
     }
   }
 
   const files = Object.entries(
-    buildPreviewFiles(plan.previewFiles),
+    buildPreviewFiles(applyGeneratedProjectTemplates(plan.previewFiles)),
   ).map(([file, data]) => ({
     file: file.replace(/^\/+/, ""),
     data,
   }));
 
-  const packageFile = files.find(
-    (file) => file.file === "package.json",
-  );
+  const packageFile = files.find((file) => file.file === "package.json");
 
   if (!packageFile) {
     throw new ApiError("package.json is missing.", 400);
@@ -219,10 +190,7 @@ function validateFiles(code: string | null) {
     typeof manifest.scripts?.build !== "string" ||
     !manifest.scripts.build.trim()
   ) {
-    throw new ApiError(
-      "package.json needs a build script.",
-      400,
-    );
+    throw new ApiError("package.json needs a build script.", 400);
   }
 
   if (!files.some((file) => file.file === "index.html")) {
@@ -230,8 +198,7 @@ function validateFiles(code: string | null) {
   }
 
   const size = files.reduce(
-    (total, file) =>
-      total + Buffer.byteLength(file.data, "utf8"),
+    (total, file) => total + Buffer.byteLength(file.data, "utf8"),
     0,
   );
 
@@ -245,15 +212,11 @@ function validateFiles(code: string | null) {
 // GET /api/vercel/deploy?projectId=...
 export async function GET(req: Request) {
   try {
-    const projectId =
-      new URL(req.url).searchParams.get("projectId") || "";
+    const projectId = new URL(req.url).searchParams.get("projectId") || "";
 
     const project = await getOwnedProject(projectId);
 
-    if (
-      project.publishLockUntil &&
-      project.publishLockUntil > new Date()
-    ) {
+    if (project.publishLockUntil && project.publishLockUntil > new Date()) {
       return NextResponse.json({
         status: "STARTING",
         previousUrl: project.publishedUrl,
@@ -268,10 +231,7 @@ export async function GET(req: Request) {
       });
     }
 
-    if (
-      !project.vercelDeploymentId ||
-      !project.vercelProjectId
-    ) {
+    if (!project.vercelDeploymentId || !project.vercelProjectId) {
       return NextResponse.json({
         status: "IDLE",
         previousUrl: project.publishedUrl,
@@ -299,16 +259,13 @@ export async function GET(req: Request) {
             alias: string;
             redirect?: string | null;
           }>;
-        }>(
-          `/v2/deployments/${encodeURIComponent(deployment.id)}/aliases`,
-        );
+        }>(`/v2/deployments/${encodeURIComponent(deployment.id)}/aliases`);
 
         const expected = `${project.publishSlug}.vercel.app`;
 
         const alias =
           assigned.aliases.find(
-            (item) =>
-              item.alias === expected && !item.redirect,
+            (item) => item.alias === expected && !item.redirect,
           ) ??
           assigned.aliases.find(
             (item) =>
@@ -367,9 +324,7 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => null);
 
     let project = await getOwnedProject(
-      typeof body?.projectId === "string"
-        ? body.projectId.trim()
-        : "",
+      typeof body?.projectId === "string" ? body.projectId.trim() : "",
     );
 
     const files = validateFiles(project.code);
@@ -399,10 +354,7 @@ export async function POST(req: Request) {
     });
 
     if (!acquired.count) {
-      return NextResponse.json(
-        { status: "STARTING" },
-        { status: 202 },
-      );
+      return NextResponse.json({ status: "STARTING" }, { status: 202 });
     }
 
     lock = { id: project.id, token };
@@ -417,10 +369,7 @@ export async function POST(req: Request) {
 
     project = refreshed;
 
-    if (
-      project.vercelDeploymentId &&
-      project.vercelProjectId
-    ) {
+    if (project.vercelDeploymentId && project.vercelProjectId) {
       const existing = await getDeployment(
         project.vercelDeploymentId,
         project.vercelProjectId,
@@ -442,19 +391,18 @@ export async function POST(req: Request) {
         where: { id: project.id },
       });
 
-      for (
-        let attempt = 0;
-        attempt < 5 && !reservation;
-        attempt++
-      ) {
+      for (let attempt = 0; attempt < 5 && !reservation; attempt++) {
         try {
           reservation = await db.publishIdentity.create({
             data: {
               id: project.id,
-              slug: `${projectName(
-                project.prompt,
-                project.title,
-              )}-${randomBytes(4).toString("hex")}`,
+              slug:
+                attempt === 0 && project.publishSlug
+                  ? project.publishSlug
+                  : `${projectName(
+                      project.prompt,
+                      project.title,
+                    )}-${randomBytes(4).toString("hex")}`,
             },
           });
         } catch (error) {
@@ -476,35 +424,22 @@ export async function POST(req: Request) {
       }
 
       if (!reservation) {
-        throw new ApiError(
-          "Could not reserve a unique name. Retry.",
-        );
+        throw new ApiError("Could not reserve a unique name. Retry.");
       }
 
       slug = reservation.slug;
 
       let created: { id: string } | null = null;
 
-      for (
-        let attempt = 0;
-        attempt < 3 && !created;
-        attempt++
-      ) {
+      for (let attempt = 0; attempt < 3 && !created; attempt++) {
         try {
-          created = await vercel<{ id: string }>(
-            "/v11/projects",
-            "POST",
-            {
-              name: slug,
-              framework: "vite",
-              ssoProtection: null,
-            },
-          );
+          created = await vercel<{ id: string }>("/v11/projects", "POST", {
+            name: slug,
+            framework: "vite",
+            ssoProtection: null,
+          });
         } catch (error) {
-          if (
-            !(error instanceof ApiError) ||
-            error.remoteStatus !== 409
-          ) {
+          if (!(error instanceof ApiError) || error.remoteStatus !== 409) {
             throw error;
           }
 
@@ -521,9 +456,7 @@ export async function POST(req: Request) {
       }
 
       if (!created) {
-        throw new ApiError(
-          "Name unavailable. Retry publishing.",
-        );
+        throw new ApiError("Name unavailable. Retry publishing.");
       }
 
       vercelProjectId = created.id;
@@ -551,31 +484,25 @@ export async function POST(req: Request) {
 
     deploymentRequested = true;
 
-    const result = await vercel<Deployment>(
-      "/v13/deployments",
-      "POST",
-      {
-        name: slug,
-        project: vercelProjectId,
-        target: "production",
-        files,
-        meta: {
-          codewithchatProjectId: project.id,
-          publishAttempt: token,
-        },
-        projectSettings: {
-          framework: "vite",
-          buildCommand: "npm run build",
-          installCommand: "npm install",
-          outputDirectory: "dist",
-        },
+    const result = await vercel<Deployment>("/v13/deployments", "POST", {
+      name: slug,
+      project: vercelProjectId,
+      target: "production",
+      files,
+      meta: {
+        codewithchatProjectId: project.id,
+        publishAttempt: token,
       },
-    );
+      projectSettings: {
+        framework: "vite",
+        buildCommand: "npm run build",
+        installCommand: "npm install",
+        outputDirectory: "dist",
+      },
+    });
 
     if (!result.id) {
-      throw new ApiError(
-        "Vercel did not return a deployment ID.",
-      );
+      throw new ApiError("Vercel did not return a deployment ID.");
     }
 
     await db.project.update({

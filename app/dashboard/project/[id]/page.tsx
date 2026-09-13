@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { ProjectNavigationDrawer } from "@/components/dashboard/project-navigation-drawer";
 
 import {
   BookOpen,
@@ -1135,13 +1136,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
     <TooltipProvider>
       <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background text-foreground">
         <header className="flex h-12 shrink-0 items-center gap-3 border-b border-border px-3">
-          <Link
-            href="/dashboard"
-            title="Dashboard"
-            className="rounded-md p-2 hover:bg-muted"
-          >
-            <Home className="size-4" />
-          </Link>
+          <ProjectNavigationDrawer />
 
           <div className="h-5 w-px bg-border" />
 
@@ -1613,65 +1608,64 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
                   <Brand animated />
                   <Loader2 className="size-4 animate-spin" />
                 </div>
-             ) : localPlan ? (
-  <div className="relative h-full min-h-0 w-full">
-    {/* Keep Sandpack mounted while the Guide is visible. */}
-    <div
-      aria-hidden={rightPanel === "guide"}
-      className="absolute inset-0"
-      style={{
-        visibility:
-          rightPanel === "guide" ? "hidden" : "visible",
-        pointerEvents:
-          rightPanel === "guide" ? "none" : "auto",
-      }}
-    >
-      {previewReady ? (
-        <SandpackPreview
-          key={previewKey}
-          files={previewFileMap}
-          dependencies={activeDependencies}
-          view={view}
-          isTerminalOpen={false}
-          onCloseTerminal={() => {}}
-          previewKey={previewKey}
-          tech={tech}
-          isLoading={busy && operationKind === "build"}
-          viewportSize={viewportSize}
-          activeFile={activeFile}
-          onPreviewError={setPreviewError}
-          onAutoFix={handleAutoFixPreview}
-        />
-      ) : (
-        <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
-          <FileCode2 className="size-8 text-muted-foreground" />
+              ) : localPlan ? (
+                <div className="relative h-full min-h-0 w-full">
+                  {/* Keep Sandpack mounted while the Guide is visible. */}
+                  <div
+                    aria-hidden={rightPanel === "guide"}
+                    className="absolute inset-0"
+                    style={{
+                      visibility: rightPanel === "guide" ? "hidden" : "visible",
+                      pointerEvents: rightPanel === "guide" ? "none" : "auto",
+                    }}
+                  >
+                    {previewReady ? (
+                      <SandpackPreview
+                        key={previewKey}
+                        files={previewFileMap}
+                        dependencies={activeDependencies}
+                        view={view}
+                        isTerminalOpen={false}
+                        onCloseTerminal={() => {}}
+                        previewKey={previewKey}
+                        tech={tech}
+                        isLoading={busy && operationKind === "build"}
+                        viewportSize={viewportSize}
+                        activeFile={activeFile}
+                        onPreviewError={setPreviewError}
+                        onAutoFix={handleAutoFixPreview}
+                      />
+                    ) : (
+                      <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
+                        <FileCode2 className="size-8 text-muted-foreground" />
 
-          <p className="text-sm">
-            Project files are saved, but no preview entry was found.
-          </p>
+                        <p className="text-sm">
+                          Project files are saved, but no preview entry was
+                          found.
+                        </p>
 
-          <Button
-            disabled={busy}
-            onClick={handleRegenerateProject}
-          >
-            Regenerate project
-          </Button>
-        </div>
-      )}
-    </div>
+                        <Button
+                          disabled={busy}
+                          onClick={handleRegenerateProject}
+                        >
+                          Regenerate project
+                        </Button>
+                      </div>
+                    )}
+                  </div>
 
-    {rightPanel === "guide" && (
-      <div className="absolute inset-0 overflow-auto bg-background">
-        <ProjectGuide
-          plan={localPlan}
-          projectId={projectId}
-          idea={idea}
-          tech={tech}
-        />
-      </div>
-    )}
-  </div>
-) : busy ? (
+                  {rightPanel === "guide" && (
+                    <div className="absolute inset-0 overflow-auto bg-background">
+                      <ProjectGuide
+                        plan={localPlan}
+                        projectId={projectId}
+                        idea={idea}
+                        tech={tech}
+                      />
+                    </div>
+                  )}
+                </div>
+              ) : busy ? (
                 <div className="flex h-full flex-col items-center justify-center gap-5 p-6 text-center">
                   <img
                     src="/dark_logo.png"

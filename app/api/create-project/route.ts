@@ -1,164 +1,123 @@
-import { auth, currentUser } from '@clerk/nextjs/server'
-import { NextRequest, NextResponse } from 'next/server'
+import { auth, currentUser } from "@clerk/nextjs/server";
+import { NextRequest, NextResponse } from "next/server";
+import { randomBytes } from "node:crypto";
 
-import { db } from '@/lib/db'
-import { MAX_DAILY_CREDITS } from '@/lib/credits'
+import { db } from "@/lib/db";
+import { MAX_DAILY_CREDITS } from "@/lib/credits";
+import { projectName } from "@/lib/project-name";
+
+export const runtime = "nodejs";
+
+// Generate the name once and save it with the project.
+function createProjectSlug(prompt: string): string {
+  // Example: Build “FreshBasket”, a polished frontend...
+  const quotedName = prompt.match(
+    /(?:build|create|make|design)\s+["“]([^"”\r\n]{1,60})["”]/i,
+  )?.[1];
+
+  const baseName = (quotedName || projectName(prompt, ""))
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 42)
+    .replace(/-+$/g, "");
+
+  const suffix = randomBytes(4).toString("hex");
+
+  return `${baseName || "website"}-${suffix}`;
+}
 
 /**
- * GET /api/create-project?idea=...
- *
- * Responsibilities:
- * 1. Check authentication
- * 2. Ensure the user exists in our database
- * 3. Create an empty project shell
- * 4. Redirect the user to the project editor
- *
- * IMPORTANT:
- * This route does NOT consume a generation credit.
- * Credits are consumed only when /api/generate-plan actually runs.
+ * Creates a project shell and redirects to the editor.
+ * Generation credits are consumed by /api/generate-plan.
  */
 export async function GET(req: NextRequest) {
   try {
-    // ─────────────────────────────────────────────
-    // AUTH
-    // ─────────────────────────────────────────────
-
-    const { userId } = await auth()
+    const { userId } = await auth();
 
     if (!userId) {
-      const signInUrl = new URL(
-        '/sign-in',
-        req.nextUrl.origin,
-      )
-
-      return NextResponse.redirect(signInUrl)
+      return NextResponse.redirect(
+        new URL("/sign-in", req.nextUrl.origin),
+      );
     }
 
-    // ─────────────────────────────────────────────
-    // PROJECT IDEA
-    // ─────────────────────────────────────────────
+    const rawIdea = req.nextUrl.searchParams.get("idea")?.trim();
 
-    const rawIdea =
-      req.nextUrl.searchParams
-        .get('idea')
-        ?.trim()
-
-    // Don't create an empty project accidentally
     if (!rawIdea) {
       return NextResponse.redirect(
-        new URL(
-          '/dashboard',
-          req.nextUrl.origin,
-        ),
-      )
+        new URL("/dashboard", req.nextUrl.origin),
+      );
     }
-
-    // Keep project title readable.
-    // Full prompt is still saved in `prompt`.
-    const projectTitle =
-      rawIdea.length > 70
-        ? `${rawIdea.slice(0, 67)}...`
-        : rawIdea
-
-    // ─────────────────────────────────────────────
-    // USER
-    // ─────────────────────────────────────────────
 
     let dbUser = await db.user.findUnique({
       where: {
         clerkId: userId,
       },
-    })
+    });
 
-    // First time user
     if (!dbUser) {
-      const clerkUser =
-        await currentUser()
+      const clerkUser = await currentUser();
 
       const email =
-        clerkUser
-          ?.emailAddresses?.[0]
-          ?.emailAddress ??
-        `${userId}@placeholder.local`
+        clerkUser?.emailAddresses?.[0]?.emailAddress ??
+        `${userId}@placeholder.local`;
 
-      dbUser = await db.user.create({
-        data: {
-          clerkId: userId,
-          email,
+      try {
+        dbUser = await db.user.create({
+          data: {
+            clerkId: userId,
+            email,
+            credits: MAX_DAILY_CREDITS,
+            lastCreditResetAt: new Date(),
+          },
+        });
+      } catch (error) {
+        // Another request may have created the same user.
+        const existingUser = await db.user.findUnique({
+          where: {
+            clerkId: userId,
+          },
+        });
 
-          // New user starts with 5 daily credits
-          credits: MAX_DAILY_CREDITS,
+        if (!existingUser) {
+          throw error;
+        }
 
-          // Used by generate-plan to know
-          // when daily credits should reset
-          lastCreditResetAt: new Date(),
-        },
-      })
+        dbUser = existingUser;
+      }
     }
 
-    // ─────────────────────────────────────────────
-    // CREATE PROJECT
-    // ─────────────────────────────────────────────
+    const slug = createProjectSlug(rawIdea);
 
-    const project =
-      await db.project.create({
-        data: {
-          userId: dbUser.id,
-          title: projectTitle,
-          prompt: rawIdea,
-        },
-      })
-
-    // ─────────────────────────────────────────────
-    // CODEWITHCHAT CANONICAL STACK
-    // ─────────────────────────────────────────────
-
-    const tech =
-      'React + Vite + TypeScript + Tailwind'
-
-    const platform = 'Website'
-
-    // Keep this aligned with /api/generate-plan
-    const agent = 'Gemini 2.5 Flash'
-
-    // ─────────────────────────────────────────────
-    // REDIRECT TO PROJECT EDITOR
-    // ─────────────────────────────────────────────
+    const project = await db.project.create({
+      data: {
+        userId: dbUser.id,
+        title: slug,
+        publishSlug: slug,
+        prompt: rawIdea,
+      },
+    });
 
     const projectUrl = new URL(
       `/dashboard/project/${project.id}`,
       req.nextUrl.origin,
-    )
+    );
 
     projectUrl.searchParams.set(
-      'tech',
-      tech,
-    )
+      "tech",
+      "React + Vite + TypeScript + Tailwind",
+    );
+    projectUrl.searchParams.set("platform", "Website");
+    projectUrl.searchParams.set("agent", "Gemini 2.5 Flash");
 
-    projectUrl.searchParams.set(
-      'platform',
-      platform,
-    )
-
-    projectUrl.searchParams.set(
-      'agent',
-      agent,
-    )
-
-    return NextResponse.redirect(
-      projectUrl,
-    )
+    return NextResponse.redirect(projectUrl);
   } catch (error) {
-    console.error(
-      '[Create Project] Error:',
-      error,
-    )
+    console.error("[Create Project] Error:", error);
 
     return NextResponse.redirect(
-      new URL(
-        '/dashboard',
-        req.nextUrl.origin,
-      ),
-    )
+      new URL("/dashboard", req.nextUrl.origin),
+    );
   }
 }

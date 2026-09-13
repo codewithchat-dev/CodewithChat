@@ -1849,7 +1849,6 @@ export function extractPreviewFromVite(
       content = content
         .replace(/@tailwind\s+(base|components|utilities)\s*;?/g, "")
         .replace(/@apply[^;]+;/g, "")
-        .replace(/@layer\s+(base|components|utilities)\s*\{[^}]*\}/g, "")
         .trim();
 
       content = repairGeneratedCss(content);

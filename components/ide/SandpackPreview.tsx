@@ -226,10 +226,8 @@ function discoverDependenciesFromFiles(
      */
     const fromRegex = /\bfrom\s+['"]([^'"]+)['"]/g;
 
-    // Side-effect imports: import 'pkg'
     const sideEffectRegex = /\bimport\s+['"]([^'"]+)['"]/g;
 
-    // Dynamic imports: import('pkg')
     const dynamicImportRegex = /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
 
     let match: RegExpExecArray | null;
@@ -457,10 +455,6 @@ function PreviewStatusOverlay({
 // ─────────────────────────────────────────────────────────────
 
 function stripHugeBase64(content: string): string {
-  if (!content) {
-    return content;
-  }
-
   return content.replace(
     /data:image\/[^;]+;base64,[A-Za-z0-9+/=]{1000,}/g,
     "https://placehold.co/1200x800?text=Preview+Image",
@@ -537,59 +531,13 @@ export function SandpackPreview({
   // ───────────────────────────────────────────────────────────
 
   const runtimeDependencies = useMemo<Record<string, string>>(() => {
-    const merged: Record<string, string> = {
+    return {
       ...discoveredDependencies,
+      ...sanitizedDependencies,
       react: "18.2.0",
       "react-dom": "18.2.0",
     };
-
-    for (const [name, version] of Object.entries(sanitizedDependencies)) {
-      if (merged[name]) {
-        merged[name] = version;
-      }
-    }
-
-    for (const optionalPackage of [
-      "lucide-react",
-      "clsx",
-      "tailwind-merge",
-    ] as const) {
-      const version =
-        sanitizedDependencies[optionalPackage] ??
-        discoveredDependencies[optionalPackage];
-
-      if (version) {
-        merged[optionalPackage] = version;
-      }
-    }
-
-    /**
-     * Always include react-router-dom at its known version
-     * if ANY file in the project imports it.
-     *
-     * This is a belt-and-suspenders guarantee on top of the
-     * discoverDependenciesFromFiles scanner — if the scanner
-     * misses it, this scan of the raw string values catches it.
-     */
-    const routerVersion =
-      sanitizedDependencies["react-router-dom"] ??
-      discoveredDependencies["react-router-dom"];
-
-    const needsReactRouter =
-      routerVersion != null ||
-      Object.values(files).some(
-        (content) =>
-          typeof content === "string" && content.includes("react-router-dom"),
-      );
-
-    if (needsReactRouter) {
-      merged["react-router-dom"] = routerVersion ?? "^6.28.0";
-    }
-
-    return Object.fromEntries(
-      Object.entries(merged).filter(([name]) => !shouldBlockDependency(name)),
-    );
-  }, [discoveredDependencies, sanitizedDependencies, files]);
+  }, [discoveredDependencies, sanitizedDependencies]);
 
   // Debug while developing
   useEffect(() => {
@@ -603,24 +551,29 @@ export function SandpackPreview({
   // ───────────────────────────────────────────────────────────
   // FILES
   // ───────────────────────────────────────────────────────────
-
   const sandpackFiles = useMemo(() => {
-    const result: Record<
-      string,
-      {
-        code: string;
-        active?: boolean;
-      }
-    > = {};
+    const result: Record<string, { code: string }> = {};
+
+    const excludedFiles = new Set([
+      "/package.json",
+      "/package-lock.json",
+      "/tsconfig.json",
+      "/vite.config.ts",
+      "/vite.config.js",
+      "/tailwind.config.js",
+      "/tailwind.config.ts",
+      "/postcss.config.js",
+    ]);
 
     for (const [rawPath, rawContent] of Object.entries(files)) {
-      if (typeof rawContent !== "string") {
-        continue;
-      }
+      if (typeof rawContent !== "string") continue;
 
       const path = normalizePath(rawPath);
 
-      if (!/\.(tsx?|jsx?|css|html)$/.test(path)) {
+      if (excludedFiles.has(path)) continue;
+
+      // Preserve JSON data and SVG assets too.
+      if (!/\.(tsx?|jsx?|css|html|json|svg)$/.test(path)) {
         continue;
       }
 
@@ -629,58 +582,19 @@ export function SandpackPreview({
       };
     }
 
-    // ─── ACTIVE FILE ──────────────────────────────────
-
-    if (activeFile) {
-      const runtimePath = toRuntimePath(activeFile);
-
-      if (result[runtimePath]) {
-        result[runtimePath] = {
-          ...result[runtimePath],
-
-          active: true,
-        };
-      }
-    } else if (result["/App.tsx"]) {
-      result["/App.tsx"] = {
-        ...result["/App.tsx"],
-
-        active: true,
-      };
-    } else if (result["/App.jsx"]) {
-      result["/App.jsx"] = {
-        ...result["/App.jsx"],
-
-        active: true,
-      };
-    }
-
-    // Sandpack template already has its own package.json & tsconfig.
-    // If we pass the generated ones, they override Sandpack's internal config
-    // and break the Vite dev server or miss dependencies we injected.
-    delete result["/package.json"];
-    delete result["/package-lock.json"];
-    delete result["/tsconfig.json"];
-    delete result["/vite.config.ts"];
-    delete result["/vite.config.js"];
-    delete result["/tailwind.config.js"];
-    delete result["/tailwind.config.ts"];
-    delete result["/postcss.config.js"];
-
     if (!result["/index.html"]) {
-      const entry = result["/index.tsx"]
-        ? "/index.tsx"
-        : result["/index.jsx"]
-          ? "/index.jsx"
-          : result["/main.tsx"]
-            ? "/main.tsx"
-            : result["/main.jsx"]
-              ? "/main.jsx"
-              : result["/App.tsx"]
-                ? "/App.tsx"
-                : result["/App.jsx"]
-                  ? "/App.jsx"
-                  : null;
+      const entryCandidates = [
+        "/src/main.tsx",
+        "/src/main.jsx",
+        "/src/index.tsx",
+        "/src/index.jsx",
+        "/main.tsx",
+        "/main.jsx",
+        "/index.tsx",
+        "/index.jsx",
+      ];
+
+      const entry = entryCandidates.find((path) => result[path]);
 
       if (entry) {
         result["/index.html"] = {
@@ -693,7 +607,6 @@ export function SandpackPreview({
 
     if (html && !html.code.includes(READY_SCRIPT)) {
       result["/index.html"] = {
-        ...html,
         code: /<\/body>/i.test(html.code)
           ? html.code.replace(/<\/body>/i, () => `${READY_SCRIPT}\n</body>`)
           : `${html.code}\n${READY_SCRIPT}`,
@@ -701,7 +614,7 @@ export function SandpackPreview({
     }
 
     return result;
-  }, [files, activeFile]);
+  }, [files]);
 
   const isProjectFiles = fileMode === "project";
 
@@ -719,6 +632,22 @@ export function SandpackPreview({
   // RENDER
   // ───────────────────────────────────────────────────────────
 
+  const customSetup = useMemo(
+    () => ({
+      dependencies: runtimeDependencies,
+    }),
+    [runtimeDependencies],
+  );
+
+  const providerOptions = useMemo(
+    () => ({
+      autorun: true,
+      recompileMode: "delayed" as const,
+      recompileDelay: 250,
+      bundlerTimeOut: 600000,
+    }),
+    [],
+  );
   return (
     <div className="flex h-full w-full flex-col overflow-hidden bg-[#151515]">
       <SandpackProvider
@@ -728,18 +657,8 @@ export function SandpackPreview({
         // standalone /preview route and makes /index.tsx the entrypoint.
         template="vite-react-ts"
         files={sandpackFiles}
-        customSetup={{
-          dependencies: runtimeDependencies,
-        }}
-        options={{
-          autorun: true,
-
-          recompileMode: "delayed",
-
-          recompileDelay: 250,
-
-          bundlerTimeOut: 600000,
-        }}
+        customSetup={customSetup}
+        options={providerOptions}
         theme={defaultDark}
         style={{
           flex: 1,
@@ -921,7 +840,12 @@ export function SandpackPreview({
                     borderRadius: 0,
                   }}
                 >
-                  <PreviewLoadingSurface onRetry={refreshPreview} />
+                  <PreviewLoadingSurface
+                    onRetry={refreshPreview}
+                    onError={handlePreviewError}
+                    onAutoFix={isLoading ? undefined : onAutoFix}
+                    isRepairing={isLoading}
+                  />
                 </SandpackLayout>
               </div>
             </div>
