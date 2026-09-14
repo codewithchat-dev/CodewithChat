@@ -28,3 +28,5 @@ pnpm-debug.log*
 # Build output
 out/
 build/
+# clerk configuration (can include secrets)
+/.clerk/
